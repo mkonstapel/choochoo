@@ -9,11 +9,16 @@ const RETRY = "RETRY";
 enum Direction {
 	N, E, S, W, NE, NW, SE, SW
 }
-	
+
+// counterclockwise
+enum Rotation {
+	ROT_0, ROT_90, ROT_180, ROT_270
+}
+
 class ChooChoo extends AIController {
 	
 	function Save() {
-		// TODO
+		AILog.Info("TODO: implement load and save");
 		return {};
 	}
 
@@ -23,59 +28,41 @@ class ChooChoo extends AIController {
 
 	function Start() {
 		AICompany.SetName("ChooChoo");
-		AIRail.SetCurrentRailType(AIRailTypeList().Begin());
+		AICompany.SetLoanAmount(AICompany.GetMaxLoanAmount());
+		
+		::PAX <- GetPassengerCargoID();
+		::TICKS_PER_DAY <- 37;
+		::BLOCK_SIZE <- 64;
+		
+		::world <- World();
+		::tasks <- [];
 		
 		while (true) {
-			Debug("Place crossing");
-			local sign = FindSign("x");
-			local tile = AISign.GetLocation(sign);
-			AISign.RemoveSign(sign);
-			
-			local crossing = BuildCrossing(tile);
-			crossing.Run();
-			local rotations = [ ROT_270, ROT_180, ROT_90, ROT_0 ];
-			
-			foreach (index, direction in [Direction.NE, Direction.SE, Direction.SW, Direction.NW]) {
-				Debug("Place station");
-				sign = FindSign("x");
-				tile = AISign.GetLocation(sign);
-				AISign.RemoveSign(sign);
-				
-				local rotation = rotations[index];
-				LevelTerrain(tile, rotation, [0,0], [1,5]).Run();
-				
-				local station = BuildTerminusStation(tile, rotation);
-				station.Run();
-				
-				local reserved = station.GetReservedEntranceSpace();
-				reserved.extend(crossing.GetReservedExitSpace(direction));
-				BuildTrack(station.GetExit(), crossing.GetEntrance(direction), reserved).Run();
-				
-				reserved = station.GetReservedExitSpace();
-				reserved.extend(crossing.GetReservedEntranceSpace(direction));
-				BuildTrack(crossing.GetExit(direction), station.GetEntrance(), reserved).Run();
+			if (tasks.len() == 0) {
+				tasks.push(Bootstrap());
 			}
-		}
-		
-		
-		::tasks <- [];
-		tasks.append(Bootstrap());
-		tasks.append(Expand());
-		
-		while (tasks.len() > 0) {
-			Debug(ArrayToString(tasks));
 			
+			Debug(ArrayToString(tasks));
+				
 			try {
 				local task = tasks[0];
 				task.Run();
 				tasks.remove(0);
 			} catch (e) {
-				Debug(e);
+				// TODO: retry after RETRY, but that keeps crashing
+				if (e == RETRY) {
+					Sleep(1000);
+					//while (AICompany.GetBankBalance(AICompany.ResolveCompanyID(AICompany.COMPANY_SELF)) < 10000) {
+					//	Sleep(1000);
+					//}
+					
+					Debug("Retrying...");
+				} else {
+					Debug("Removing failed task");
+					tasks.remove(0);
+				}
 			}
 		}
-		
-		Debug("Task queue empty");
-		while (true) Sleep(1000);
 	}
 	
 	function DrawCompass() {
@@ -94,39 +81,33 @@ class ChooChoo extends AIController {
 
 class Bootstrap extends Task {
 	function Run() {
-		Debug("Select site for first crossing");
-		local sign = FindSign("x");
-		local tile = AISign.GetLocation(sign);
-		AISign.RemoveSign(sign);
+		local tile;
 		
-		tasks.insert(1, TaskList([
-			LevelTerrain(tile, [5,5]),
+		// tile = 0xEBD3;
+		do {
+			Debug("" + AIMap.GetMapSize());
+			tile = abs(AIBase.Rand()) % AIMap.GetMapSize();
+			Debug("" + tile);
+		} while (!AITile.IsBuildableRectangle(tile, Crossing.WIDTH*3, Crossing.WIDTH*3));
+		
+		tile += AIMap.GetTileIndex(Crossing.WIDTH, Crossing.WIDTH);
+		
+		local network = Network();
+		network.railType = AIRailTypeList().Begin();
+		AIRail.SetCurrentRailType(network.railType);
+		
+		tasks.insert(1, TaskList(this, [
+			LevelTerrain(tile, Rotation.ROT_0, [-1, -1], [Crossing.WIDTH + 1, Crossing.WIDTH + 1]),
 			BuildCrossing(tile),
-			ExtendCrossing(tile, null),
+			ExtendCrossing(tile, Direction.NE, network),
+			ExtendCrossing(tile, Direction.SE, network),
+			ExtendCrossing(tile, Direction.SW, network),
+			ExtendCrossing(tile, Direction.NW, network),
 		]));
 	}
 	
 	function _tostring() {
 		return "Bootstrap";
-	}
-}
-
-class Expand extends Task {
-	function Run() {
-		Debug("Select site for station");
-		local sign = FindSign("x");
-		local tile = AISign.GetLocation(sign);
-		AISign.RemoveSign(sign);
-		
-		tasks.insert(1, TaskList(
-		[
-			//LevelTerrain(tile, [2,5]),
-			//BuildStation(tile)
-		]));
-	}
-	
-	function _tostring() {
-		return "Expand";
 	}
 }
 

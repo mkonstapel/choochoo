@@ -5,6 +5,8 @@
  */
 class Rail
 {
+	estimate_multiplier = 1;
+	
 	_aystar_class = import("graph.aystar", "", 4);
 	_max_cost = null;              ///< The maximum cost for a route.
 	_cost_tile = null;             ///< The cost for a single tile.
@@ -249,7 +251,7 @@ function Rail::_Estimate(cur_tile, cur_direction, goal_tiles, self)
 		local dy = abs(AIMap.GetTileY(cur_tile) - AIMap.GetTileY(tile[0]));
 		min_cost = min(min_cost, min(dx, dy) * self._cost_diagonal_tile * 2 + (max(dx, dy) - min(dx, dy)) * self._cost_tile);
 	}
-	return min_cost;
+	return min_cost*self.estimate_multiplier;
 }
 
 function Rail::_Neighbours(path, cur_node, self)

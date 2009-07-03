@@ -19,6 +19,12 @@ function PrintError() {
 	Error(AIError.GetLastErrorString());
 }
 
+function Sign(x) {
+	if (x < 0) return -1;
+	if (x > 0) return 1;
+	return 0;
+}
+
 /**
  * Create a string of all elements of an array, separated by a comma.
  */
@@ -44,4 +50,22 @@ function SafeAddRectangle(list, tile, radius) {
 	local y2 = min(AIMap.GetMapSizeY() - 2, AIMap.GetTileY(tile) + radius);
 	
 	list.AddRectangle(AIMap.GetTileIndex(x1, y1),AIMap.GetTileIndex(x2, y2)); 
+}
+
+/**
+ * Find the cargo ID for passengers.
+ * Otto: newgrf can have tourist (TOUR) which qualify as passengers but townfolk won't enter the touristbus...
+ * hence this rewrite; you can check for PASS as string, but this is discouraged on the wiki
+ */
+function GetPassengerCargoID() {
+	local list = AICargoList();
+	local candidate = -1;
+	for (local i = list.Begin(); list.HasNext(); i = list.Next()) {
+		if (AICargo.HasCargoClass(i, AICargo.CC_PASSENGERS))
+		candidate = i;
+	}
+	if(candidate != -1)
+		return candidate;
+	
+	throw "no passenger cargo in this game!";
 }

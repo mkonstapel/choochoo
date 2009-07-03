@@ -1,150 +1,90 @@
-/**
- * Return the tile at x, y coordinates offset from origin.
- */
-function GetTile(origin, coordinates) {
-	return origin + AIMap.GetTileIndex(coordinates[0], coordinates[1]);
+class World {
+	stations = {};	// by tile
+	crossings = {};	// by tile
 }
 
-/**
- * Return the tile one step away from the given tile in the given direction.
- */
-function Step(tile, direction) {
-	local offset;
-	switch (direction) {
-		case Direction.N:  offset = [-1,-1]; break;
-		case Direction.E:  offset = [-1, 1]; break;
-		case Direction.S:  offset = [ 1, 1]; break;
-		case Direction.W:  offset = [ 1,-1]; break;
-		case Direction.NE: offset = [-1, 0]; break;
-		case Direction.NW: offset = [ 0,-1]; break;
-		case Direction.SE: offset = [ 0, 1]; break;
-		case Direction.SW: offset = [ 1, 0]; break;
-	}
+class RelativeCoordinates {
 	
-	return GetTile(tile, offset);
-}
+	static matrices = [
+		// ROT_0
+		[ 1, 0,
+		  0, 1],
 
-/**
- * 2-platform terminus station
- */
-class StationTypeA {
+		// ROT_90
+		[ 0,-1,
+		  1, 0],
+
+		// ROT_180
+		[-1, 0,
+		  0,-1],
+
+		// ROT_270
+		[ 0, 1,
+		 -1, 0]
+	];
 	
-	static PLATFORM_LENGTH = 3;
-
 	location = null;
+	rotation = null;	
 	
-	constructor(location) {
+	constructor(location, rotation = Rotation.ROT_0) {
 		this.location = location;
+		this.rotation = rotation;
 	}
 	
-	function GetEntrance() {
-		// see which way the station is oriented
-		local directions = [
-			Direction.SE,
-			Direction.SW,
-			Direction.NW,
-			Direction.NE,
-		];
+	function GetTile(coordinates) {
+		local matrix = matrices[rotation];
+		local x = coordinates[0] * matrix[0] + coordinates[1] * matrix[1];
+		local y = coordinates[0] * matrix[2] + coordinates[1] * matrix[3];
+		//Debug(coordinates[0] + "," + coordinates[1] + " -> " + x + "," + y);
+		return location + AIMap.GetTileIndex(x, y);
+	}
+	
+}
+
+class WorldObject {
+	
+	relativeCoordinates = null;
+	location = null;
+	rotation = null;
+	
+	constructor(location, rotation = Rotation.ROT_0) {
+		this.relativeCoordinates = RelativeCoordinates(location, rotation);
+		this.location = location;
+		this.rotation = rotation;
+	}
+	
+	function GetTile(coordinates) {
+		return relativeCoordinates.GetTile(coordinates);
+	}
+	
+	function TileStrip(start, end) {
+		local tiles = [];
 		
-		local candidates = [
-			GetTile(location, [0, PLATFORM_LENGTH+1]),
-			GetTile(location, [PLATFORM_LENGTH+1, 1]),
-			GetTile(location, [ 1,-2]),
-			GetTile(location, [-2, 0])
-		];
-		
-		foreach (i, c in candidates) {
-			if (HasCorrectSignal(c, directions[i])) {
-				return [Step(c, directions[i]), c];
-			}
+		local count, xstep, ystep;
+		if (start[0] == end[0]) {
+			count = abs(end[1] - start[1]);
+			xstep = 0;
+			ystep = end[1] < start[1] ? -1 : 1;
+		} else {
+			count = abs(end[0] - start[0]);
+			xstep = end[0] < start[0] ? -1 : 1;
+			ystep = 0
 		}
 		
-		throw "Station has no entrance!";
-	}
-	
-	function GetExit() {
-		// see which way the station is oriented
-		local directions = [
-			Direction.SE,
-			Direction.SW,
-			Direction.NW,
-			Direction.NE,
-		];
-		
-		local reverse = [
-			Direction.NW,
-			Direction.NE,
-			Direction.SE,
-			Direction.NW,
-		];
-		
-		local candidates = [
-			GetTile(location, [1, PLATFORM_LENGTH+1]),
-			GetTile(location, [PLATFORM_LENGTH+1, 0]),
-			GetTile(location, [ 0,-2]),
-			GetTile(location, [-2, 1])
-		];
-		
-		foreach (i, c in candidates) {
-			if (HasCorrectSignal(c, reverse[i])) {
-				return [c, Step(c, directions[i])];
-			}
+		for (local i = 0, x  = start[0], y = start[1]; i <= count; i++, x += xstep, y += ystep) {
+			tiles.append(GetTile([x, y]));
 		}
-		
-		throw "Station has no exit!";
+				
+		return tiles;
 	}
-	
-	function GetReservedEntranceSpace() {
-		return ReserveSpace(GetEntrance(), GetExit());
-	}
-	
-	function GetReservedExitSpace() {
-		return ReserveSpace(GetExit(), GetEntrance());
-	}
-	
-	/**
-	 * Return a rectangle of reserved space for entrance/exit a, away from exit/entrance b.
-	 */
-	function ReserveSpace(a, b) {
-		
-	}
-	
-	function HasCorrectSignal(tile, direction) {
-		return AIRail.GetSignalType(tile, Step(tile, direction)) == AIRail.SIGNALTYPE_PBS &&
-		AITile.GetOwner(tile) == AICompany.ResolveCompanyID(AICompany.COMPANY_SELF);
-	}
-	
 }
 
-/**
- * 1-platform RoRo station
- */
-class StationTypeB {
+class Crossing extends WorldObject {
 	
-	static PLATFORM_LENGTH = 3;
-
-	location = null;
+	static WIDTH = 4;
 	
 	constructor(location) {
-		this.location = location;
-	}
-	
-	function GetEntrance() {
-		return [GetTile(location, [4,0]), GetTile(location, [3,0])];
-	}
-	
-	function GetExit() {
-		return [GetTile(location, [-1,0]), GetTile(location, [-2,0])];
-	}
-	
-}
-
-class Crossing {
-	
-	location = null;
-	
-	constructor(location) {
-		this.location = location;
+		WorldObject.constructor(location);
 	}
 	
 	function GetEntrance(direction) {
@@ -158,7 +98,7 @@ class Crossing {
 			default: throw "Invalid direction";
 		}
 		
-		return [GetTile(location, a), GetTile(location, b)];
+		return TileStrip(a, b);
 	}
 	
 	function GetExit(direction) {
@@ -172,7 +112,75 @@ class Crossing {
 			default: throw "Invalid direction";
 		}
 		
-		return [GetTile(location, a), GetTile(location, b)];
+		return TileStrip(a, b);
+	}
+	
+	function GetReservedEntranceSpace(direction) {
+		local a, b;
+		
+		switch (direction) {
+			case Direction.NE: a = [-5, 1]; b = [0,1]; break;
+			case Direction.SE: a = [ 1, 8]; b = [1,3]; break;
+			case Direction.SW: a = [ 8, 2]; b = [3,2]; break;
+			case Direction.NW: a = [ 2,-5]; b = [2,0]; break;
+			default: throw "Invalid direction";
+		}
+		
+		return TileStrip(a, b);
+	}
+
+	function GetReservedExitSpace(direction) {
+		local a, b;
+		
+		switch (direction) {
+			case Direction.NE: a = [0,2]; b = [-5, 2]; break;
+			case Direction.SE: a = [2,3]; b = [ 2, 8]; break;
+			case Direction.SW: a = [3,1]; b = [ 8, 1]; break;
+			case Direction.NW: a = [1,0]; b = [ 1,-5]; break;
+			default: throw "Invalid direction";
+		}
+		
+		return TileStrip(a, b);
+	}
+	
+}
+
+class TerminusStation extends WorldObject {
+	
+	platformLength = null;
+	
+	constructor(location, rotation, platformLength) {
+		WorldObject.constructor(location, rotation);
+		this.platformLength = platformLength;
+	}
+	
+	function GetEntrance() {
+		return TileStrip([0, platformLength + 2], [0, platformLength + 1]);
+	}
+	
+	function GetExit() {
+		return TileStrip([1, platformLength + 1], [1, platformLength + 2]);
+	}
+	
+	function GetReservedEntranceSpace() {
+		return TileStrip([0, platformLength], [0, platformLength + 4]);
+	}
+
+	function GetReservedExitSpace() {
+		return TileStrip([1, platformLength], [1, platformLength + 4]);
+	}
+	
+}
+
+class Network {
+	
+	stations = null;
+	depots = null;
+	railType = null;
+	
+	constructor() {
+		stations = [];
+		depots = [];
 	}
 	
 }

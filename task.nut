@@ -13,12 +13,12 @@ class Task {
 			case AITile.ERR_AREA_ALREADY_FLAT:
 				return;
 			
-			case AIError.ERR_UNKNOWN:
 			case AIError.ERR_NOT_ENOUGH_CASH:
 			case AIError.ERR_VEHICLE_IN_THE_WAY:
 				PrintError();
 				throw RETRY;
 			
+			case AIError.ERR_UNKNOWN:
 			case AIError.ERR_PRECONDITION_FAILED:
 			case AIError.ERR_PRECONDITION_STRING_TOO_LONG:
 			case AIError.ERR_NEWGRF_SUPPLIED_ERROR:
@@ -32,6 +32,7 @@ class Task {
 			case AIError.ERR_TOO_CLOSE_TO_EDGE:
 			case AIError.ERR_STATION_TOO_SPREAD_OUT:
 			default:
+				Error("Task " + this + " failed:");
 				PrintError();
 				throw FAILED;
 		}
@@ -40,9 +41,11 @@ class Task {
 
 class TaskList extends Task {
 	
+	parentTask = null;
 	subtasks = null;
 	
-	constructor(subtasks) {
+	constructor(parentTask, subtasks) {
+		this.parentTask = parentTask;
 		this.subtasks = subtasks;
 	}
 	
@@ -55,30 +58,6 @@ class TaskList extends Task {
 	}
 	
 	function _tostring() {
-		return "(" + ArrayToString(subtasks) + ")";
+		return parentTask + ": (" + ArrayToString(subtasks) + ")";
 	}
 }
-
-class DebugTask extends Task {
-	
-	s = null;
-	
-	constructor(s) {
-		this.s = s;
-	}
-	
-	function Run() {
-		Debug(this);
-	}
-	
-	function _tostring() {
-		return "DebugTask " + s;
-	} 
-}
-
-class FailTask extends Task {
-	function Run() {
-		throw TaskResult.FAILED;
-	}
-}
-		
