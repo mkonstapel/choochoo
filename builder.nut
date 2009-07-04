@@ -58,8 +58,11 @@ class Builder extends Task {
 
 class BuildCrossing extends Builder {
 	
-	constructor(location) {
+	network = null;
+	
+	constructor(location, network) {
 		Builder.constructor(location);
+		this.network = network;
 	}
 	
 	function Run() {
@@ -88,14 +91,15 @@ class BuildCrossing extends Builder {
 		BuildRail([1,1], [2,1], [2,2]);
 		
 		// signals (clockwise)
+		// initially, all signals face outwards to block trains off from unfinished tracks
 		BuildSignal([0,1], [-1, 1]);
-		BuildSignal([0,2], [ 1, 2]);
+		BuildSignal([0,2], [-1, 2]);
 		BuildSignal([1,3], [ 1, 4]);
-		BuildSignal([2,3], [ 2, 2]);
+		BuildSignal([2,3], [ 2, 4]);
 		BuildSignal([3,2], [ 4, 2]);
-		BuildSignal([3,1], [ 2, 1]);
+		BuildSignal([3,1], [ 4, 1]);
 		BuildSignal([2,0], [ 2,-1]);
-		BuildSignal([1,0], [ 1, 1]);
+		BuildSignal([1,0], [ 1,-1]);
 		
 		// cap entrances off with depots
 		//BuildDepot([-1,1], [0,1]);
@@ -108,6 +112,10 @@ class BuildCrossing extends Builder {
 		//BuildDepot([1,-1], [1,0]);
 		
 		world.crossings[location] <- Crossing(location);
+		tasks.push(ExtendCrossing(location, Direction.NE, network));
+		tasks.push(ExtendCrossing(location, Direction.SE, network));
+		tasks.push(ExtendCrossing(location, Direction.SW, network));
+		tasks.push(ExtendCrossing(location, Direction.NW, network));
 	}
 	
 	function _tostring() {
@@ -225,6 +233,8 @@ class BuildTrack extends Builder {
 	addDepots = null;
 	network = null;
 	path = null;
+	count = null;
+	lastDepot = null;
 	
 	constructor(from, to, ignored, forward, addDepots, network) {
 		this.a = from[0];
@@ -235,6 +245,8 @@ class BuildTrack extends Builder {
 		this.forward = forward;
 		this.addDepots = addDepots;
 		this.network = network;
+		this.count = 1;
+		this.lastDepot = count;
 	}
 	
 	function Run() {
@@ -255,7 +267,7 @@ class BuildTrack extends Builder {
 		pathfinder.cost.max_cost = pathfinder.cost.tile * 4 * AIMap.DistanceManhattan(a, d);
 		pathfinder.estimate_multiplier = 2;
 		
-		pathfinder.cost.diagonal_tile = 200;
+		pathfinder.cost.diagonal_tile = 150;
 		pathfinder.cost.bridge_per_tile = 400;
 		pathfinder.InitializePath([[b, a]], [[c, d]], ignored);
 		
@@ -268,8 +280,6 @@ class BuildTrack extends Builder {
 		local prev = null;
 		local prevprev = null;
 		local prevprevprev = null;
-		local count = 1;
-		local lastDepot = count;
 		while (path != null) {
 			if (prevprev != null) {
 				if (AIMap.DistanceManhattan(prev, path.GetTile()) > 1) {
@@ -288,11 +298,12 @@ class BuildTrack extends Builder {
 					path = path.GetParent();
 				} else {
 					AIRail.BuildRail(prevprev, prev, path.GetTile());
-					if (AIError.GetLastError() != AIError.ERR_NONE) Warning("### route building error"); 
 					CheckError();
 					
-					if (count % SIGNAL_INTERVAL == 0) {
-						local front = forward ? path.GetTile() : prevprev;
+					// since we can be restarted, we can process a tile more than once
+					// don't build signals again, or they'll be flipped around!
+					local front = forward ? path.GetTile() : prevprev;
+					if (count % SIGNAL_INTERVAL == 0 && AIRail.GetSignalType(prev, front) == AIRail.SIGNALTYPE_NONE) {
 						AIRail.BuildSignal(prev, front, AIRail.SIGNALTYPE_NORMAL);
 					}
 					
@@ -392,6 +403,8 @@ class ConnectStation extends Builder {
 	direction = null;
 	stationTile = null;
 	network = null;
+	bt1 = null;
+	bt2 = null;
 	
 	constructor(crossingTile, direction, stationTile, network) {
 		this.crossingTile = crossingTile;
@@ -404,14 +417,28 @@ class ConnectStation extends Builder {
 		local crossing = world.crossings[crossingTile];
 		local station = world.stations[stationTile];
 		
-		local reserved = station.GetReservedEntranceSpace();
-		reserved.extend(crossing.GetReservedExitSpace(direction));
-		BuildTrack(station.GetExit(), crossing.GetEntrance(direction), reserved, true, false, network).Run();
+		// if we ran these subtasks as a task list, we can't signal failure to our parent task list
+		// so, we run them inline, making sure we can be restarted
+		// TODO: clean this up?
 		
-		reserved = station.GetReservedExitSpace();
-		reserved.extend(crossing.GetReservedEntranceSpace(direction));
-		BuildTrack(Swap(station.GetEntrance()), Swap(crossing.GetExit(direction)), reserved, false, true, network).Run();
-		Error("Connected " + AIStation.GetName(AIStation.GetStationID(stationTile)));
+		if (bt1 == null) {
+			local reserved = station.GetReservedEntranceSpace();
+			reserved.extend(crossing.GetReservedExitSpace(direction));
+			bt1 = BuildTrack(station.GetExit(), crossing.GetEntrance(direction), reserved, true, false, network);
+		}
+		
+		if (bt2 == null) {
+			local reserved = station.GetReservedExitSpace();
+			reserved.extend(crossing.GetReservedEntranceSpace(direction));
+			bt2 = BuildTrack(Swap(station.GetEntrance()), Swap(crossing.GetExit(direction)), reserved, false, true, network);
+		}
+		
+		bt1.Run();
+		bt2.Run();
+		
+		// building another signal on the tile will flip it
+		local exit = crossing.GetExit(direction);
+		AIRail.BuildSignal(exit[0], exit[1], AIRail.SIGNALTYPE_PBS_ONEWAY);
 	}
 	
 	function Swap(tiles) {
@@ -450,6 +477,12 @@ class ConnectCrossing extends Builder {
 		reserved = toCrossing.GetReservedExitSpace(toDirection);
 		reserved.extend(fromCrossing.GetReservedEntranceSpace(fromDirection));
 		BuildTrack(Swap(toCrossing.GetEntrance(toDirection)), Swap(fromCrossing.GetExit(fromDirection)), reserved, false, false, network).Run();
+		
+		local exit = fromCrossing.GetExit(fromDirection);
+		AIRail.BuildSignal(exit[0], exit[1], AIRail.SIGNALTYPE_PBS_ONEWAY);
+		
+		exit = toCrossing.GetExit(toDirection);
+		AIRail.BuildSignal(exit[0], exit[1], AIRail.SIGNALTYPE_PBS_ONEWAY);
 	}
 	
 	function Swap(tiles) {
@@ -461,7 +494,7 @@ class ConnectCrossing extends Builder {
 	}
 }
 
-class ExtendCrossing extends Task {
+class ExtendCrossing extends Builder {
 
 	static RAIL_STATION_RADIUS = 4;
 	static RAIL_STATION_LENGTH = 8;	// actual building and rails plus room for exit
@@ -473,6 +506,7 @@ class ExtendCrossing extends Task {
 	network = null;
 	
 	constructor(crossing, direction, network) {
+		Builder.constructor(crossing);
 		this.crossing = crossing;
 		this.direction = direction;
 		this.network = network;
@@ -483,6 +517,12 @@ class ExtendCrossing extends Task {
 	}
 	
 	function Run() {
+		// see if we''ve not already built this direction
+		local entrance = world.crossings[crossing].GetEntrance(direction);
+		if (AIRail.IsRailTile(entrance[0])) {
+			return;
+		}
+		
 		// do the math
 		local town = FindTown();
 		local stationTile = FindStationSite(town, StationRotationForDirection());
@@ -497,18 +537,11 @@ class ExtendCrossing extends Task {
 			subtasks = [
 				BuildTerminusStation(stationTile, StationRotationForDirection(), network),
 				LevelTerrain(crossingTile, Rotation.ROT_0, [-1, -1], [Crossing.WIDTH + 1, Crossing.WIDTH + 1]),
-				BuildCrossing(crossingTile),
+				BuildCrossing(crossingTile, network),
 				ConnectCrossing(crossing, direction, crossingTile, crossingEntranceDirection, network),
 				ConnectStation(crossingTile, crossingExitDirection, stationTile, network),
 				BuildTrains(stationTile, network)
 			];
-			
-			// later, extend the new crossing to the remaining directions
-			foreach (d in [Direction.NE, Direction.NW, Direction.SE, Direction.SW]) {
-				if (d != crossingEntranceDirection && d != crossingExitDirection) {
-					tasks.push(ExtendCrossing(crossingTile, d, network));
-				}
-			}
 		} else {
 			subtasks = [
 				BuildTerminusStation(stationTile, StationRotationForDirection(), network),
@@ -725,8 +758,14 @@ class BuildTrains {
 		
 		local from = AIStation.GetStationID(stationTile);
 		foreach (to in network.stations) {
-			if (AIMap.DistanceManhattan(stationTile, AIStation.GetLocation(to)) > BLOCK_SIZE) {
-				tasks.insert(1, BuildTrain(from, to, depot, network.railType));
+			local distance = AIMap.DistanceManhattan(stationTile, AIStation.GetLocation(to));
+			local numTrains = network.trains.len();
+			local numStations = network.stations.len();
+			// build more trains if we have few, or they are long distance
+			if (distance > BLOCK_SIZE &&
+				numTrains < 30*numStations &&
+				(numTrains < 2*numStations || distance > 3*BLOCK_SIZE)) {
+				tasks.insert(1, BuildTrain(from, to, depot, network));
 			}
 		}
 	}
@@ -740,14 +779,14 @@ class BuildTrain extends Task {
 	from = null;
 	to = null;
 	depot = null;
-	railType = null;
+	network = null;
 	wagonCount = null;
 	
-	constructor(from, to, depot, railType) {
+	constructor(from, to, depot, network) {
 		this.from = from;
 		this.to = to;
 		this.depot = depot;
-		this.railType = railType;
+		this.network = network;
 		this.wagonCount = 0;
 	}
 	
@@ -756,10 +795,10 @@ class BuildTrain extends Task {
 	}
 	
 	function Run() {
-		local train = AIVehicle.BuildVehicle(depot, GetEngine(railType));
+		local train = AIVehicle.BuildVehicle(depot, GetEngine(network.railType));
 		CheckError();
 		
-		local wagonType = GetWagon(PAX, railType);
+		local wagonType = GetWagon(PAX, network.railType);
 		while (wagonCount < NUM_WAGONS) {
 			local wagon = AIVehicle.BuildVehicle(depot, wagonType);
 			CheckError();
@@ -768,6 +807,7 @@ class BuildTrain extends Task {
 		}
 
 		Debug("Built train: " + train);
+		network.trains.append(train);
 		AIOrder.AppendOrder(train, AIStation.GetLocation(from), AIOrder.AIOF_NON_STOP_INTERMEDIATE);
 		AIOrder.AppendOrder(train, AIStation.GetLocation(to),   AIOrder.AIOF_NON_STOP_INTERMEDIATE);
 		AIVehicle.StartStopVehicle(train);

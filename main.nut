@@ -98,11 +98,7 @@ class Bootstrap extends Task {
 		
 		tasks.insert(1, TaskList(this, [
 			LevelTerrain(tile, Rotation.ROT_0, [-1, -1], [Crossing.WIDTH + 1, Crossing.WIDTH + 1]),
-			BuildCrossing(tile),
-			ExtendCrossing(tile, Direction.NE, network),
-			ExtendCrossing(tile, Direction.SE, network),
-			ExtendCrossing(tile, Direction.SW, network),
-			ExtendCrossing(tile, Direction.NW, network),
+			BuildCrossing(tile, network)
 		]));
 	}
 	

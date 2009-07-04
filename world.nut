@@ -177,10 +177,12 @@ class Network {
 	stations = null;
 	depots = null;
 	railType = null;
+	trains = null;
 	
 	constructor() {
 		stations = [];
 		depots = [];
+		trains = [];
 	}
 	
 }
