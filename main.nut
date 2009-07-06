@@ -5,6 +5,7 @@ require("builder.nut");
 
 const FAILED = "FAILED";
 const RETRY = "RETRY";
+const FATAL = "FATAL";
 
 enum Direction {
 	N, E, S, W, NE, NW, SE, SW
@@ -29,6 +30,7 @@ class ChooChoo extends AIController {
 	function Start() {
 		AICompany.SetName("ChooChoo");
 		AICompany.SetLoanAmount(AICompany.GetMaxLoanAmount());
+		AIRoad.SetCurrentRoadType(AIRoad.ROADTYPE_ROAD);
 		
 		::PAX <- GetPassengerCargoID();
 		::TICKS_PER_DAY <- 37;
@@ -49,12 +51,19 @@ class ChooChoo extends AIController {
 				task.Run();
 				tasks.remove(0);
 			} catch (e) {
-				// TODO: retry after RETRY, but that keeps crashing
+				if (e == FATAL) {
+					Warning("Bye bye...");
+					return;
+				}
+				
 				if (e == RETRY) {
-					Sleep(1000);
-					//while (AICompany.GetBankBalance(AICompany.ResolveCompanyID(AICompany.COMPANY_SELF)) < 10000) {
-					//	Sleep(1000);
-					//}
+					// minimum sleep
+					Sleep(100);
+					
+					// retries are usually due to running out of money
+					while (AICompany.GetBankBalance(AICompany.ResolveCompanyID(AICompany.COMPANY_SELF)) < 10000) {
+						Sleep(100);
+					}
 					
 					Debug("Retrying...");
 				} else {
