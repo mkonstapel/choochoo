@@ -34,8 +34,8 @@ class Rail
 		this._cost_bridge_per_tile = 150;
 		this._cost_tunnel_per_tile = 120;
 		this._cost_coast = 20;
-		this._max_bridge_length = 6;
-		this._max_tunnel_length = 6;
+		this._max_bridge_length = 15;
+		this._max_tunnel_length = 15;
 		this._pathfinder = this._aystar_class(this._Cost, this._Estimate, this._Neighbours, this._CheckDirection, this, this, this, this);
 
 		this.cost = this.Cost(this);

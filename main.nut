@@ -45,30 +45,30 @@ class ChooChoo extends AIController {
 			}
 			
 			Debug(ArrayToString(tasks));
-				
+			
+			local task;
 			try {
-				local task = tasks[0];
+				task = tasks[0];
 				task.Run();
 				tasks.remove(0);
 			} catch (e) {
-				if (e == FATAL) {
-					Warning("Bye bye...");
-					return;
-				}
-				
 				if (e == RETRY) {
 					// minimum sleep
 					Sleep(100);
 					
 					// retries are usually due to running out of money
-					while (AICompany.GetBankBalance(AICompany.ResolveCompanyID(AICompany.COMPANY_SELF)) < 10000) {
+					while (AICompany.GetBankBalance(AICompany.ResolveCompanyID(AICompany.COMPANY_SELF)) < 100000) {
 						Sleep(100);
 					}
 					
 					Debug("Retrying...");
-				} else {
+				} else if (e == FAILED) {
 					Debug("Removing failed task");
 					tasks.remove(0);
+					task.Failed();
+				} else {
+					Error("Unexpected error");
+					return;
 				}
 			}
 		}

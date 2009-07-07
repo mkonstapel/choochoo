@@ -58,6 +58,11 @@ class Builder extends Task {
 		AIRail.BuildRailDepot(GetTile(tile), GetTile(front));
 		CheckError();
 	}
+
+	function Demolish(tile) {
+		AITile.DemolishTile(GetTile(tile));
+		// TODO: check error?
+	}
 	
 }
 
@@ -84,16 +89,16 @@ class BuildCrossing extends Builder {
 		BuildRail([2,0], [2,1], [3,1]);
 		
 		// long inner diagonals
-		//BuildRail([0,1], [1,1], [2,3]);
-		//BuildRail([0,2], [1,2], [2,0]);
-		//BuildRail([1,3], [1,2], [3,1]);
-		//BuildRail([3,2], [2,2], [1,0]);
+		BuildRail([0,1], [1,1], [2,3]);
+		BuildRail([0,2], [1,2], [2,0]);
+		BuildRail([1,3], [1,2], [3,1]);
+		BuildRail([3,2], [2,2], [1,0]);
 		
 		// inner diagonals (clockwise)
-		BuildRail([2,1], [1,1], [1,2]);
-		BuildRail([1,1], [1,2], [2,2]);
-		BuildRail([2,1], [2,2], [1,2]);
-		BuildRail([1,1], [2,1], [2,2]);
+		//BuildRail([2,1], [1,1], [1,2]);
+		//BuildRail([1,1], [1,2], [2,2]);
+		//BuildRail([2,1], [2,2], [1,2]);
+		//BuildRail([1,1], [2,1], [2,2]);
 		
 		// signals (clockwise)
 		// initially, all signals face outwards to block trains off from unfinished tracks
@@ -135,11 +140,15 @@ class BuildTerminusStation extends Builder {
 	
 	network = null;
 	platformLength = null;
+	builtPlatform1 = null;
+	builtPlatform2 = null;
 	
 	constructor(location, rotation, network, platformLength = 3) {
 		Builder.constructor(location, rotation);
 		this.network = network;
 		this.platformLength = platformLength;
+		this.builtPlatform1 = false;
+		this.builtPlatform2 = false;
 	}
 	
 	function Run() {
@@ -153,6 +162,23 @@ class BuildTerminusStation extends Builder {
 		BuildSignal([1, p+1], [1, p]);
 		world.stations[location] <- TerminusStation(location, rotation, platformLength);
 		network.stations.append(AIStation.GetStationID(location));
+	}
+	
+	function Failed() {
+		local station = AIStation.GetStationID(location);
+		world.stations[location] <- null;
+		foreach (index, entry in network.stations) {
+			if (entry == station) {
+				network.stations.remove(index);
+				break;
+			}
+		}
+		
+		foreach (x in Range(0, 2)) {
+			foreach (y in Range(0, platformLength+2)) {
+				Demolish([x,y]);
+			}
+		}
 	}
 	
 	/**
@@ -186,10 +212,17 @@ class BuildTerminusStation extends Builder {
 			throw "invalid rotation";
 		}
 		
-		AIRail.BuildRailStation(platform1, direction, 1, platformLength, AIStation.STATION_NEW);
-		CheckError();
-		AIRail.BuildRailStation(platform2, direction, 1, platformLength, AIStation.STATION_JOIN_ADJACENT);
-		CheckError();
+		if (!builtPlatform1) {
+			AIRail.BuildRailStation(platform1, direction, 1, platformLength, AIStation.STATION_NEW);
+			CheckError();
+			builtPlatform1 = true;
+		}
+		
+		if (!builtPlatform2) {
+			AIRail.BuildRailStation(platform2, direction, 1, platformLength, AIStation.GetStationID(platform1));
+			CheckError();
+			builtPlatform2 = true;
+		}
 		
 		return AIStation.GetStationID(platform1);
 	}
@@ -238,7 +271,7 @@ class BuildBusStations extends Builder {
 	}
 	
 	function _tostring() {
-		return "BuildBusStations " + AITown.GetName(town);
+		return "BuildBusStations";
 	}
 	
 	function Run() {
@@ -300,10 +333,11 @@ class BuildTrack extends Builder {
 		this.network = network;
 		this.count = 1;
 		this.lastDepot = count;
+		this.path = null;
 	}
 	
 	function _tostring() {
-		return "BuildTrack from " + Get;
+		return "BuildTrack";
 	}
 	
 	function Run() {
@@ -326,6 +360,7 @@ class BuildTrack extends Builder {
 		
 		pathfinder.cost.diagonal_tile = 150;
 		pathfinder.cost.bridge_per_tile = 400;
+		pathfinder.cost.tunnel_per_tile = 400;
 		pathfinder.InitializePath([[b, a]], [[c, d]], ignored);
 		
 		Debug("Pathfinding...");
@@ -461,6 +496,8 @@ class ConnectStation extends Builder {
 		this.direction = direction;
 		this.stationTile = stationTile;
 		this.network = network;
+		this.bt1 = null;
+		this.bt2 = null;
 	}
 	
 	function Run() {
@@ -516,6 +553,8 @@ class ConnectCrossing extends Builder {
 		this.toCrossingTile = toCrossingTile;
 		this.toDirection = toDirection;
 		this.network = network;
+		this.bt1 = null;
+		this.bt2 = null;
 	}
 	
 	function Run() {
@@ -795,9 +834,20 @@ class ExtendCrossing extends Builder {
 		
 		return true;
 	}
+	
+	function Failed() {
+		// cap the failed end with depots
+		local entrance = Crossing(location).GetEntrance(direction);
+		AIRail.RemoveSignal(entrance[1], entrance[0]);
+		AIRail.BuildRailDepot(entrance[0], entrance[1]);
+		
+		local exit = Crossing(location).GetExit(direction);
+		AIRail.RemoveSignal(exit[0], exit[1]);
+		AIRail.BuildRailDepot(exit[1], exit[0]);
+	}
 }
 
-class BuildTrains {
+class BuildTrains extends Task {
 	
 	stationTile = null;
 	network = null;
@@ -835,7 +885,7 @@ class BuildTrains {
 			local numStations = network.stations.len();
 			// build more trains if we have few, or they are long distance
 			if (distance > BLOCK_SIZE &&
-				numTrains < 30*numStations &&
+				numTrains < 10*numStations &&
 				(numTrains < 2*numStations || distance > 3*BLOCK_SIZE)) {
 				tasks.insert(1, BuildTrain(from, to, depot, network));
 			}
@@ -846,7 +896,7 @@ class BuildTrains {
 
 class BuildTrain extends Builder {
 	
-	static TRAIN_LENGTH = 6;
+	static TRAIN_LENGTH = 3;	// in tiles
 	
 	from = null;
 	to = null;
@@ -868,19 +918,18 @@ class BuildTrain extends Builder {
 	
 	function Run() {
 		if (!train || !AIVehicle.IsValidVehicle(train)) {
-			Debug("Building locomotive at " + AIMap.GetTileX(depot) + "," + AIMap.GetTileY(depot));
+			//Debug("Building locomotive at " + AIMap.GetTileX(depot) + "," + AIMap.GetTileY(depot));
 			train = AIVehicle.BuildVehicle(depot, GetEngine(network.railType));
 			CheckError();
 		}
 		
 		local wagonType = GetWagon(PAX, network.railType);
-		while (AIVehicle.GetNumWagons(train) < TRAIN_LENGTH) {
+		while (AIVehicle.GetLength(train)/16 < TRAIN_LENGTH) {
 			local wagon = AIVehicle.BuildVehicle(depot, wagonType);
 			CheckError();
 			AIVehicle.MoveWagon(wagon, 0, train, 0);
 		}
 
-		Debug("Built train: " + train);
 		network.trains.append(train);
 		AIOrder.AppendOrder(train, AIStation.GetLocation(from), AIOrder.AIOF_NON_STOP_INTERMEDIATE);
 		AIOrder.AppendOrder(train, AIStation.GetLocation(to),   AIOrder.AIOF_NON_STOP_INTERMEDIATE);
@@ -891,15 +940,15 @@ class BuildTrain extends Builder {
 		local engineList = AIEngineList(AIVehicle.VT_RAIL);
 		engineList.Valuate(AIEngine.CanRunOnRail, railType);
 		engineList.KeepValue(1);
+		engineList.Valuate(AIEngine.HasPowerOnRail, railType);
+		engineList.KeepValue(1);
 
 		//engineList.Valuate(AIEngine.GetReliability);	// TODO: may be better if breakdowns are on
 		engineList.Valuate(AIEngine.GetMaxSpeed);
-
 		engineList.KeepTop(1);
-		local engine = engineList.Begin();
-		//Debug("Picked engine: " + AIEngine.GetName(engine));
-
-		return engine;
+		
+		if (engineList.IsEmpty()) throw FAILED;
+		return engineList.Begin();
 	}
 	
 	function GetWagon(cargoID, railType) {
@@ -917,8 +966,6 @@ class BuildTrain extends Builder {
 		engineList.KeepTop(1);
 		
 		local engine = engineList.Begin();
-		//Debug("Picked cart for cargo " + AICargo.GetCargoLabel(cargoID) + ": " + AIEngine.GetName(engine));
-
 		return engine;
 	}
 }

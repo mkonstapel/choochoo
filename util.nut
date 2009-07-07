@@ -25,6 +25,15 @@ function Sign(x) {
 	return 0;
 }
 
+function Range(from, to) {
+	local range = [];
+	for (local i=from; i<to; i++) {
+		range.append(i);
+	}
+	
+	return range;
+}
+
 /**
  * Create a string of all elements of an array, separated by a comma.
  */
