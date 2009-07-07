@@ -1,4 +1,4 @@
-require("RailPathFinder.nut");
+require("pathfinder.nut");
 require("world.nut");
 require("task.nut");
 require("builder.nut");
