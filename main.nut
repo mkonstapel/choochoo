@@ -92,11 +92,8 @@ class Bootstrap extends Task {
 	function Run() {
 		local tile;
 		
-		// tile = 0xEBD3;
 		do {
-			Debug("" + AIMap.GetMapSize());
 			tile = abs(AIBase.Rand()) % AIMap.GetMapSize();
-			Debug("" + tile);
 		} while (!AITile.IsBuildableRectangle(tile, Crossing.WIDTH*3, Crossing.WIDTH*3));
 		
 		tile += AIMap.GetTileIndex(Crossing.WIDTH, Crossing.WIDTH);
