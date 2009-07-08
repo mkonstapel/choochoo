@@ -34,6 +34,10 @@ function Range(from, to) {
 	return range;
 }
 
+function RandomTile() {
+	return abs(AIBase.Rand()) % AIMap.GetMapSize();
+}
+
 /**
  * Create a string of all elements of an array, separated by a comma.
  */
@@ -67,14 +71,23 @@ function SafeAddRectangle(list, tile, radius) {
  * hence this rewrite; you can check for PASS as string, but this is discouraged on the wiki
  */
 function GetPassengerCargoID() {
+	return GetCargoID(AICargo.CC_PASSENGERS);
+}
+
+function GetMailCargoID() {
+	return GetCargoID(AICargo.CC_MAIL);
+}
+
+function GetCargoID(cargoClass) {
 	local list = AICargoList();
 	local candidate = -1;
 	for (local i = list.Begin(); list.HasNext(); i = list.Next()) {
-		if (AICargo.HasCargoClass(i, AICargo.CC_PASSENGERS))
+		if (AICargo.HasCargoClass(i, cargoClass))
 		candidate = i;
 	}
+	
 	if(candidate != -1)
 		return candidate;
 	
-	throw "no passenger cargo in this game!";
+	throw "missing required cargo class";
 }

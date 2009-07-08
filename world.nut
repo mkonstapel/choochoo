@@ -1,6 +1,7 @@
 class World {
 	stations = {};	// by tile
 	crossings = {};	// by tile
+	towns = {};		// town ID to station
 }
 
 class RelativeCoordinates {
@@ -174,15 +175,20 @@ class TerminusStation extends WorldObject {
 
 class Network {
 	
+	railType = null;
+	blockSize = null;
+	cheap = null;
 	stations = null;
 	depots = null;
-	railType = null;
 	trains = null;
 	
-	constructor() {
-		stations = [];
-		depots = [];
-		trains = [];
+	constructor(railType, blockSize, cheap = false) {
+		this.railType = railType;
+		this.blockSize = blockSize;
+		this.cheap = cheap;
+		this.stations = [];
+		this.depots = [];
+		this.trains = [];
 	}
 	
 }
