@@ -89,7 +89,7 @@ class BuildLine extends Task {
 		local b = towns[1];
 		
 		Debug("Connecting " + AITown.GetName(a) + " and " + AITown.GetName(b));
-		local network = Network(AIRailTypeList().Begin(), MIN_TOWN_DISTANCE, MAX_TOWN_DISTANCE, true);
+		local network = Network(AIRailTypeList().Begin(), MIN_TOWN_DISTANCE, MAX_TOWN_DISTANCE);
 		
 		local dirA = StationDirection(a, b);
 		local rotA = BuildTerminusStation.StationRotationForDirection(dirA);
@@ -107,7 +107,7 @@ class BuildLine extends Task {
 			BuildTerminusStation(siteA, dirA, network),
 			BuildTerminusStation(siteB, dirB, network),
 			BuildTrack(exitA, exitB, [], SignalMode.NONE, network),
-			BuildTrains(siteA, network, AIOrder.AIOF_FULL_LOAD_ANY),
+			BuildTrains(siteA, network, AIOrder.AIOF_FULL_LOAD_ANY, true),
 			BuildBusStations(siteA, a),
 			BuildBusStations(siteB, b),
 		];
@@ -160,8 +160,8 @@ class BuildNewNetwork extends Builder {
 	
 	network = null;
 	
-	constructor(minDistance, maxDistance, cheap = false) {
-		this.network = Network(AIRailTypeList().Begin(), minDistance, maxDistance, cheap);
+	constructor(minDistance = MIN_DISTANCE, maxDistance = MAX_DISTANCE) {
+		this.network = Network(AIRailTypeList().Begin(), minDistance, maxDistance);
 	}
 	
 	function Run() {
@@ -189,7 +189,7 @@ class BuildNewNetwork extends Builder {
 	
 	function EstimateNetworkStationCount(tile) {
 		local stationCount = 0;
-		local estimationNetwork = Network(network.railType, network.minDistance, network.maxDistance, network.cheap);
+		local estimationNetwork = Network(network.railType, network.minDistance, network.maxDistance);
 		foreach (direction in [Direction.NE, Direction.SW, Direction.NW, Direction.SE]) {
 			stationCount += EstimateCrossing(tile, direction, estimationNetwork);
 		}
@@ -880,12 +880,6 @@ class ExtendCrossing extends Builder {
 		// remove towns too far off to the side
 		towns.Valuate(widthValuator, location);
 		towns.KeepBetweenValue(-network.maxDistance/2, network.maxDistance/2);
-		
-		// if we want bang for our buck, don't connect towns that are too small
-		if (network.cheap) {
-			towns.Valuate(AITown.GetPopulation);
-			towns.KeepAboveValue(500);
-		}
 	}
 	
 	function GetXDistance(town, tile) {
@@ -974,13 +968,15 @@ class BuildTrains extends Task {
 	stationTile = null;
 	network = null;
 	flags = null;
+	cheap = null;
 	depot = null;
 	engine = null;
 	
-	constructor(stationTile, network, flags = null) {
+	constructor(stationTile, network, flags = null, cheap = false) {
 		this.stationTile = stationTile;
 		this.network = network;
 		this.flags = flags == null ? AIOrder.AIOF_NONE : AIOrder.AIOF_FULL_LOAD_ANY;
+		this.cheap = cheap;
 	}
 	
 	function _tostring() {
@@ -1034,16 +1030,18 @@ class BuildTrain extends Builder {
 	to = null;
 	depot = null;
 	network = null;
+	cheap = null;
 	flags = null;
 	train = null;
 	hasMail = null;
 	
-	constructor(from, to, depot, network, flags) {
+	constructor(from, to, depot, network, flags, cheap = false) {
 		this.from = from;
 		this.to = to;
 		this.depot = depot;
 		this.network = network;
 		this.flags = flags;
+		this.cheap = cheap;
 		this.train = null;
 		this.hasMail = false;
 	}
@@ -1056,7 +1054,7 @@ class BuildTrain extends Builder {
 		// we need an engine
 		if (!train || !AIVehicle.IsValidVehicle(train)) {
 			//Debug("Building locomotive at " + AIMap.GetTileX(depot) + "," + AIMap.GetTileY(depot));
-			local engineType = GetEngine(network.railType, network.cheap);
+			local engineType = GetEngine(network.railType, cheap);
 			train = AIVehicle.BuildVehicle(depot, engineType);
 			
 			// locomotives are expensive compared to other things we build

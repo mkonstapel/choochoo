@@ -45,9 +45,7 @@ class ChooChoo extends AIController {
 		while (true) {
 			
 			if (tasks.len() == 0) {
-				// build cheap networks until we have 4 stations
-				local cheap = world.stations.len() < 4;
-				tasks.push(BuildNewNetwork(MIN_DISTANCE, cheap ? MAX_DISTANCE/2 : MAX_DISTANCE, cheap));
+				tasks.push(BuildNewNetwork());
 			}
 			
 			Debug(ArrayToString(tasks));

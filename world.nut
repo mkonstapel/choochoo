@@ -178,16 +178,14 @@ class Network {
 	railType = null;
 	minDistance = null;
 	maxDistance = null;
-	cheap = null;
 	stations = null;
 	depots = null;
 	trains = null;
 	
-	constructor(railType, minDistance, maxDistance, cheap = false) {
+	constructor(railType, minDistance, maxDistance) {
 		this.railType = railType;
 		this.minDistance = minDistance;
 		this.maxDistance = maxDistance;
-		this.cheap = cheap;
 		this.stations = [];
 		this.depots = [];
 		this.trains = [];
