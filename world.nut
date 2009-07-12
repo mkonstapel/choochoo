@@ -176,15 +176,17 @@ class TerminusStation extends WorldObject {
 class Network {
 	
 	railType = null;
-	blockSize = null;
+	minDistance = null;
+	maxDistance = null;
 	cheap = null;
 	stations = null;
 	depots = null;
 	trains = null;
 	
-	constructor(railType, blockSize, cheap = false) {
+	constructor(railType, minDistance, maxDistance, cheap = false) {
 		this.railType = railType;
-		this.blockSize = blockSize;
+		this.minDistance = minDistance;
+		this.maxDistance = maxDistance;
 		this.cheap = cheap;
 		this.stations = [];
 		this.depots = [];

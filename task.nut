@@ -1,13 +1,42 @@
 require("util.nut");
 
+class TaskFailedException {
+	msg = null;
+	
+	constructor(msg) {
+		this.msg = msg;
+	}
+	
+	function _tostring() {
+		return msg;
+	}
+}
+
+class TaskRetryException {
+	sleep = 0;
+	
+	constructor(sleep = 10) {
+		this.sleep = sleep;
+	}
+}
+class NeedMoneyException {
+	
+	amount = 0;
+	
+	constructor(amount) {
+		this.amount = amount;
+	}
+}
+
 class Task {
 	
 	static MAX_ERR_UNKNOWN = 10;
 	
 	errUnknownCount = 0;
+	costEstimate = 5000;
 	
 	function Run() {
-		throw Task.FAILED;
+		throw TaskFailedException("task not implemented");
 	}
 	
 	function Failed() {}
@@ -23,12 +52,14 @@ class Task {
 				errUnknownCount++
 				PrintError();
 				Warning("ERR_UNKNOWN #" + errUnknownCount);
-				throw errUnknownCount < MAX_ERR_UNKNOWN ? RETRY : FAILED;
+				throw errUnknownCount < MAX_ERR_UNKNOWN ? TaskRetryException() : TaskFailedException("too many ERR_UNKNOWN");
 							
 			case AIError.ERR_NOT_ENOUGH_CASH:
+				costEstimate *= 2;
+				throw NeedMoneyException(costEstimate);
+				
 			case AIError.ERR_VEHICLE_IN_THE_WAY:
-				PrintError();
-				throw RETRY;
+				throw TaskRetryException();
 			
 			case AIError.ERR_PRECONDITION_FAILED:
 			case AIError.ERR_PRECONDITION_STRING_TOO_LONG:
@@ -43,9 +74,7 @@ class Task {
 			case AIError.ERR_TOO_CLOSE_TO_EDGE:
 			case AIError.ERR_STATION_TOO_SPREAD_OUT:
 			default:
-				Error("Task " + this + " failed:");
-				PrintError();
-				throw FAILED;
+				throw TaskFailedException(AIError.GetLastErrorString());
 		}
 	}
 }

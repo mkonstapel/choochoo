@@ -1,13 +1,14 @@
 require("pathfinder.nut");
 require("world.nut");
 require("task.nut");
+require("finance.nut");
 require("builder.nut");
 
-const FAILED = "FAILED";
-const RETRY = "RETRY";
-const FATAL = "FATAL";
+import("pathfinder.road", "RoadPathFinder", 3);
+// TODO: rail pathfinder
 
-const BLOCK_SIZE = 64;
+const MIN_DISTANCE =  20;
+const MAX_DISTANCE = 100;
 
 enum Direction {
 	N, E, S, W, NE, NW, SE, SW
@@ -18,12 +19,17 @@ enum Rotation {
 	ROT_0, ROT_90, ROT_180, ROT_270
 }
 
+enum SignalMode {
+	NONE, FORWARD, BACKWARD
+}
+
 class ChooChoo extends AIController {
 	
 	function Start() {
 		AICompany.SetName("ChooChoo");
 		AICompany.SetLoanAmount(AICompany.GetMaxLoanAmount());
 		AIRoad.SetCurrentRoadType(AIRoad.ROADTYPE_ROAD);
+		AIRail.SetCurrentRailType(AIRailTypeList().Begin());
 		
 		::PAX <- GetPassengerCargoID();
 		::MAIL <- GetMailCargoID();
@@ -32,39 +38,60 @@ class ChooChoo extends AIController {
 		::world <- World();
 		::tasks <- [];
 		
+		// start with some point to point lines
+		tasks.push(Bootstrap());
+		
+		local minMoney = 0;
 		while (true) {
+			
 			if (tasks.len() == 0) {
 				// build cheap networks until we have 4 stations
-				tasks.push(NewNetwork(BLOCK_SIZE, world.stations.len() < 4));
+				local cheap = world.stations.len() < 4;
+				tasks.push(BuildNewNetwork(MIN_DISTANCE, cheap ? MAX_DISTANCE/2 : MAX_DISTANCE, cheap));
 			}
 			
 			Debug(ArrayToString(tasks));
 			
 			local task;
 			try {
+				WaitForMoney(minMoney);
+				minMoney = 0;
+				
+				// run the next task in the queue
 				task = tasks[0];
 				task.Run();
 				tasks.remove(0);
+				
+				// repay loan if possible
+				ManageLoan();
 			} catch (e) {
-				if (e == RETRY) {
-					// minimum sleep
-					Sleep(100);
-					
-					// retries are usually due to running out of money
-					while (AICompany.GetBankBalance(AICompany.ResolveCompanyID(AICompany.COMPANY_SELF)) < 20000) {
-						Sleep(100);
+				if (typeof(e) == "instance") {
+					if (e instanceof TaskRetryException) {
+						Sleep(e.sleep);
+						Debug("Retrying...");
+					} else if (e instanceof TaskFailedException) {
+						Warning(task + " failed: " + e);
+						tasks.remove(0);
+						task.Failed();
+					} else if (e instanceof NeedMoneyException) {
+						Debug(task + " needs £" + e.amount);
+						minMoney = e.amount;
 					}
-					
-					Debug("Retrying...");
-				} else if (e == FAILED) {
-					Debug("Removing failed task");
-					tasks.remove(0);
-					task.Failed();
 				} else {
 					Error("Unexpected error");
 					return;
 				}
 			}
+		}
+	}
+	
+	function WaitForMoney(amount) {
+		Debug("Waiting until we have £" + amount + " to spend plus £" + GetMinimumSafeMoney() + " for safety");
+		MaxLoan();
+		while (GetBankBalance() < amount) {
+			FullyMaxLoan();
+			Sleep(100);
+			MaxLoan();
 		}
 	}
 	
@@ -76,4 +103,20 @@ class ChooChoo extends AIController {
 	function Load() {
 		Warning("TODO: implement load and save");
 	}
+}
+
+class Bootstrap extends Task {
+	
+	function _tostring() {
+		return "Bootstrap";
+	}
+	
+	function Run() {
+		tasks.insert(1, TaskList(this, [
+			BuildLine(),
+			BuildLine(),
+			BuildLine(),
+		]));
+	}
+	
 }

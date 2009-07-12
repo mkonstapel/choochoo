@@ -34,8 +34,28 @@ function Range(from, to) {
 	return range;
 }
 
+/**
+ * Return the closest integer equal to or greater than x.
+ */
+function Ceiling(x) {
+	if (x.tointeger().tofloat() == x) return x.tointeger();
+	return x.tointeger() + 1;
+}
+
 function RandomTile() {
 	return abs(AIBase.Rand()) % AIMap.GetMapSize();
+}
+
+/**
+ * Sum up the values of an AIList.
+ */
+function Sum(list) {
+	local sum = 0;
+	for (local item = list.Begin(); list.HasNext(); item = list.Next()) {
+		sum += list.GetValue(item);
+	}
+	
+	return sum;
 }
 
 /**
@@ -52,6 +72,24 @@ function ArrayToString(a) {
 }
 
 /**
+ * Create an array from an AIList.
+ */
+function ListToArray(l) {
+	local a = [];
+	for (local item = l.Begin(); l.HasNext(); item = l.Next()) a.append(item);
+	return a;
+}
+
+/**
+ * Create an AIList from an array.
+ */
+function ArrayToList(a) {
+	local l = AIList();
+	foreach (item in a) l.AddItem(item, 0);
+	return l;
+}
+
+/**
  * Add a rectangular area to an AITileList containing tiles that are within /radius/
  * tiles from the center tile, taking the edges of the map into account.
  */  
@@ -63,6 +101,30 @@ function SafeAddRectangle(list, tile, radius) {
 	local y2 = min(AIMap.GetMapSizeY() - 2, AIMap.GetTileY(tile) + radius);
 	
 	list.AddRectangle(AIMap.GetTileIndex(x1, y1),AIMap.GetTileIndex(x2, y2)); 
+}
+
+/**
+ * Filter an AITileList for AITile.IsBuildable tiles.
+ */
+function KeepBuildableArea(area) {
+	area.Valuate(AITile.IsBuildable);
+	area.KeepValue(1);
+	return area;
+}
+
+function InverseDirection(direction) {
+	switch (direction) {
+		case Direction.N: return Direction.S;
+		case Direction.E: return Direction.W;
+		case Direction.S: return Direction.N;
+		case Direction.W: return Direction.E;
+		
+		case Direction.NE: return Direction.SW;
+		case Direction.SE: return Direction.NW;
+		case Direction.SW: return Direction.NE;
+		case Direction.NW: return Direction.SE;
+		default: throw "invalid direction";
+	}
 }
 
 /**
