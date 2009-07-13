@@ -75,9 +75,11 @@ class Builder extends Task {
 
 class BuildLine extends Task {
 	
-	static MIN_TOWN_POPULATION = 200;
+	static MIN_TOWN_POPULATION = 300;
 	static MIN_TOWN_DISTANCE = 50;
 	static MAX_TOWN_DISTANCE = 100;
+	
+	static wrapper = [];
 	
 	function _tostring() {
 		return "BuildLine";
@@ -116,31 +118,38 @@ class BuildLine extends Task {
 	}
 	
 	function FindTownPair() {
-		local towns = AITownList();
-		towns.Valuate(AITown.GetPopulation);
-		towns.KeepAboveValue(MIN_TOWN_POPULATION);
+		local pairs;
 		
-		local copy = AIList();
-		copy.AddList(towns);
-		
-		local pairs = AIList();
-		for (local a = towns.Begin(); towns.HasNext(); a = towns.Next()) {
-			for (local b = copy.Begin(); copy.HasNext(); b = copy.Next()) {
-				// store two 16-bit town IDs in one 32-bit list item, and valuate them with their distance
-				local pair = a + (b << 16);
-				pairs.AddItem(pair, AITown.GetDistanceManhattanToTile(a, AITown.GetLocation(b)));
+		if (wrapper.len() == 0) {
+			Debug("Generating list of viable town pairs...");
+			local towns = AITownList();
+			towns.Valuate(AITown.GetPopulation);
+			towns.KeepAboveValue(MIN_TOWN_POPULATION);
+			
+			local copy = AIList();
+			copy.AddList(towns);
+			
+			pairs = AIList();
+			for (local a = towns.Begin(); towns.HasNext(); a = towns.Next()) {
+				for (local b = copy.Begin(); copy.HasNext(); b = copy.Next()) {
+					// store two 16-bit town IDs in one 32-bit list item, and valuate them with their distance
+					local pair = a + (b << 16);
+					pairs.AddItem(pair, AITown.GetDistanceManhattanToTile(a, AITown.GetLocation(b)));
+				}
 			}
+			
+			pairs.KeepAboveValue(MIN_TOWN_DISTANCE);
+			pairs.KeepBelowValue(MAX_TOWN_DISTANCE);
+			if (pairs.IsEmpty()) throw TaskFailedException("no suitable towns");
+			
+			wrapper.append(pairs);
+		} else {
+			pairs = wrapper[0];
 		}
 		
-		pairs.KeepAboveValue(MIN_TOWN_DISTANCE);
-		pairs.KeepBelowValue(MAX_TOWN_DISTANCE);
-		
-		if (pairs.IsEmpty()) throw TaskFailedException("no suitable towns");
-		
 		pairs.Valuate(AIBase.RandItem);
-		pairs.KeepTop(1);
+		pairs.Sort(AIList.SORT_BY_VALUE, true);
 		local pair = pairs.Begin();
-		Debug(pair + " -> " + (pair & 0xFFFF) + " + " + (pair >> 16));
 		return [pair & 0xFFFF, pair >> 16];
 	}
 	
@@ -661,13 +670,28 @@ class ConnectStation extends Builder {
 		if (bt1 == null) {
 			local reserved = station.GetReservedEntranceSpace();
 			reserved.extend(crossing.GetReservedExitSpace(direction));
+			foreach (d in [Direction.NE, Direction.SW, Direction.NW, Direction.SE]) {
+				if (d != direction) {
+					reserved.extend(crossing.GetReservedEntranceSpace(d));
+					reserved.extend(crossing.GetReservedExitSpace(d));
+				}
+			}
+			
 			bt1 = BuildTrack(station.GetExit(), crossing.GetEntrance(direction), reserved, SignalMode.FORWARD, network);
 		}
 		
 		if (bt2 == null) {
+			// we don't have to reserve space for the path we just connected 
 			//local reserved = station.GetReservedExitSpace();
 			//reserved.extend(crossing.GetReservedEntranceSpace(direction));
 			local reserved = [];
+			foreach (d in [Direction.NE, Direction.SW, Direction.NW, Direction.SE]) {
+				if (d != direction) {
+					reserved.extend(crossing.GetReservedEntranceSpace(d));
+					reserved.extend(crossing.GetReservedExitSpace(d));
+				}
+			}
+			
 			bt2 = BuildTrack(Swap(station.GetEntrance()), Swap(crossing.GetExit(direction)), reserved, SignalMode.BACKWARD, network);
 		}
 		
@@ -715,6 +739,18 @@ class ConnectCrossing extends Builder {
 		if (bt1 == null) {
 			local reserved = toCrossing.GetReservedEntranceSpace(toDirection);
 			reserved.extend(fromCrossing.GetReservedExitSpace(fromDirection));
+			foreach (d in [Direction.NE, Direction.SW, Direction.NW, Direction.SE]) {
+				if (d != fromDirection) {
+					reserved.extend(fromCrossing.GetReservedEntranceSpace(d));
+					reserved.extend(fromCrossing.GetReservedExitSpace(d));
+				}
+				
+				if (d != toDirection) {
+					reserved.extend(toCrossing.GetReservedEntranceSpace(d));
+					reserved.extend(toCrossing.GetReservedExitSpace(d));
+				}
+			}
+			
 			bt1 = BuildTrack(toCrossing.GetExit(toDirection), fromCrossing.GetEntrance(fromDirection), reserved, SignalMode.FORWARD, network);
 		}
 		
@@ -722,6 +758,18 @@ class ConnectCrossing extends Builder {
 			//local reserved = toCrossing.GetReservedExitSpace(toDirection);
 			//reserved.extend(fromCrossing.GetReservedEntranceSpace(fromDirection));
 			local reserved = [];
+			foreach (d in [Direction.NE, Direction.SW, Direction.NW, Direction.SE]) {
+				if (d != fromDirection) {
+					reserved.extend(fromCrossing.GetReservedEntranceSpace(d));
+					reserved.extend(fromCrossing.GetReservedExitSpace(d));
+				}
+				
+				if (d != toDirection) {
+					reserved.extend(toCrossing.GetReservedEntranceSpace(d));
+					reserved.extend(toCrossing.GetReservedExitSpace(d));
+				}
+			}
+			
 			bt2 = BuildTrack(Swap(toCrossing.GetEntrance(toDirection)), Swap(fromCrossing.GetExit(fromDirection)), reserved, SignalMode.BACKWARD, network);
 		}
 		
@@ -922,9 +970,6 @@ class ExtendCrossing extends Builder {
 		//AIRail.RemoveSignal(exit[0], exit[1]);
 		//AIRail.BuildRailDepot(exit[1], exit[0]);
 		
-		AITile.DemolishTile(entrance[1]);
-		AITile.DemolishTile(exit[0]);
-		
 		switch (direction) {
 			case Direction.NE:
 				RemoveRail([0,1], [1,1], [1,0]);
@@ -960,6 +1005,9 @@ class ExtendCrossing extends Builder {
 				
 			default: throw "invalid direction";
 		}
+		
+		AITile.DemolishTile(entrance[1]);
+		AITile.DemolishTile(exit[0]);
 	}
 }
 
