@@ -1013,6 +1013,8 @@ class ExtendCrossing extends Builder {
 
 class BuildTrains extends Task {
 	
+	static TRAINS_ADDED_PER_STATION = 3;
+	
 	stationTile = null;
 	network = null;
 	flags = null;
@@ -1046,26 +1048,56 @@ class BuildTrains extends Task {
 		
 		local depot = depotList.Begin();
 		local from = AIStation.GetStationID(stationTile);
-		foreach (to in network.stations) {
-			local distance = AIMap.DistanceManhattan(stationTile, AIStation.GetLocation(to));
-			local numTrains = network.trains.len();
-			local numStations = network.stations.len();
-			
-			// build more trains if we have few, or they are long distance
-			local full = numTrains > 10 * numStations;
-			local empty = numTrains < 4 || numTrains < 2 * numStations;
-			local far = distance > 3*network.maxDistance;
-			
-			if (from != to && !full && (far || empty)) {
-				tasks.insert(1, BuildTrain(from, to, depot, network, flags));
-			}
-			
-			// the first two stations connected get an extra train
-			if (numStations == 2 && from != to) {
-				tasks.insert(1, BuildTrain(to, from, depot, network, flags));
-			}
+		
+		// add trains to the N stations with the greatest capacity deficit
+		local stationList = ArrayToList(network.stations);
+		stationList.RemoveItem(from);
+		stationList.Valuate(StationCapacityDeficit);
+		stationList.KeepTop(TRAINS_ADDED_PER_STATION);
+		
+		for (local to = stationList.Begin(); stationList.HasNext(); to = stationList.Next()) {
+			Debug("Adding train to " + AIStation.GetName(to));
+			tasks.insert(1, BuildTrain(to, from, depot, network, flags));
 		}
 	}
+	
+	/**
+	 * Calculates the difference between the amount of cargo/passengers produced
+	 * and the transport capacity of currently assigned trains.
+	 */
+	function StationCapacityDeficit(station) {
+		local production = AITown.GetMaxProduction(AIStation.GetNearestTown(station), PAX);
+		local trains = AIVehicleList_Station(station);
+		trains.Valuate(BuildTrains.TrainCapacity);
+		local capacity = Sum(trains);
+		
+		//Debug("Station " + AIStation.GetName(station) + " production: " + production + ", capacity: " + capacity + ", deficit: " + (production - capacity));
+		return production - capacity;
+	}
+	
+	/**
+	 * Estimates train capacity in terms of cargo/passengers transported per month.
+	 * Speed conversion from http://wiki.openttd.org/Game_mechanics#Vehicle_speeds:
+	 * 160 km/h = 5.6 tiles/day, so 1 km/h = 0.035 tiles/day = 1.05 tiles/month.
+	 */ 
+	function TrainCapacity(train) {
+		local capacity = AIVehicle.GetCapacity(train, PAX);
+		
+		local a = AIOrder.GetOrderDestination(train, 0);
+		local b = AIOrder.GetOrderDestination(train, 1);
+		local distance = AIMap.DistanceManhattan(a, b);
+		
+		local speedKph = AIEngine.GetMaxSpeed(AIVehicle.GetEngineType(train)) / 2;
+		local speedTpm = speedKph * 1.05;
+		local triptime = distance/speedTpm;
+		
+		//Debug("Vehicle " + AIVehicle.GetName(train) + " at speed " + speedKph + " km/h can travel " +
+		//	distance + " tiles in " + triptime + " months with " + capacity + " passengers");
+		
+		return (capacity/triptime).tointeger();
+	}
+	
+		
 	
 }
 

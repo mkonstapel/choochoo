@@ -84,7 +84,7 @@ class ChooChoo extends AIController {
 	}
 	
 	function WaitForMoney(amount) {
-		Debug("Waiting until we have £" + amount + " to spend plus £" + GetMinimumSafeMoney() + " for safety");
+		Debug("Waiting until we have £" + amount + " to spend plus £" + GetMinimumSafeMoney() + " in reserve");
 		MaxLoan();
 		while (GetBankBalance() < amount) {
 			FullyMaxLoan();
