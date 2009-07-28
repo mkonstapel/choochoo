@@ -1,6 +1,6 @@
 require("util.nut");
 
-class TaskFailedException {
+class TaskFailed {
 	msg = null;
 	
 	constructor(msg) {
@@ -8,23 +8,32 @@ class TaskFailedException {
 	}
 	
 	function _tostring() {
-		return msg;
+		return "Failed: " + msg;
 	}
 }
 
-class TaskRetryException {
+class Retry {
 	sleep = 0;
 	
 	constructor(sleep = 10) {
 		this.sleep = sleep;
 	}
+	
+	function _tostring() {
+		return "Retry: " + sleep;
+	}
 }
-class NeedMoneyException {
+
+class NeedMoney {
 	
 	amount = 0;
 	
 	constructor(amount) {
 		this.amount = amount;
+	}
+	
+	function _tostring() {
+		return "NeedMoney: " + amount;
 	}
 }
 
@@ -36,7 +45,7 @@ class Task {
 	costEstimate = 5000;
 	
 	function Run() {
-		throw TaskFailedException("task not implemented");
+		return TaskFailed("task not implemented");
 	}
 	
 	function Failed() {}
@@ -52,14 +61,16 @@ class Task {
 				errUnknownCount++
 				PrintError();
 				Warning("ERR_UNKNOWN #" + errUnknownCount);
-				throw errUnknownCount < MAX_ERR_UNKNOWN ? TaskRetryException() : TaskFailedException("too many ERR_UNKNOWN");
+				throw errUnknownCount < MAX_ERR_UNKNOWN ? Retry() : Failed("too many ERR_UNKNOWN");
 							
 			case AIError.ERR_NOT_ENOUGH_CASH:
 				costEstimate *= 2;
-				throw NeedMoneyException(costEstimate);
+				Warning("Throwing NeedMoney: wait for £" + costEstimate);
+				throw NeedMoney(costEstimate);
 				
 			case AIError.ERR_VEHICLE_IN_THE_WAY:
-				throw TaskRetryException();
+				Warning("Throwing Retry: vehicle in the way");
+				throw Retry();
 			
 			case AIError.ERR_PRECONDITION_FAILED:
 			case AIError.ERR_PRECONDITION_STRING_TOO_LONG:
@@ -74,7 +85,8 @@ class Task {
 			case AIError.ERR_TOO_CLOSE_TO_EDGE:
 			case AIError.ERR_STATION_TOO_SPREAD_OUT:
 			default:
-				throw TaskFailedException(AIError.GetLastErrorString());
+				Warning("Throwing TaskFailed: " + AIError.GetLastErrorString());
+				throw TaskFailed(AIError.GetLastErrorString());
 		}
 	}
 }
@@ -94,12 +106,18 @@ class TaskList extends Task {
 	}
 	
 	function Run() {
+		local result;
+		
 		while (subtasks.len() > 0) {
 			currentTask = subtasks[0];
-			currentTask.Run();
-			subtasks.remove(0);
-			completed.append(currentTask);
-			currentTask = null;
+			result = currentTask.Run();
+			if (result == null) {
+				subtasks.remove(0);
+				completed.append(currentTask);
+				currentTask = null;
+			} else {
+				return result;
+			}
 		}
 	}
 	

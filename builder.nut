@@ -90,21 +90,27 @@ class BuildLine extends Task {
 		local a = towns[0];
 		local b = towns[1];
 		
-		Debug("Connecting " + AITown.GetName(a) + " and " + AITown.GetName(b));
-		local network = Network(AIRailTypeList().Begin(), MIN_TOWN_DISTANCE, MAX_TOWN_DISTANCE);
-		
+		local nameA = AITown.GetName(a);
 		local dirA = StationDirection(a, b);
 		local rotA = BuildTerminusStation.StationRotationForDirection(dirA);
 		local siteA = FindStationSite(a, rotA, AITown.GetLocation(b));
-		if (!siteA) throw TaskRetryException(1);
-		local exitA = TerminusStation(siteA, rotA, RAIL_STATION_PLATFORM_LENGTH).GetExit();
-		
+
+		local nameB = AITown.GetName(b);
 		local dirB = StationDirection(b, a);
 		local rotB = BuildTerminusStation.StationRotationForDirection(dirB);
 		local siteB = FindStationSite(b, rotB, AITown.GetLocation(a));
-		if (!siteB) throw TaskRetryException(1);
+		
+		if (siteA && siteB) {
+			Debug("Connecting " + nameA + " and " + nameB);
+		} else {
+			Debug("Cannot build a station at " + (siteA ? nameB : nameA));
+			return Retry();
+		}
+		
+		local exitA = TerminusStation(siteA, rotA, RAIL_STATION_PLATFORM_LENGTH).GetEntrance();
 		local exitB = TerminusStation(siteB, rotB, RAIL_STATION_PLATFORM_LENGTH).GetEntrance();
 		
+		local network = Network(AIRailTypeList().Begin(), MIN_TOWN_DISTANCE, MAX_TOWN_DISTANCE);
 		local subtasks = [
 			BuildTerminusStation(siteA, dirA, network),
 			BuildTerminusStation(siteB, dirB, network),
@@ -140,7 +146,7 @@ class BuildLine extends Task {
 			
 			pairs.KeepAboveValue(MIN_TOWN_DISTANCE);
 			pairs.KeepBelowValue(MAX_TOWN_DISTANCE);
-			if (pairs.IsEmpty()) throw TaskFailedException("no suitable towns");
+			if (pairs.IsEmpty()) throw TaskFailed("no suitable towns");
 			
 			wrapper.append(pairs);
 		} else {
@@ -460,15 +466,15 @@ class BuildBusStations extends Builder {
 }
 
 class BuildTrack extends Builder {
-	
-	SIGNAL_INTERVAL = 3;
-	DEPOT_INTERVAL = 15;
+
+	static SIGNAL_INTERVAL = 3;
+	static DEPOT_INTERVAL = 15;
 	
 	a = null;
 	b = null;
 	c = null;
 	d = null;
-	ignored = [];
+	ignored = null;
 	signalMode = null;
 	network = null;
 	path = null;
@@ -501,53 +507,77 @@ class BuildTrack extends Builder {
 		*/
 		
 		if (!path) path = FindPath(a, b, c, d, ignored);
-		if (!path) throw TaskFailedException("no path");
+		if (!path) return TaskFailed("no path");
 		BuildPath(path);
 	}
 	
 	function FindPath(a, b, c, d, ignored) {
 		local pathfinder = Rail();
-		pathfinder.cost.max_cost = pathfinder.cost.tile * 4 * AIMap.DistanceManhattan(a, d);
+		
+		pathfinder.cost.max_bridge_length = 20;
+		pathfinder.cost.max_tunnel_length = 20;
 		pathfinder.estimate_multiplier = 2;
 		
+		pathfinder.cost.max_cost = pathfinder.cost.tile * 4 * AIMap.DistanceManhattan(a, d);
 		pathfinder.cost.diagonal_tile = 200;
 		pathfinder.cost.bridge_per_tile = 500;
 		pathfinder.cost.tunnel_per_tile = 500;
-		pathfinder.InitializePath([[b, a]], [[c, d]], ignored);
+		
+		// Pathfinding needs money since it attempts to build in test mode.
+		// We can't get the price of a tunnel, but we can get it for a bridge
+		// and we'll assume they're comparable.
+		local maxBridgeCost = GetMaxBridgeCost(pathfinder.cost.max_bridge_length);
+		if (GetBankBalance() < maxBridgeCost*2) {
+			throw NeedMoney(maxBridgeCost*2);
+		}
 		
 		Debug("Pathfinding...");
+		pathfinder.InitializePath([[b, a]], [[c, d]], ignored);
 		return pathfinder.FindPath(AIMap.DistanceManhattan(a, d) * 10 * TICKS_PER_DAY);
+	}
+	
+	function GetMaxBridgeCost(length) {
+		local bridges = AIBridgeList_Length(length);
+		if (bridges.IsEmpty()) throw "Cannot build " + length + " tile bridges!";
+		bridges.Valuate(AIBridge.GetMaxSpeed);
+		bridges.KeepTop(1);
+		local bridge = bridges.Begin();
+		return AIBridge.GetPrice(bridge, length);
 	}
 	
 	function BuildPath(path) {
 		Debug("Building...");
+		local node = path;
 		local prev = null;
 		local prevprev = null;
 		local prevprevprev = null;
-		while (path != null) {
+		while (node != null) {
 			if (prevprev != null) {
-				if (AIMap.DistanceManhattan(prev, path.GetTile()) > 1) {
-					if (AITunnel.GetOtherTunnelEnd(prev) == path.GetTile()) {
-						AITunnel.BuildTunnel(AIVehicle.VT_RAIL, prev);
-						CheckError();
+				if (AIMap.DistanceManhattan(prev, node.GetTile()) > 1) {
+					if (AITunnel.GetOtherTunnelEnd(prev) == node.GetTile()) {
+						// since we can resume building, check if there already is a tunnel
+						if (!AITunnel.IsTunnelTile(prev)) {
+							AITunnel.BuildTunnel(AIVehicle.VT_RAIL, prev);
+							CheckError();
+						}
 					} else {
-						local bridge_list = AIBridgeList_Length(AIMap.DistanceManhattan(path.GetTile(), prev) + 1);
+						local bridge_list = AIBridgeList_Length(AIMap.DistanceManhattan(node.GetTile(), prev) + 1);
 						bridge_list.Valuate(AIBridge.GetMaxSpeed);
 						bridge_list.Sort(AIAbstractList.SORT_BY_VALUE, false);
-						AIBridge.BuildBridge(AIVehicle.VT_RAIL, bridge_list.Begin(), prev, path.GetTile());
+						AIBridge.BuildBridge(AIVehicle.VT_RAIL, bridge_list.Begin(), prev, node.GetTile());
 						CheckError();
 					}
 					prevprev = prev;
-					prev = path.GetTile();
-					path = path.GetParent();
+					prev = node.GetTile();
+					node = node.GetParent();
 				} else {
-					local built = AIRail.BuildRail(prevprev, prev, path.GetTile());
+					local built = AIRail.BuildRail(prevprev, prev, node.GetTile());
 					CheckError();
 					
 					// since we can be restarted, we can process a tile more than once
 					// don't build signals again, or they'll be flipped around!
 					local forward = signalMode == SignalMode.FORWARD;
-					local front = forward ? path.GetTile() : prevprev;
+					local front = forward ? node.GetTile() : prevprev;
 					if (signalMode != SignalMode.NONE &&
 					    count % SIGNAL_INTERVAL == 0 &&
 					    AIRail.GetSignalType(prev, front) == AIRail.SIGNALTYPE_NONE)
@@ -555,30 +585,30 @@ class BuildTrack extends Builder {
 						AIRail.BuildSignal(prev, front, AIRail.SIGNALTYPE_NORMAL);
 					}
 					
-					local possibleDepot = prevprevprev && path.GetParent();
-					local depotSite = possibleDepot ? GetDepotSite(prevprevprev, prevprev, prev, path.GetTile(), path.GetParent().GetTile(), forward) : null;
+					local possibleDepot = prevprevprev && node.GetParent();
+					local depotSite = possibleDepot ? GetDepotSite(prevprevprev, prevprev, prev, node.GetTile(), node.GetParent().GetTile(), forward) : null;
 					if (count % SIGNAL_INTERVAL == 1 && count - lastDepot > DEPOT_INTERVAL && depotSite) {
 						if (AIRail.BuildRailDepot(depotSite, prev) &&
 							AIRail.BuildRail(depotSite, prev, prevprev) &&
-							AIRail.BuildRail(depotSite, prev, path.GetTile())) {
+							AIRail.BuildRail(depotSite, prev, node.GetTile())) {
 							// success
 							lastDepot = count;
 							network.depots.append(depotSite);
 						} else {
 							AITile.DemolishTile(depotSite);
 							AIRail.RemoveRail(depotSite, prev, prevprev);
-							AIRail.RemoveRail(depotSite, prev, path.GetTile());
+							AIRail.RemoveRail(depotSite, prev, node.GetTile());
 						}							
 					}
 					
 					if (built) count++;
 				}
 			}
-			if (path != null) {
+			if (node != null) {
 				prevprevprev = prevprev;
 				prevprev = prev;
-				prev = path.GetTile();
-				path = path.GetParent();
+				prev = node.GetTile();
+				node = node.GetParent();
 			}
 		}
 		
@@ -797,7 +827,6 @@ class ExtendCrossing extends Builder {
 
 	crossing = null;
 	direction = null;
-	stations = null;
 	network = null;
 	
 	constructor(crossing, direction, network) {
@@ -828,7 +857,7 @@ class ExtendCrossing extends Builder {
 		}
 		
 		if (!stationTile) {
-			throw TaskFailedException("no towns where we can build a station");
+			return TaskFailed("no towns where we can build a station");
 		}
 		
 		local crossingTile = FindCrossingSite(stationTile);
@@ -1139,7 +1168,7 @@ class BuildTrain extends Builder {
 			
 			// locomotives are expensive compared to other things we build
 			if (AIError.GetLastError() == AIError.ERR_NOT_ENOUGH_CASH) {
-				throw NeedMoneyException(AIEngine.GetPrice(engineType));
+				return NeedMoney(AIEngine.GetPrice(engineType));
 			}
 			
 			CheckError();
@@ -1177,7 +1206,7 @@ class BuildTrain extends Builder {
 				AIVehicle.SellVehicle(train);
 				AIVehicle.SellVehicle(wagon);
 				train = null;
-				throw TaskRetryException();
+				return Retry();
 			}
 		}
 
@@ -1210,7 +1239,7 @@ class BuildTrain extends Builder {
 			engineList.RemoveTop(engineList.Count() / 2);
 		}
 		
-		if (engineList.IsEmpty()) throw TaskFailedException("no suitable engine");
+		if (engineList.IsEmpty()) throw TaskFailed("no suitable engine");
 		return engineList.Begin();
 	}
 	
