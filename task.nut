@@ -1,39 +1,41 @@
 require("util.nut");
 
-class TaskFailed {
+class TaskFailedException {
 	msg = null;
 	
 	constructor(msg) {
 		this.msg = msg;
+		Warning(this);
 	}
 	
 	function _tostring() {
-		return "Failed: " + msg;
+		return "Task failed: " + msg;
 	}
 }
 
-class Retry {
+class TaskRetryException {
 	sleep = 0;
 	
 	constructor(sleep = 10) {
 		this.sleep = sleep;
+		Warning(this);
 	}
 	
 	function _tostring() {
 		return "Retry: " + sleep;
 	}
 }
-
-class NeedMoney {
+class NeedMoneyException {
 	
 	amount = 0;
 	
 	constructor(amount) {
 		this.amount = amount;
+		Warning(this);
 	}
 	
 	function _tostring() {
-		return "NeedMoney: " + amount;
+		return "NeedMoney: £" + amount;
 	}
 }
 
@@ -45,7 +47,7 @@ class Task {
 	costEstimate = 5000;
 	
 	function Run() {
-		return TaskFailed("task not implemented");
+		throw TaskFailedException("task not implemented");
 	}
 	
 	function Failed() {}
@@ -61,16 +63,14 @@ class Task {
 				errUnknownCount++
 				PrintError();
 				Warning("ERR_UNKNOWN #" + errUnknownCount);
-				throw errUnknownCount < MAX_ERR_UNKNOWN ? Retry() : Failed("too many ERR_UNKNOWN");
+				throw errUnknownCount < MAX_ERR_UNKNOWN ? TaskRetryException() : TaskFailedException("too many ERR_UNKNOWN");
 							
 			case AIError.ERR_NOT_ENOUGH_CASH:
 				costEstimate *= 2;
-				Warning("Throwing NeedMoney: wait for £" + costEstimate);
-				throw NeedMoney(costEstimate);
+				throw NeedMoneyException(costEstimate);
 				
 			case AIError.ERR_VEHICLE_IN_THE_WAY:
-				Warning("Throwing Retry: vehicle in the way");
-				throw Retry();
+				throw TaskRetryException();
 			
 			case AIError.ERR_PRECONDITION_FAILED:
 			case AIError.ERR_PRECONDITION_STRING_TOO_LONG:
@@ -85,8 +85,7 @@ class Task {
 			case AIError.ERR_TOO_CLOSE_TO_EDGE:
 			case AIError.ERR_STATION_TOO_SPREAD_OUT:
 			default:
-				Warning("Throwing TaskFailed: " + AIError.GetLastErrorString());
-				throw TaskFailed(AIError.GetLastErrorString());
+				throw TaskFailedException(AIError.GetLastErrorString());
 		}
 	}
 }
@@ -110,14 +109,10 @@ class TaskList extends Task {
 		
 		while (subtasks.len() > 0) {
 			currentTask = subtasks[0];
-			result = currentTask.Run();
-			if (result == null) {
-				subtasks.remove(0);
-				completed.append(currentTask);
-				currentTask = null;
-			} else {
-				return result;
-			}
+			currentTask.Run();
+			subtasks.remove(0);
+			completed.append(currentTask);
+			currentTask = null;
 		}
 	}
 	
@@ -129,6 +124,8 @@ class TaskList extends Task {
 		if (currentTask) {
 			currentTask.Failed();
 		}
+		
+		parentTask.Failed();
 	}
 	
 	function _tostring() {

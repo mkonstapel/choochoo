@@ -1,7 +1,7 @@
 const RAIL_STATION_RADIUS = 4;
 const RAIL_STATION_PLATFORM_LENGTH = 3;
 const RAIL_STATION_LENGTH = 8;	// actual building and rails plus room for entrance/exit
-const RAIL_STATION_WIDTH = 2;
+const RAIL_STATION_WIDTH = 3;
 
 class Builder extends Task {
 	
@@ -22,6 +22,12 @@ class Builder extends Task {
 	
 	function GetTile(coordinates) {
 		return relativeCoordinates.GetTile(coordinates);
+	}
+	
+	function SetLocalCoordinateSystem(location, rotation) {
+		this.relativeCoordinates = RelativeCoordinates(location, rotation);
+		this.location = location;
+		this.rotation = rotation;
 	}
 	
 	/**
@@ -49,10 +55,18 @@ class Builder extends Task {
 	}
 	
 	/**
-	 * Remove rail, see BuildRail.
+	 * Remove rail, see BuildRail. If a vehicle is in the way, wait and retry.
 	 */
 	function RemoveRail(from, on, to, check = false) {
-		AIRail.RemoveRail(GetTile(from), GetTile(on), GetTile(to));
+		while (true) {
+			AIRail.RemoveRail(GetTile(from), GetTile(on), GetTile(to));
+			if (AIError.GetLastError() == AIError.ERR_VEHICLE_IN_THE_WAY) {
+				AIController.Sleep(1);
+			} else {
+				break;
+			}
+		}
+		
 		if (check) CheckError();
 	}
 	
@@ -104,18 +118,19 @@ class BuildLine extends Task {
 			Debug("Connecting " + nameA + " and " + nameB);
 		} else {
 			Debug("Cannot build a station at " + (siteA ? nameB : nameA));
-			return Retry();
+			throw TaskRetryException();
 		}
 		
-		local exitA = TerminusStation(siteA, rotA, RAIL_STATION_PLATFORM_LENGTH).GetEntrance();
+		local exitA = Swap(TerminusStation(siteA, rotA, RAIL_STATION_PLATFORM_LENGTH).GetEntrance());
 		local exitB = TerminusStation(siteB, rotB, RAIL_STATION_PLATFORM_LENGTH).GetEntrance();
 		
 		local network = Network(AIRailTypeList().Begin(), MIN_TOWN_DISTANCE, MAX_TOWN_DISTANCE);
 		local subtasks = [
-			BuildTerminusStation(siteA, dirA, network),
-			BuildTerminusStation(siteB, dirB, network),
+			BuildTerminusStation(siteA, dirA, network, false),
+			BuildTerminusStation(siteB, dirB, network, false),
 			BuildTrack(exitA, exitB, [], SignalMode.NONE, network),
 			BuildTrains(siteA, network, AIOrder.AIOF_FULL_LOAD_ANY, true),
+			BuildTrains(siteB, network, AIOrder.AIOF_FULL_LOAD_ANY, true),
 			BuildBusStations(siteA, a),
 			BuildBusStations(siteB, b),
 		];
@@ -146,7 +161,7 @@ class BuildLine extends Task {
 			
 			pairs.KeepAboveValue(MIN_TOWN_DISTANCE);
 			pairs.KeepBelowValue(MAX_TOWN_DISTANCE);
-			if (pairs.IsEmpty()) throw TaskFailed("no suitable towns");
+			if (pairs.IsEmpty()) throw TaskFailedException("no suitable towns");
 			
 			wrapper.append(pairs);
 		} else {
@@ -193,7 +208,7 @@ class BuildNewNetwork extends Builder {
 		
 		AIRail.SetCurrentRailType(network.railType);
 		tasks.insert(1, TaskList(this, [
-			LevelTerrain(tile, Rotation.ROT_0, [-1, -1], [Crossing.WIDTH + 1, Crossing.WIDTH + 1]),
+			LevelTerrain(tile, Rotation.ROT_0, [-1, -1], [Crossing.WIDTH, Crossing.WIDTH]),
 			BuildCrossing(tile, network)
 		]));
 	}
@@ -267,6 +282,7 @@ class BuildCrossing extends Builder {
 		
 		// signals (clockwise)
 		// initially, all signals face outwards to block trains off from unfinished tracks
+		// after an exit is connected, we open it up by either flipping or removing the signal
 		local type = AIRail.SIGNALTYPE_PBS_ONEWAY;
 		BuildSignal([0,1], [-1, 1], type);
 		BuildSignal([0,2], [-1, 2], type);
@@ -314,24 +330,33 @@ class BuildTerminusStation extends Builder {
 	platformLength = null;
 	builtPlatform1 = null;
 	builtPlatform2 = null;
+	doubleTrack = null;
 	
-	constructor(location, direction, network, platformLength = RAIL_STATION_PLATFORM_LENGTH) {
+	constructor(location, direction, network, doubleTrack = true, platformLength = RAIL_STATION_PLATFORM_LENGTH) {
 		Builder.constructor(location, StationRotationForDirection(direction));
 		this.network = network;
 		this.platformLength = platformLength;
 		this.builtPlatform1 = false;
 		this.builtPlatform2 = false;
+		this.doubleTrack = doubleTrack;
 	}
 	
 	function Run() {
 		BuildPlatforms();
 		local p = platformLength;
 		BuildSegment([0, p], [0, p+1]);
-		BuildSegment([1, p], [1, p+1]);
-		BuildRail([0, p-1], [0, p], [1, p+1]);
+		if (doubleTrack) BuildSegment([1, p], [1, p+1]);
 		BuildRail([1, p-1], [1, p], [0, p+1]);
+		if (doubleTrack) BuildRail([0, p-1], [0, p], [1, p+1]);
+		
+		BuildDepot([2,p], [1,p]);
+		BuildRail([2, p], [1, p], [0, p]);
+		BuildRail([2, p], [1, p], [1, p-1]);
+		BuildRail([1, p], [0, p], [0, p-1]);
+		if (doubleTrack) BuildRail([2, p], [1, p], [1, p+1]);
+		network.depots.append(GetTile([2,p]));
+		
 		BuildSignal([0, p+1], [0, p+2], AIRail.SIGNALTYPE_PBS);
-		BuildSignal([1, p+1], [1, p], AIRail.SIGNALTYPE_PBS);
 		world.stations[location] <- TerminusStation(location, rotation, platformLength);
 		network.stations.append(AIStation.GetStationID(location));
 	}
@@ -452,11 +477,7 @@ class BuildBusStations extends Builder {
 	}
 	
 	function BuildStationAt(tile) {
-		if (BuildStation(tile, true) || BuildStation(tile, false)) {
-			return true;
-		}
-		
-		return false;
+		return BuildStation(tile, true) || BuildStation(tile, false);
 	}
 	
 	function BuildStation(tile, facing) {
@@ -468,7 +489,7 @@ class BuildBusStations extends Builder {
 class BuildTrack extends Builder {
 
 	static SIGNAL_INTERVAL = 3;
-	static DEPOT_INTERVAL = 15;
+	static DEPOT_INTERVAL = 30;
 	
 	a = null;
 	b = null;
@@ -478,7 +499,6 @@ class BuildTrack extends Builder {
 	signalMode = null;
 	network = null;
 	path = null;
-	count = null;
 	lastDepot = null;
 	
 	constructor(from, to, ignored, signalMode, network) {
@@ -489,8 +509,8 @@ class BuildTrack extends Builder {
 		this.ignored = ignored;
 		this.signalMode = signalMode;
 		this.network = network;
-		this.count = 1;
-		this.lastDepot = -DEPOT_INTERVAL;	// build one as soon as possible
+		//this.lastDepot = -DEPOT_INTERVAL;	// build one as soon as possible
+		this.lastDepot = 0;
 		this.path = null;
 	}
 	
@@ -507,7 +527,7 @@ class BuildTrack extends Builder {
 		*/
 		
 		if (!path) path = FindPath(a, b, c, d, ignored);
-		if (!path) return TaskFailed("no path");
+		if (!path) throw TaskFailedException("no path");
 		BuildPath(path);
 	}
 	
@@ -528,7 +548,7 @@ class BuildTrack extends Builder {
 		// and we'll assume they're comparable.
 		local maxBridgeCost = GetMaxBridgeCost(pathfinder.cost.max_bridge_length);
 		if (GetBankBalance() < maxBridgeCost*2) {
-			throw NeedMoney(maxBridgeCost*2);
+			throw NeedMoneyException(maxBridgeCost*2);
 		}
 		
 		Debug("Pathfinding...");
@@ -551,6 +571,7 @@ class BuildTrack extends Builder {
 		local prev = null;
 		local prevprev = null;
 		local prevprevprev = null;
+		local count = 1;	// don't start with signals right away
 		while (node != null) {
 			if (prevprev != null) {
 				if (AIMap.DistanceManhattan(prev, node.GetTile()) > 1) {
@@ -601,9 +622,10 @@ class BuildTrack extends Builder {
 						}							
 					}
 					
-					if (built) count++;
+					count++;
 				}
 			}
+			
 			if (node != null) {
 				prevprevprev = prevprev;
 				prevprev = prev;
@@ -730,11 +752,8 @@ class ConnectStation extends Builder {
 		
 		// building another signal on the tile will flip it, opening up the exit
 		local exit = crossing.GetExit(direction);
-		AIRail.BuildSignal(exit[0], exit[1], AIRail.SIGNALTYPE_PBS_ONEWAY);
-	}
-	
-	function Swap(tiles) {
-		return [tiles[1], tiles[0]];
+		//AIRail.BuildSignal(exit[0], exit[1], AIRail.SIGNALTYPE_PBS_ONEWAY);
+		AIRail.RemoveSignal(exit[0], exit[1]);
 	}
 	
 	function _tostring() {
@@ -808,10 +827,11 @@ class ConnectCrossing extends Builder {
 		
 		// open up both crossings' exits
 		local exit = fromCrossing.GetExit(fromDirection);
-		AIRail.BuildSignal(exit[0], exit[1], AIRail.SIGNALTYPE_PBS_ONEWAY);
+		//AIRail.BuildSignal(exit[0], exit[1], AIRail.SIGNALTYPE_PBS_ONEWAY);
+		AIRail.RemoveSignal(exit[0], exit[1]);
 		
 		exit = toCrossing.GetExit(toDirection);
-		AIRail.BuildSignal(exit[0], exit[1], AIRail.SIGNALTYPE_PBS_ONEWAY);
+		AIRail.RemoveSignal(exit[0], exit[1]);
 	}
 	
 	function Swap(tiles) {
@@ -841,7 +861,7 @@ class ExtendCrossing extends Builder {
 	}
 	
 	function Run() {
-		// see if we''ve not already built this direction
+		// see if we've not already built this direction
 		local entrance = world.crossings[crossing].GetEntrance(direction);
 		if (AIRail.IsRailTile(entrance[0])) {
 			return;
@@ -857,7 +877,7 @@ class ExtendCrossing extends Builder {
 		}
 		
 		if (!stationTile) {
-			return TaskFailed("no towns where we can build a station");
+			throw TaskFailedException("no towns where we can build a station");
 		}
 		
 		local crossingTile = FindCrossingSite(stationTile);
@@ -992,51 +1012,70 @@ class ExtendCrossing extends Builder {
 	function Failed() {
 		// remove the pieces of track for this direction
 		local entrance = Crossing(location).GetEntrance(direction);
-		//AIRail.RemoveSignal(entrance[1], entrance[0]);
-		//AIRail.BuildRailDepot(entrance[0], entrance[1]);
-		
 		local exit = Crossing(location).GetExit(direction);
-		//AIRail.RemoveSignal(exit[0], exit[1]);
-		//AIRail.BuildRailDepot(exit[1], exit[0]);
+		
+		// use the NE direction as a template and derive the others
+		// by rotation and offset
+		local rotation;
+		local offset;
 		
 		switch (direction) {
 			case Direction.NE:
-				RemoveRail([0,1], [1,1], [1,0]);
-				RemoveRail([0,1], [1,1], [2,1]);
-				
-				RemoveRail([0,2], [1,2], [2,2]);
-				RemoveRail([0,2], [1,2], [1,3]);
+				rotation = Rotation.ROT_0;
+				offset = [0,0];
 				break;
-				
+			
 			case Direction.SE:
-				RemoveRail([1,3], [1,2], [1,1]);
-				RemoveRail([1,3], [1,2], [0,2]);
-				
-				RemoveRail([2,3], [2,2], [2,1]);
-				RemoveRail([2,3], [2,2], [3,2]);
+				rotation = Rotation.ROT_270;
+				offset = [0,3];
 				break;
 				
 			case Direction.SW:
-				RemoveRail([3,2], [2,2], [2,3]);
-				RemoveRail([3,2], [2,2], [1,2]);
-				
-				RemoveRail([3,1], [2,1], [2,0]);
-				RemoveRail([3,1], [2,1], [1,1]);
+				rotation = Rotation.ROT_180;
+				offset = [3,3];
 				break;
 				
 			case Direction.NW:
-				RemoveRail([1,0], [1,1], [0,1]);
-				RemoveRail([1,0], [1,1], [1,2]);
-				
-				RemoveRail([2,0], [2,1], [3,1]);
-				RemoveRail([2,0], [2,1], [2,2]);
+				rotation = Rotation.ROT_90;
+				offset = [3,0];
 				break;
-				
-			default: throw "invalid direction";
 		}
 		
-		AITile.DemolishTile(entrance[1]);
-		AITile.DemolishTile(exit[0]);
+		// move coordinate system
+		local oldLocation = location;
+		SetLocalCoordinateSystem(GetTile(offset), rotation);
+		
+		RemoveRail([-1,1], [0,1], [1,1]);
+		RemoveRail([-1,2], [0,2], [1,2]);
+		
+		RemoveRail([0,1], [1,1], [1,0]);
+		RemoveRail([0,1], [1,1], [2,1]);
+		
+		RemoveRail([0,2], [1,2], [2,2]);
+		RemoveRail([0,2], [1,2], [1,3]);
+		
+		RemoveRail([2,2], [2,1], [1,1]);
+		RemoveRail([2,1], [2,2], [1,2]);
+		
+		// we can remove more bits if another direction is already gone
+		if (!HasRail([1,3])) {
+			RemoveRail([1,1], [2,1], [3,1]);
+			RemoveRail([2,0], [2,1], [2,2]);
+			RemoveRail([2,1], [2,2], [2,3]);
+		}
+		
+		if (!HasRail([1,0])) {
+			RemoveRail([1,2], [2,2], [3,2]);
+			RemoveRail([2,0], [2,1], [2,2]);
+			RemoveRail([2,1], [2,2], [2,3]);
+		}
+		
+		// restore coordinate system
+		SetLocalCoordinateSystem(oldLocation, Rotation.ROT_0);
+	}
+	
+	function HasRail(tileCoords) {
+		return AIRail.IsRailTile(GetTile(tileCoords));
 	}
 }
 
@@ -1086,7 +1125,7 @@ class BuildTrains extends Task {
 		
 		for (local to = stationList.Begin(); stationList.HasNext(); to = stationList.Next()) {
 			Debug("Adding train to " + AIStation.GetName(to));
-			tasks.insert(1, BuildTrain(to, from, depot, network, flags));
+			tasks.insert(1, BuildTrain(from, to, depot, network, flags));
 		}
 	}
 	
@@ -1168,7 +1207,7 @@ class BuildTrain extends Builder {
 			
 			// locomotives are expensive compared to other things we build
 			if (AIError.GetLastError() == AIError.ERR_NOT_ENOUGH_CASH) {
-				return NeedMoney(AIEngine.GetPrice(engineType));
+				throw NeedMoneyException(AIEngine.GetPrice(engineType));
 			}
 			
 			CheckError();
@@ -1206,8 +1245,13 @@ class BuildTrain extends Builder {
 				AIVehicle.SellVehicle(train);
 				AIVehicle.SellVehicle(wagon);
 				train = null;
-				return Retry();
+				throw TaskRetryException();
 			}
+		}
+		
+		// see if we went over - newgrfs can introduce non-half-tile wagons
+		if (AIVehicle.GetLength(train)/16 > TRAIN_LENGTH) {
+			AIVehicle.SellWagon(train, 1);
 		}
 
 		network.trains.append(train);
@@ -1239,7 +1283,7 @@ class BuildTrain extends Builder {
 			engineList.RemoveTop(engineList.Count() / 2);
 		}
 		
-		if (engineList.IsEmpty()) throw TaskFailed("no suitable engine");
+		if (engineList.IsEmpty()) throw TaskFailedException("no suitable engine");
 		return engineList.Begin();
 	}
 	
@@ -1275,16 +1319,52 @@ class LevelTerrain extends Builder {
 	}
 	
 	function Run() {
+		local tiles = AITileList();
+		tiles.AddRectangle(GetTile(from), GetTile(to));
+		
+		local min = 100;
+		local max = 0;
+		
+		for (local tile = tiles.Begin(); tiles.HasNext(); tile = tiles.Next()) {
+			if (AITile.GetMaxHeight(tile) > max) max = AITile.GetMaxHeight(tile);
+			if (AITile.GetMinHeight(tile) < min) min = AITile.GetMinHeight(tile);
+		}
+		
+		// prefer rounding up
+		local targetHeight = (min + max + 1) / 2;
+		for (local tile = tiles.Begin(); tiles.HasNext(); tile = tiles.Next()) {
+			LevelTile(tile, targetHeight);
+		}
+			
 		// TODO: this levels the area between the north corners of the resulting tiles
 		// so due to rotation, we may be one tile short
-		AITile.LevelTiles(GetTile(from), GetTile(to));
-		CheckError();
+		//AITile.LevelTiles(GetTile(from), GetTile(to));
+		//CheckError();
+	}
+	
+	function LevelTile(tile, height) {
+		// raise or lower each corner of the tile to the target height
+		foreach (corner in [AITile.CORNER_N, AITile.CORNER_E, AITile.CORNER_S, AITile.CORNER_W]) {
+			while (AITile.GetCornerHeight(tile, corner) < height) {
+				AITile.RaiseTile(tile, 1 << corner);
+				CheckError();
+			}
+			
+			while (AITile.GetCornerHeight(tile, corner) > height) {
+				AITile.LowerTile(tile, 1 << corner);
+				CheckError();
+			}
+		}
 	}
 	
 	function _tostring() {
 		return "LevelTerrain";
 	}
 	
+}
+
+function Swap(tiles) {
+	return [tiles[1], tiles[0]];
 }
 
 /**

@@ -1,5 +1,4 @@
 const MONTHLY_STATION_MAINTENANCE = 50;	// station upkeep per month
-const INDEPENDENTLY_WEALTHY = 1000000;	// no longer need a loan
 
 function GetBankBalance() {
 	local me = AICompany.ResolveCompanyID(AICompany.COMPANY_SELF);
