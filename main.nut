@@ -39,11 +39,12 @@ class ChooChoo extends AIController {
 		::MAIL <- GetMailCargoID();
 		::TICKS_PER_DAY <- 37;
 		
-		::world <- World();
 		::tasks <- [];
 		
-		// start with some point to point lines
-		tasks.push(Bootstrap());
+		if (AIStationList(AIStation.STATION_TRAIN).IsEmpty()) {
+			// start with some point to point lines
+			tasks.push(Bootstrap());
+		}
 		
 		local minMoney = 0;
 		while (true) {
@@ -95,13 +96,10 @@ class ChooChoo extends AIController {
 	}
 	
 	function Save() {
-		Warning("TODO: implement load and save");
 		return {};
 	}
 
-	function Load() {
-		Warning("TODO: implement load and save");
-	}
+	function Load(version, data) {}
 }
 
 class Bootstrap extends Task {

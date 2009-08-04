@@ -1,9 +1,3 @@
-class World {
-	stations = {};	// by tile
-	crossings = {};	// by tile
-	towns = {};		// town ID to station
-}
-
 class RelativeCoordinates {
 	
 	static matrices = [
@@ -153,6 +147,29 @@ class TerminusStation extends WorldObject {
 	constructor(location, rotation, platformLength) {
 		WorldObject.constructor(location, rotation);
 		this.platformLength = platformLength;
+	}
+	
+	function AtLocation(location, platformLength) {
+		// deduce the rotation of an existing station
+		local rotation;
+		local direction = AIRail.GetRailStationDirection(location);
+		if (direction == AIRail.RAILTRACK_NE_SW) {
+			if (AIRail.IsRailStationTile(location + AIMap.GetTileIndex(1,0))) {
+				rotation = Rotation.ROT_270;
+			} else {
+				rotation = Rotation.ROT_90;
+			}
+		} else if (direction == AIRail.RAILTRACK_NW_SE) {
+			if (AIRail.IsRailStationTile(location + AIMap.GetTileIndex(0,1))) {
+				rotation = Rotation.ROT_0;
+			} else {
+				rotation = Rotation.ROT_180;
+			}
+		} else {
+			throw "no station at " + location;
+		}
+		
+		return TerminusStation(location, rotation, platformLength);
 	}
 	
 	function GetEntrance() {

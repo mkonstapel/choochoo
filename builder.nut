@@ -303,8 +303,6 @@ class BuildCrossing extends Builder {
 		//BuildDepot([2,-1], [2,0]);
 		//BuildDepot([1,-1], [1,0]);
 		
-		world.crossings[location] <- Crossing(location);
-		
 		// expand in opposite directions first, to maximize potential gains
 		tasks.push(ExtendCrossing(location, Direction.NE, network));
 		tasks.push(ExtendCrossing(location, Direction.SW, network));
@@ -316,9 +314,6 @@ class BuildCrossing extends Builder {
 		return "BuildCrossing " + GetLocationString();
 	}
 	
-	function Failed() {
-		AISign.RemoveSign(location);
-	}
 }
 
 /**
@@ -357,7 +352,6 @@ class BuildTerminusStation extends Builder {
 		network.depots.append(GetTile([2,p]));
 		
 		BuildSignal([0, p+1], [0, p+2], AIRail.SIGNALTYPE_PBS);
-		world.stations[location] <- TerminusStation(location, rotation, platformLength);
 		network.stations.append(AIStation.GetStationID(location));
 	}
 	
@@ -373,7 +367,6 @@ class BuildTerminusStation extends Builder {
 	
 	function Failed() {
 		local station = AIStation.GetStationID(location);
-		world.stations[location] <- null;
 		foreach (index, entry in network.stations) {
 			if (entry == station) {
 				network.stations.remove(index);
@@ -712,8 +705,8 @@ class ConnectStation extends Builder {
 	}
 	
 	function Run() {
-		local crossing = world.crossings[crossingTile];
-		local station = world.stations[stationTile];
+		local crossing = Crossing(crossingTile);
+		local station = TerminusStation.AtLocation(stationTile, RAIL_STATION_PLATFORM_LENGTH);
 		
 		// if we ran these subtasks as a task list, we can't signal failure to our parent task list
 		// so, we run them inline, making sure we can be restarted
@@ -782,8 +775,8 @@ class ConnectCrossing extends Builder {
 	}
 	
 	function Run() {
-		local fromCrossing = world.crossings[fromCrossingTile];
-		local toCrossing = world.crossings[toCrossingTile];
+		local fromCrossing = Crossing(fromCrossingTile);
+		local toCrossing = Crossing(toCrossingTile);
 		
 		if (bt1 == null) {
 			local reserved = toCrossing.GetReservedEntranceSpace(toDirection);
@@ -862,7 +855,7 @@ class ExtendCrossing extends Builder {
 	
 	function Run() {
 		// see if we've not already built this direction
-		local entrance = world.crossings[crossing].GetEntrance(direction);
+		local entrance = Crossing(crossing).GetEntrance(direction);
 		if (AIRail.IsRailTile(entrance[0])) {
 			return;
 		}
@@ -929,8 +922,9 @@ class ExtendCrossing extends Builder {
 	function FindTowns() {
 		local towns = AIList();
 		towns.AddList(AITownList());
-		foreach (key, value in world.stations) {
-			local station = AIStation.GetStationID(key);
+		
+		local stations = AIStationList(AIStation.STATION_TRAIN);
+		for (local station = stations.Begin(); stations.HasNext(); station = stations.Next()) {
 			towns.RemoveItem(AIStation.GetNearestTown(station));
 		}
 		
