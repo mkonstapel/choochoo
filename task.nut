@@ -5,8 +5,7 @@ class TaskFailedException {
 	
 	constructor(msg) {
 		this.msg = msg;
-		Warning(this);
-		Warning("(The following red text is not an actual error)");
+		Warning(this + " (the following red text is not an actual error)");
 	}
 	
 	function _tostring() {
@@ -19,7 +18,7 @@ class TaskRetryException {
 	
 	constructor(sleep = 10) {
 		this.sleep = sleep;
-		Warning(this);
+		Warning(this + " (the following red text is not an actual error)");
 	}
 	
 	function _tostring() {
@@ -32,7 +31,7 @@ class NeedMoneyException {
 	
 	constructor(amount) {
 		this.amount = amount;
-		Warning(this);
+		Warning(this + " (the following red text is not an actual error)");
 	}
 	
 	function _tostring() {

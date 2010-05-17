@@ -43,7 +43,7 @@ class ChooChoo extends AIController {
 		
 		if (AIStationList(AIStation.STATION_TRAIN).IsEmpty()) {
 			// start with some point to point lines
-			//tasks.push(Bootstrap());
+			tasks.push(Bootstrap());
 		}
 		
 		local minMoney = 0;

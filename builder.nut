@@ -66,7 +66,7 @@ class Builder extends Task {
 	/**
 	 * Remove rail, see BuildRail. If a vehicle is in the way, wait and retry.
 	 */
-	function RemoveRail(from, on, to, check = false) {
+	function RemoveRail(from, on, to, check = true) {
 		while (true) {
 			AIRail.RemoveRail(GetTile(from), GetTile(on), GetTile(to));
 			if (AIError.GetLastError() == AIError.ERR_VEHICLE_IN_THE_WAY) {
@@ -230,7 +230,7 @@ class BuildNewNetwork extends Task {
 			count++;
 			if (count > MAX_ATTEMPTS) {
 				Warning("Tried " + count + " locations to start a new network, map may be full. Trying again tomorrow...");
-				AIController.Sleep(TICKS_PER_DAY);
+				throw TaskRetryException(TICKS_PER_DAY);
 			}
 		}
 		
@@ -346,6 +346,12 @@ class BuildCrossing extends Builder {
 		foreach (task in extenders) {
 			task.Cancel();
 		}
+
+		// one exit should have a waypoint which we need to demolish
+		Demolish([0,2])
+		Demolish([2,3])
+		Demolish([3,1])
+		Demolish([1,0])
 		
 		// four segments of track
 		RemoveSegment([0,1], [3,1]);
@@ -855,33 +861,30 @@ class ConnectStation extends TaskList {
 	}
 }
 
-class ConnectCrossing extends Task {
+class ConnectCrossing extends TaskList {
 	
 	fromCrossingTile = null;
 	fromDirection = null;
 	toCrossingTile = null;
 	toDirection = null;
 	network = null;
-	bt1 = null;
-	bt2 = null;
 	
 	constructor(fromCrossingTile, fromDirection, toCrossingTile, toDirection, network) {
+		TaskList.constructor(this, null)
 		this.fromCrossingTile = fromCrossingTile;
 		this.fromDirection = fromDirection;
 		this.toCrossingTile = toCrossingTile;
 		this.toDirection = toDirection;
 		this.network = network;
-		this.bt1 = null;
-		this.bt2 = null;
 	}
 	
 	function Run() {
 		local fromCrossing = Crossing(fromCrossingTile);
 		local toCrossing = Crossing(toCrossingTile);
 		
-		// TODO: use same technique as ConnectStation
+		if (!subtasks) {
+			subtasks = [];
 		
-		if (bt1 == null) {
 			local reserved = toCrossing.GetReservedEntranceSpace(toDirection);
 			reserved.extend(fromCrossing.GetReservedExitSpace(fromDirection));
 			foreach (d in [Direction.NE, Direction.SW, Direction.NW, Direction.SE]) {
@@ -896,10 +899,8 @@ class ConnectCrossing extends Task {
 				}
 			}
 			
-			bt1 = BuildTrack(toCrossing.GetExit(toDirection), fromCrossing.GetEntrance(fromDirection), reserved, SignalMode.FORWARD, network);
-		}
+			subtasks.append(BuildTrack(toCrossing.GetExit(toDirection), fromCrossing.GetEntrance(fromDirection), reserved, SignalMode.FORWARD, network));
 		
-		if (bt2 == null) {
 			//local reserved = toCrossing.GetReservedExitSpace(toDirection);
 			//reserved.extend(fromCrossing.GetReservedEntranceSpace(fromDirection));
 			local reserved = [];
@@ -915,11 +916,10 @@ class ConnectCrossing extends Task {
 				}
 			}
 			
-			bt2 = BuildTrack(Swap(toCrossing.GetEntrance(toDirection)), Swap(fromCrossing.GetExit(fromDirection)), reserved, SignalMode.BACKWARD, network);
+			subtasks.append(BuildTrack(Swap(toCrossing.GetEntrance(toDirection)), Swap(fromCrossing.GetExit(fromDirection)), reserved, SignalMode.BACKWARD, network));
 		}
 		
-		bt1.Run();
-		bt2.Run();
+		RunSubtasks();
 		
 		// open up both crossings' exits
 		local exit = fromCrossing.GetExit(fromDirection);
@@ -947,19 +947,6 @@ class ConnectCrossing extends Task {
 		}
 	}
 	
-	function MoveWaypoint(crossingTile, exitTile) {
-		// TODO remove
-		// if the placeholder waypoint is still present, move it onto the exit
-		local waypoint = AIWaypoint.GetWaypointID(crossingTile);
-		if (AIWaypoint.IsValidWaypoint(waypoint)) {
-			local name = AIWaypoint.GetName(waypoint);
-			AIRail.BuildRailWaypoint(exitTile);
-			waypoint = AIWaypoint.GetWaypointID(exitTile);
-			AITile.DemolishTile(crossingTile);
-			AIWaypoint.SetName(waypoint, name);
-		}
-	}
-	
 	function Swap(tiles) {
 		return [tiles[1], tiles[0]];
 	}
@@ -974,7 +961,6 @@ class ExtendCrossing extends TaskList {
 	crossing = null;
 	direction = null;
 	network = null;
-	newCrossingBuilt = null;
 	cancelled = null;
 	
 	constructor(crossing, direction, network) {
@@ -982,7 +968,6 @@ class ExtendCrossing extends TaskList {
 		this.crossing = crossing;
 		this.direction = direction;
 		this.network = network;
-		this.newCrossingBuilt = false;
 		this.cancelled = false;
 	}
 	
@@ -999,8 +984,9 @@ class ExtendCrossing extends TaskList {
 		if (cancelled) return;
 		
 		// see if we've not already built this direction
-		local entrance = Crossing(crossing).GetEntrance(direction);
-		if (AIRail.IsRailTile(entrance[0])) {
+		// if we have subtasks but we do find rails, assume we're still building
+		local exit = Crossing(crossing).GetExit(direction);
+		if (!subtasks && AIRail.IsRailTile(exit[1])) {
 			return;
 		}
 		
@@ -1027,7 +1013,6 @@ class ExtendCrossing extends TaskList {
 					LevelTerrain(crossingTile, Rotation.ROT_0, [-1, -1], [Crossing.WIDTH + 1, Crossing.WIDTH + 1]),
 					BuildCrossing(crossingTile, network),
 					ConnectCrossing(crossing, direction, crossingTile, crossingEntranceDirection, network),
-					Marker(this, 1),
 					ConnectStation(crossingTile, crossingExitDirection, stationTile, network),
 					BuildTrains(stationTile, network),
 					BuildBusStations(stationTile, town),
@@ -1043,12 +1028,6 @@ class ExtendCrossing extends TaskList {
 		}
 		
 		RunSubtasks();
-	}
-	
-	// callback to see which tasks were completed
-	function Callback(value) {
-		// for now, the only callback is after ConnectCrossing
-		newCrossingBuilt = true;
 	}
 	
 	function CrossingExitDirection(crossingTile, stationTile) {
@@ -1153,14 +1132,9 @@ class ExtendCrossing extends TaskList {
 	}
 	
 	function SubtaskFailed() {
-		if (newCrossingBuilt) {
-			// we didn't connect a new station, but we did connect a new crossing,
-			// so don't remove this exit
-		} else {
-			// clean up after we finish this network
-			Debug("Cleaning up after network is complete");
-			tasks.push(ExtendCrossingCleanup(crossing, direction));
-		}
+		// either we didn't find a town, or one of our subtasks failed
+		//tasks.push(ExtendCrossingCleanup(crossing, direction));
+		ExtendCrossingCleanup(crossing, direction).Run();
 	}
 }
 
@@ -1210,6 +1184,9 @@ class ExtendCrossingCleanup extends Builder {
 		
 		// move coordinate system
 		SetLocalCoordinateSystem(GetTile(offset), rotation);
+		
+		// the exit might have a waypoint
+		Demolish([0,2]);
 		
 		RemoveRail([-1,1], [0,1], [1,1]);
 		RemoveRail([-1,2], [0,2], [1,2]);
