@@ -66,7 +66,7 @@ class Builder extends Task {
 	/**
 	 * Remove rail, see BuildRail. If a vehicle is in the way, wait and retry.
 	 */
-	function RemoveRail(from, on, to, check = true) {
+	function RemoveRail(from, on, to, check = false) {
 		while (true) {
 			AIRail.RemoveRail(GetTile(from), GetTile(on), GetTile(to));
 			if (AIError.GetLastError() == AIError.ERR_VEHICLE_IN_THE_WAY) {
@@ -148,10 +148,10 @@ class BuildLine extends TaskList {
 				BuildTerminusStation(siteA, dirA, network, a, false),
 				BuildTerminusStation(siteB, dirB, network, b, false),
 				BuildTrack(exitA, exitB, [], SignalMode.NONE, network),
-				BuildTrains(siteA, network, AIOrder.AIOF_FULL_LOAD_ANY, true),
-				BuildTrains(siteB, network, AIOrder.AIOF_FULL_LOAD_ANY, true),
 				BuildBusStations(siteA, a),
 				BuildBusStations(siteB, b),
+				BuildTrains(siteA, network, AIOrder.AIOF_FULL_LOAD_ANY, true),
+				BuildTrains(siteB, network, AIOrder.AIOF_FULL_LOAD_ANY, true),
 			];
 		}
 		
@@ -595,8 +595,9 @@ class BuildTrack extends Builder {
 	function FindPath(a, b, c, d, ignored) {
 		local pathfinder = Rail();
 		
-		pathfinder.cost.max_bridge_length = 20;
-		pathfinder.cost.max_tunnel_length = 20;
+		local bridgeLength = AIController.GetSetting("MaxBridgeLength");
+		pathfinder.cost.max_bridge_length = bridgeLength;
+		pathfinder.cost.max_tunnel_length = bridgeLength;
 		pathfinder.estimate_multiplier = 2;
 		
 		pathfinder.cost.max_cost = pathfinder.cost.tile * 4 * AIMap.DistanceManhattan(a, d);
@@ -924,13 +925,13 @@ class ConnectCrossing extends TaskList {
 		// open up both crossings' exits
 		local exit = fromCrossing.GetExit(fromDirection);
 		AIRail.RemoveSignal(exit[0], exit[1]);
-		if (fromCrossing.GetName() == "unnamed junction") {
+		if (fromCrossing.GetName() == "unnamed junction" && AIController.GetSetting("JunctionNames")) {
 			BuildWaypoint(exit[0]);
 		}
 		
 		exit = toCrossing.GetExit(toDirection);
 		AIRail.RemoveSignal(exit[0], exit[1]);
-		if (toCrossing.GetName() == "unnamed junction") {
+		if (toCrossing.GetName() == "unnamed junction" && AIController.GetSetting("JunctionNames")) {
 			BuildWaypoint(exit[0]);
 		}
 	}
@@ -1014,15 +1015,15 @@ class ExtendCrossing extends TaskList {
 					BuildCrossing(crossingTile, network),
 					ConnectCrossing(crossing, direction, crossingTile, crossingEntranceDirection, network),
 					ConnectStation(crossingTile, crossingExitDirection, stationTile, network),
-					BuildTrains(stationTile, network),
 					BuildBusStations(stationTile, town),
+					BuildTrains(stationTile, network),
 				];
 			} else {
 				subtasks = [
 					BuildTerminusStation(stationTile, direction, network, town),
 					ConnectStation(crossing, direction, stationTile, network),
-					BuildTrains(stationTile, network),
 					BuildBusStations(stationTile, town),
+					BuildTrains(stationTile, network),
 				];
 			}
 		}
@@ -1234,7 +1235,7 @@ class BuildTrains extends TaskList {
 		TaskList.constructor(this, null);
 		this.stationTile = stationTile;
 		this.network = network;
-		this.flags = flags == null ? AIOrder.AIOF_NONE : AIOrder.AIOF_FULL_LOAD_ANY;
+		this.flags = flags == null ? AIOrder.AIOF_NONE : flags;
 		this.cheap = cheap;
 	}
 	
@@ -1267,7 +1268,11 @@ class BuildTrains extends TaskList {
 			
 			subtasks = [];
 			for (local to = stationList.Begin(); stationList.HasNext(); to = stationList.Next()) {
-				subtasks.append(BuildTrain(from, to, depot, network, flags));
+				// the first train always gets a full load order to boost ratings
+				local first = subtasks.len() == 0;
+				local fromFlags = first ? flags | AIOrder.AIOF_FULL_LOAD_ANY : flags;
+				local toFlags = flags;
+				subtasks.append(BuildTrain(from, to, depot, network, fromFlags, toFlags));
 			}
 		}
 		
@@ -1310,8 +1315,6 @@ class BuildTrains extends TaskList {
 		return (capacity/triptime).tointeger();
 	}
 	
-		
-	
 }
 
 class BuildTrain extends Builder {
@@ -1324,16 +1327,18 @@ class BuildTrain extends Builder {
 	depot = null;
 	network = null;
 	cheap = null;
-	flags = null;
+	fromFlags = null;
+	toFlags = null;
 	train = null;
 	hasMail = null;
 	
-	constructor(from, to, depot, network, flags, cheap = false) {
+	constructor(from, to, depot, network, fromFlags, toFlags, cheap = false) {
 		this.from = from;
 		this.to = to;
 		this.depot = depot;
 		this.network = network;
-		this.flags = flags;
+		this.fromFlags = fromFlags;
+		this.toFlags = toFlags;
 		this.cheap = cheap;
 		this.train = null;
 		this.hasMail = false;
@@ -1400,8 +1405,8 @@ class BuildTrain extends Builder {
 		}
 
 		network.trains.append(train);
-		AIOrder.AppendOrder(train, AIStation.GetLocation(from), flags);
-		AIOrder.AppendOrder(train, AIStation.GetLocation(to), flags);
+		AIOrder.AppendOrder(train, AIStation.GetLocation(from), fromFlags);
+		AIOrder.AppendOrder(train, AIStation.GetLocation(to), toFlags);
 		AIVehicle.StartStopVehicle(train);
 	}
 	
@@ -1530,11 +1535,15 @@ function FindStationSite(town, stationRotation, destination) {
 	area.Valuate(IsBuildableRectangle, stationRotation, [0, 0], [RAIL_STATION_WIDTH, RAIL_STATION_LENGTH], true);
 	area.KeepValue(1);
 	
-	// must accept and produce passengers
-	area.Valuate(AITile.GetCargoAcceptance, PAX, 1, 1, RAIL_STATION_RADIUS);
-	area.KeepAboveValue(7);
+	// must accept passengers
+	// we can capture more production by joining bus stations 
+	area.Valuate(AcceptsCargo, stationRotation, [0, 0], [2, RAIL_STATION_PLATFORM_LENGTH], PAX, RAIL_STATION_RADIUS);
+	area.KeepValue(1);
+	
+	// any production will do (we can capture more with bus stations)
+	// but we need some, or we could connect, for example, a steel mill that only accepts passengers
 	area.Valuate(AITile.GetCargoProduction, PAX, 1, 1, RAIL_STATION_RADIUS);
-	area.KeepAboveValue(7);
+	area.KeepAboveValue(0);
 	
 	// pick the tile closest to the crossing
 	area.Valuate(AITile.GetDistanceManhattanToTile, destination);
@@ -1559,4 +1568,19 @@ function IsBuildableRectangle(location, rotation, from, to, mustBeFlat) {
 	}
 	
 	return true;
+}
+
+function AcceptsCargo(location, rotation, from, to, cargo, radius) {
+	// check if any tile in the rectangle has >= 8 cargo acceptance
+	local coords = RelativeCoordinates(location, rotation);
+	for (local x = from[0]; x < to[0]; x++) {
+		for (local y = from[1]; y < to[1]; y++) {
+			local tile = coords.GetTile([x, y]);
+			if (AITile.GetCargoAcceptance(tile, cargo, 1, 1, radius) > 7) {
+				return 1;
+			}
+		}
+	}
+	
+	return 0;
 }

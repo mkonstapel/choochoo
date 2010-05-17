@@ -58,7 +58,7 @@ class ChooChoo extends AIController {
 			
 			local task;
 			try {
-				WaitForMoney(minMoney);
+				if (minMoney > 0) WaitForMoney(minMoney);
 				minMoney = 0;
 				
 				// run the next task in the queue
@@ -94,7 +94,8 @@ class ChooChoo extends AIController {
 		MaxLoan();
 		while (GetBankBalance() < amount) {
 			FullyMaxLoan();
-			Sleep(100);
+			HandleEvents();
+			Sleep(TICKS_PER_DAY);
 			MaxLoan();
 		}
 	}
@@ -145,9 +146,11 @@ class Bootstrap extends Task {
 	}
 	
 	function Run() {
-		tasks.push(BuildLine());
-		tasks.push(BuildLine());
-		tasks.push(BuildLine());
+		local lines = AIController.GetSetting("BootstrapLines");
+		Debug("Starting with " + lines + " single track lines");
+		for (local i = 0; i < lines; i++) {
+			tasks.push(BuildLine());
+		}
 	}
 	
 }
