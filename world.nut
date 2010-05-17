@@ -138,6 +138,22 @@ class Crossing extends WorldObject {
 		return TileStrip(a, b);
 	}
 	
+	function GetName() {
+		local waypoints = [ [0,0], [0,2], [2,3], [3,1], [1,0] ];
+		foreach (tile in waypoints) {
+			local waypoint = AIWaypoint.GetWaypointID(GetTile(tile));
+			if (AIWaypoint.IsValidWaypoint(waypoint)) {
+				return AIWaypoint.GetName(waypoint);
+			}
+		}
+		
+		return "unnamed junction";
+	}
+	
+	function _tostring() {
+		return GetName();
+	}
+	
 }
 
 class TerminusStation extends WorldObject {

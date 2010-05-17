@@ -72,6 +72,13 @@ function ArrayToString(a) {
 }
 
 /**
+ * Turn a tile index into an "x, y" string.
+ */
+function TileToString(tile) {
+	return "(" + AIMap.GetTileX(tile) + ", " + AIMap.GetTileY(tile) + ")";
+}
+
+/**
  * Create an array from an AIList.
  */
 function ListToArray(l) {
@@ -127,6 +134,21 @@ function InverseDirection(direction) {
 	}
 }
 
+function DirectionName(direction) {
+	switch (direction) {
+		case Direction.N: return "N";
+		case Direction.E: return "E";
+		case Direction.S: return "S";
+		case Direction.W: return "W";
+		
+		case Direction.NE: return "NE";
+		case Direction.SE: return "SE";
+		case Direction.SW: return "SW";
+		case Direction.NW: return "NW";
+		default: throw "invalid direction";
+	}
+}
+
 /**
  * Find the cargo ID for passengers.
  * Otto: newgrf can have tourist (TOUR) which qualify as passengers but townfolk won't enter the touristbus...
@@ -152,4 +174,21 @@ function GetCargoID(cargoClass) {
 		return candidate;
 	
 	throw "missing required cargo class";
+}
+
+class Counter {
+	
+	count = 0;
+	
+	constructor() {
+		count = 0;
+	}
+	
+	function Get() {
+		return count;
+	}
+	
+	function Inc() {
+		count++;
+	}
 }

@@ -43,17 +43,18 @@ class ChooChoo extends AIController {
 		
 		if (AIStationList(AIStation.STATION_TRAIN).IsEmpty()) {
 			// start with some point to point lines
-			tasks.push(Bootstrap());
+			//tasks.push(Bootstrap());
 		}
 		
 		local minMoney = 0;
 		while (true) {
+			HandleEvents();
 			
 			if (tasks.len() == 0) {
 				tasks.push(BuildNewNetwork());
 			}
 			
-			Debug(ArrayToString(tasks));
+			Debug("Tasks: " + ArrayToString(tasks));
 			
 			local task;
 			try {
@@ -62,6 +63,7 @@ class ChooChoo extends AIController {
 				
 				// run the next task in the queue
 				task = tasks[0];
+				Debug("Running: " + task);
 				task.Run();
 				tasks.remove(0);
 			} catch (e) {
@@ -86,12 +88,46 @@ class ChooChoo extends AIController {
 	}
 	
 	function WaitForMoney(amount) {
-		Debug("Waiting until we have £" + amount + " to spend plus £" + GetMinimumSafeMoney() + " in reserve");
+		local reserve = GetMinimumSafeMoney();
+		local total = amount + reserve;
+		Debug("Waiting until we have £" + total + " (£" + amount + " to spend plus £" + reserve + " in reserve)");
 		MaxLoan();
 		while (GetBankBalance() < amount) {
 			FullyMaxLoan();
 			Sleep(100);
 			MaxLoan();
+		}
+	}
+	
+	function HandleEvents() {
+		while (AIEventController.IsEventWaiting()) {
+  			local e = AIEventController.GetNextEvent();
+  			local converted;
+  			local vehicle;
+  			switch (e.GetEventType()) {
+  				case AIEvent.AI_ET_VEHICLE_UNPROFITABLE:
+  					converted = AIEventVehicleUnprofitable.Convert(e);
+  					vehicle = converted.GetVehicleID();
+  					// see if it's not already going to a depot
+  					if (AIOrder.IsGotoDepotOrder(vehicle, AIOrder.ORDER_CURRENT)) {
+  						Warning("Vehicle already going to depot");
+  					} else {
+  						Warning("Vehicle unprofitable: " + AIVehicle.GetName(vehicle));
+  						AIVehicle.SendVehicleToDepot(vehicle);
+  					}
+  					
+  					break;
+  					
+				case AIEvent.AI_ET_VEHICLE_WAITING_IN_DEPOT:
+					converted = AIEventVehicleWaitingInDepot.Convert(e);
+					vehicle = converted.GetVehicleID();
+					Warning("Selling: " + AIVehicle.GetName(vehicle));
+					AIVehicle.SellVehicle(vehicle);
+					break;
+				
+      			default:
+      				// Debug("Unhandled event:" + e);
+  			}
 		}
 	}
 	
@@ -109,11 +145,9 @@ class Bootstrap extends Task {
 	}
 	
 	function Run() {
-		tasks.insert(1, TaskList(this, [
-			BuildLine(),
-			BuildLine(),
-			BuildLine(),
-		]));
+		tasks.push(BuildLine());
+		tasks.push(BuildLine());
+		tasks.push(BuildLine());
 	}
 	
 }

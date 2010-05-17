@@ -6,6 +6,7 @@ class TaskFailedException {
 	constructor(msg) {
 		this.msg = msg;
 		Warning(this);
+		Warning("(The following red text is not an actual error)");
 	}
 	
 	function _tostring() {
@@ -105,10 +106,13 @@ class TaskList extends Task {
 	}
 	
 	function Run() {
-		local result;
-		
+		RunSubtasks();
+	}
+	
+	function RunSubtasks() {
 		while (subtasks.len() > 0) {
 			currentTask = subtasks[0];
+			Debug("Running subtask: " + currentTask);
 			currentTask.Run();
 			subtasks.remove(0);
 			completed.append(currentTask);
@@ -125,10 +129,33 @@ class TaskList extends Task {
 			currentTask.Failed();
 		}
 		
-		parentTask.Failed();
+		SubtaskFailed();
+	}
+	
+	function SubtaskFailed() {
+		Warning(this + ": subtask failed");
 	}
 	
 	function _tostring() {
 		return parentTask + ": (" + ArrayToString(subtasks) + ")";
+	}
+}
+
+class Marker extends Task {
+	
+	parentTask = null;
+	value = null;
+	
+	constructor(parentTask, value) {
+		this.parentTask = parentTask;
+		this.value = value;
+	}
+	
+	function Run() {
+		parentTask.Callback(value);
+	}
+	
+	function _tostring() {
+		return "Marker " + value;
 	}
 }
