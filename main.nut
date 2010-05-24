@@ -37,6 +37,7 @@ class ChooChoo extends AIController {
 		
 		::PAX <- GetPassengerCargoID();
 		::MAIL <- GetMailCargoID();
+		::SIGN <- 0;
 		::TICKS_PER_DAY <- 37;
 		
 		::tasks <- [];
@@ -90,13 +91,29 @@ class ChooChoo extends AIController {
 	function WaitForMoney(amount) {
 		local reserve = GetMinimumSafeMoney();
 		local total = amount + reserve;
+		local buildSign = AIController.GetSetting("ActivitySigns");
+		local sign;
+		
+		if (buildSign) {
+			local tile = AISign.GetLocation(SIGN) + AIMap.GetTileIndex(1, 1);
+			sign = AISign.BuildSign(tile, "...");
+		}
+		
 		Debug("Waiting until we have £" + total + " (£" + amount + " to spend plus £" + reserve + " in reserve)");
 		MaxLoan();
 		while (GetBankBalance() < amount) {
+			if (buildSign) {
+				AISign.SetName(sign, "Money: " + ((100 * GetBankBalance()) / total) + "% of £" + total/1000 + "K");
+			}
+			
 			FullyMaxLoan();
 			HandleEvents();
 			Sleep(TICKS_PER_DAY);
 			MaxLoan();
+		}
+		
+		if (buildSign) {
+			AISign.RemoveSign(sign);
 		}
 	}
 	

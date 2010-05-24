@@ -80,8 +80,12 @@ class Builder extends Task {
 	}
 	
 	function BuildSignal(tile, front, type) {
-		AIRail.BuildSignal(GetTile(tile), GetTile(front), type);
-		CheckError();
+		// if we build a signal again on a tile that already has one,
+		// it'll be turned the other way, so check before we build
+		if (AIRail.GetSignalType(GetTile(tile), GetTile(front)) == AIRail.SIGNALTYPE_NONE) {
+			AIRail.BuildSignal(GetTile(tile), GetTile(front), type);
+			CheckError();
+		}
 	}
 	
 	function BuildDepot(tile, front) {
@@ -150,8 +154,8 @@ class BuildLine extends TaskList {
 				BuildTrack(exitA, exitB, [], SignalMode.NONE, network),
 				BuildBusStations(siteA, a),
 				BuildBusStations(siteB, b),
-				BuildTrains(siteA, network, AIOrder.AIOF_FULL_LOAD_ANY, true),
-				BuildTrains(siteB, network, AIOrder.AIOF_FULL_LOAD_ANY, true),
+				BuildTrains(siteA, network, null, true),
+				BuildTrains(siteB, network, null, true),
 			];
 		}
 		
@@ -294,6 +298,8 @@ class BuildCrossing extends Builder {
 	}
 	
 	function Run() {
+		MoveConstructionSign(location, this);
+		
 		// four segments of track
 		BuildSegment([0,1], [3,1]);
 		BuildSegment([0,2], [3,2]);
@@ -403,6 +409,8 @@ class BuildTerminusStation extends Builder {
 	}
 	
 	function Run() {
+		MoveConstructionSign(location, this);
+		
 		BuildPlatforms();
 		local p = platformLength;
 		BuildSegment([0, p], [0, p+1]);
@@ -551,6 +559,7 @@ class BuildTrack extends Builder {
 
 	static SIGNAL_INTERVAL = 3;
 	static DEPOT_INTERVAL = 30;
+	static TREE_INTERVAL = 2;
 	
 	a = null;
 	b = null;
@@ -580,6 +589,8 @@ class BuildTrack extends Builder {
 	}
 	
 	function Run() {
+		//MoveConstructionSign(a, this);
+		
 		/*
 		AISign.BuildSign(a, "a");
 		AISign.BuildSign(b, "b");
@@ -597,13 +608,23 @@ class BuildTrack extends Builder {
 		
 		local bridgeLength = AIController.GetSetting("MaxBridgeLength");
 		pathfinder.cost.max_bridge_length = bridgeLength;
-		pathfinder.cost.max_tunnel_length = bridgeLength;
-		pathfinder.estimate_multiplier = 2;
+		pathfinder.cost.max_tunnel_length = 10;
+		pathfinder.estimate_multiplier = AIController.GetSetting("PathfinderMultiplier");
 		
 		pathfinder.cost.max_cost = pathfinder.cost.tile * 4 * AIMap.DistanceManhattan(a, d);
-		pathfinder.cost.diagonal_tile = 200;
-		pathfinder.cost.bridge_per_tile = 500;
-		pathfinder.cost.tunnel_per_tile = 500;
+		
+		local loose = false;
+		if (loose) {
+			pathfinder.cost.diagonal_tile = 40;
+			pathfinder.cost.turn = 25;
+			pathfinder.cost.slope = 300;
+		} else {
+			pathfinder.cost.diagonal_tile = 200;
+		}
+		
+		// high multiplier settings make it very bridge happy, so increase the cost
+		pathfinder.cost.bridge_per_tile = 200 + (200 * pathfinder.estimate_multiplier);
+		pathfinder.cost.tunnel_per_tile = 100;
 		
 		// Pathfinding needs money since it attempts to build in test mode.
 		// We can't get the price of a tunnel, but we can get it for a bridge
@@ -813,6 +834,8 @@ class ConnectStation extends TaskList {
 	}
 	
 	function Run() {
+		MoveConstructionSign(crossingTile, this);
+		
 		local crossing = Crossing(crossingTile);
 		
 		if (!subtasks) {
@@ -880,6 +903,8 @@ class ConnectCrossing extends TaskList {
 	}
 	
 	function Run() {
+		MoveConstructionSign(fromCrossingTile, this);
+		
 		local fromCrossing = Crossing(fromCrossingTile);
 		local toCrossing = Crossing(toCrossingTile);
 		
@@ -983,6 +1008,8 @@ class ExtendCrossing extends TaskList {
 	function Run() {
 		// we can be cancelled if BuildCrossing failed
 		if (cancelled) return;
+		
+		MoveConstructionSign(crossing, this);
 		
 		// see if we've not already built this direction
 		// if we have subtasks but we do find rails, assume we're still building
@@ -1259,7 +1286,8 @@ class BuildTrains extends TaskList {
 			
 			local depot = depotList.Begin();
 			local from = AIStation.GetStationID(stationTile);
-			
+			MoveConstructionSign(depot, this);
+																							
 			// add trains to the N stations with the greatest capacity deficit
 			local stationList = ArrayToList(network.stations);
 			stationList.RemoveItem(from);
@@ -1469,6 +1497,8 @@ class LevelTerrain extends Builder {
 	}
 	
 	function Run() {
+		MoveConstructionSign(location, this);
+		
 		local tiles = AITileList();
 		tiles.AddRectangle(GetTile(from), GetTile(to));
 		
@@ -1518,8 +1548,7 @@ function Swap(tiles) {
 }
 
 /**
- * Find a site for a station at the given town, as close as possible
- * to the destination tile.
+ * Find a site for a station at the given town.
  */
 function FindStationSite(town, stationRotation, destination) {
 	local location = AITown.GetLocation(town);
@@ -1546,7 +1575,11 @@ function FindStationSite(town, stationRotation, destination) {
 	area.KeepAboveValue(0);
 	
 	// pick the tile closest to the crossing
-	area.Valuate(AITile.GetDistanceManhattanToTile, destination);
+	//area.Valuate(AITile.GetDistanceManhattanToTile, destination);
+	//area.KeepBottom(1);
+	
+	// pick the tile closest to the city center
+	area.Valuate(AITile.GetDistanceManhattanToTile, location);
 	area.KeepBottom(1);
 	
 	return area.IsEmpty() ? null : area.Begin();
@@ -1583,4 +1616,24 @@ function AcceptsCargo(location, rotation, from, to, cargo, radius) {
 	}
 	
 	return 0;
+}
+
+function MoveConstructionSign(tile, task) {
+	AISign.RemoveSign(SIGN);
+	
+	if (!AIController.GetSetting("ActivitySigns")) return;
+	
+	local text = task.tostring();
+	local space = text.find(" ");
+	if (space) {
+		text = text.slice(0, space);
+	}
+	
+	text = "ChooChoo: " + text;
+	
+	if (text.len() > 30) {
+		text = text.slice(0, 29);
+	}
+	
+	SIGN = AISign.BuildSign(tile, text);
 }
