@@ -107,8 +107,8 @@ class Builder extends Task {
 
 class BuildLine extends TaskList {
 	
-	static MIN_TOWN_POPULATION = 300;
-	static MIN_TOWN_DISTANCE = 50;
+	static MIN_TOWN_POPULATION = 500;
+	static MIN_TOWN_DISTANCE = 30;
 	static MAX_TOWN_DISTANCE = 100;
 	
 	static wrapper = [];
@@ -128,12 +128,13 @@ class BuildLine extends TaskList {
 			local b = towns[1];
 			
 			local nameA = AITown.GetName(a);
-			local dirA = StationDirection(a, b);
+			local dirA = StationDirection(AITown.GetLocation(a), AITown.GetLocation(B));
 			local rotA = BuildTerminusStation.StationRotationForDirection(dirA);
 			local siteA = FindStationSite(a, rotA, AITown.GetLocation(b));
 	
 			local nameB = AITown.GetName(b);
-			local dirB = StationDirection(b, a);
+			local locB = AITown.GetLocation(b);
+			local dirB = StationDirection(AITown.GetLocation(b), AITown.GetLocation(a));
 			local rotB = BuildTerminusStation.StationRotationForDirection(dirB);
 			local siteB = FindStationSite(b, rotB, AITown.GetLocation(a));
 			
@@ -147,15 +148,15 @@ class BuildLine extends TaskList {
 			local exitA = Swap(TerminusStation(siteA, rotA, RAIL_STATION_PLATFORM_LENGTH).GetEntrance());
 			local exitB = TerminusStation(siteB, rotB, RAIL_STATION_PLATFORM_LENGTH).GetEntrance();
 			
-			local network = Network(AIRailTypeList().Begin(), MIN_TOWN_DISTANCE, MAX_TOWN_DISTANCE);
+			local network = Network(AIRailTypeList().Begin(), RAIL_STATION_PLATFORM_LENGTH, MIN_TOWN_DISTANCE, MAX_TOWN_DISTANCE);
 			subtasks = [
 				BuildTerminusStation(siteA, dirA, network, a, false),
 				BuildTerminusStation(siteB, dirB, network, b, false),
-				BuildTrack(exitA, exitB, [], SignalMode.NONE, network),
+				BuildTrack(exitA, exitB, [], SignalMode.NONE, network, BuildTrack.FAST),
 				BuildBusStations(siteA, a),
 				BuildBusStations(siteB, b),
-				BuildTrains(siteA, network, null, true),
-				BuildTrains(siteB, network, null, true),
+				BuildTrains(siteA, network, PAX, null, true),
+				BuildTrains(siteB, network, PAX, null, true),
 			];
 		}
 		
@@ -198,16 +199,137 @@ class BuildLine extends TaskList {
 		return [pair & 0xFFFF, pair >> 16];
 	}
 	
-	function StationDirection(fromTown, toTown) {
-		local dx = AIMap.GetTileX(AITown.GetLocation(fromTown)) - AIMap.GetTileX(AITown.GetLocation(toTown));
-		local dy = AIMap.GetTileY(AITown.GetLocation(fromTown)) - AIMap.GetTileY(AITown.GetLocation(toTown));
-		
-		if (abs(dx) > abs(dy)) {
-			return dx > 0 ? Direction.SW : Direction.NE;
-		} else {
-			return dy > 0 ? Direction.SE : Direction.NW;
-		}
+}
+
+class BuildCargoLine extends TaskList {
+	
+	static TILES_PER_DAY = 1;
+	static CARGO_STATION_LENGTH = 4;
+	
+	static bannedCargo = [];
+	
+	constructor() {
+		TaskList.constructor(this, null);
 	}
+	
+	function _tostring() {
+		return "BuildCargoLine";
+	}
+	
+	function Run() {
+		if (!subtasks) {
+			local cargo = SelectCargo();
+			Debug("Going to try and build a " + AICargo.GetCargoLabel(cargo) + " line");
+			
+			local between = SelectIndustries(cargo);
+			local a = between[0];
+			local b = between[1];
+			local locA = AIIndustry.GetLocation(a);
+			local locB = AIIndustry.GetLocation(b);
+			
+			Debug("From " + AIIndustry.GetName(a) + " to " + AIIndustry.GetName(b));
+			
+			local nameA = AIIndustry.GetName(a);
+			local dirA = StationDirection(locA, locB);
+			local rotA = BuildTerminusStation.StationRotationForDirection(dirA);
+			local siteA = FindIndustryStationSite(a, true, rotA, locB);
+
+			local nameB = AIIndustry.GetName(b);
+			local dirB = StationDirection(locB, locA);
+			local rotB = BuildTerminusStation.StationRotationForDirection(dirB);
+			local siteB = FindIndustryStationSite(b, false, rotB, locA);
+			
+			if (siteA && siteB) {
+				Debug("Connecting " + nameA + " and " + nameB);
+			} else {
+				Debug("Cannot build a station at " + (siteA ? nameB : nameA));
+				throw TaskRetryException();
+			}
+			
+			local exitA = Swap(TerminusStation(siteA, rotA, CARGO_STATION_LENGTH).GetEntrance());
+			local exitB = TerminusStation(siteB, rotB, CARGO_STATION_LENGTH).GetEntrance();
+			
+			local network = Network(AIRailTypeList().Begin(), CARGO_STATION_LENGTH, MIN_DISTANCE, MAX_DISTANCE);
+			subtasks = [
+				BuildTerminusStation(siteA, dirA, network, a, false, CARGO_STATION_LENGTH),
+				BuildTerminusStation(siteB, dirB, network, b, false, CARGO_STATION_LENGTH),
+				BuildTrack(exitA, exitB, [], SignalMode.NONE, network, BuildTrack.FAST),
+				BuildTrains(siteA, network, cargo),
+			];
+		}
+		
+		RunSubtasks();
+	}
+	
+	function SelectCargo() {
+		local cargoList = AICargoList();
+		
+		// haven't tried to use it before, and failed
+		cargoList.RemoveList(ArrayToList(bannedCargo));
+		
+		// no passengers, mail or valuables
+		foreach (cc in [AICargo.CC_PASSENGERS, AICargo.CC_MAIL, AICargo.CC_EXPRESS, AICargo.CC_ARMOURED]) { 
+			cargoList.Valuate(AICargo.HasCargoClass, cc);
+			cargoList.KeepValue(0);
+		}
+		
+		// is actually available (primaries only)
+		cargoList.Valuate(IsAvailable);
+		cargoList.KeepValue(1);
+		
+		// decent profit
+		cargoList.Valuate(AICargo.GetCargoIncome, MAX_DISTANCE, MAX_DISTANCE/TILES_PER_DAY);
+		cargoList.KeepTop(5);
+		
+		if (cargoList.IsEmpty()) {
+			throw TaskFailedException("No suitable cargo");
+		}
+		
+		// pick one at random
+		cargoList.Valuate(AIBase.RandItem);
+		cargoList.KeepTop(1);
+		return cargoList.Begin();
+	}
+	
+	/**
+	 * See if a cargo is produced anywhere in reasonable quantities.
+	 */
+	function IsAvailable(cargo) {
+		local industries = AIIndustryList_CargoProducing(cargo);
+		industries.Valuate(AIIndustry.GetLastMonthProduction, cargo);
+		industries.KeepAboveValue(50);
+		return !industries.IsEmpty();
+	}
+	
+	function SelectIndustries(cargo) {
+		local producers = AIIndustryList_CargoProducing(cargo);
+		local consumers = AIIndustryList_CargoAccepting(cargo);
+		
+		// we want decent production
+		producers.Valuate(AIIndustry.GetLastMonthProduction, cargo);
+		producers.KeepAboveValue(50);
+		
+		// and no competition
+		producers.Valuate(AIIndustry.GetAmountOfStationsAround);
+		producers.KeepValue(0);
+		
+		// find a random producer/consumer pair that's within our target distance
+		producers.Valuate(AIBase.RandItem);
+		producers.Sort(AIList.SORT_BY_VALUE, true);
+		for (local producer = producers.Begin(); producers.HasNext(); producer = producers.Next()) {
+			consumers.Valuate(AIIndustry.GetDistanceManhattanToTile, AIIndustry.GetLocation(producer));
+			consumers.KeepAboveValue(MIN_DISTANCE);
+			consumers.KeepBelowValue(MAX_DISTANCE);
+			if (!consumers.IsEmpty()) {
+				return [producer, consumers.Begin()];
+			}
+		}
+		
+		// can't find a route for this cargo
+		bannedCargo.append(cargo);
+		throw TaskRetryException();
+	}
+
 }
 
 class BuildNewNetwork extends Task {
@@ -216,7 +338,7 @@ class BuildNewNetwork extends Task {
 	network = null;
 	
 	constructor(minDistance = MIN_DISTANCE, maxDistance = MAX_DISTANCE) {
-		this.network = Network(AIRailTypeList().Begin(), minDistance, maxDistance);
+		this.network = Network(AIRailTypeList().Begin(), RAIL_STATION_PLATFORM_LENGTH, minDistance, maxDistance);
 	}
 	
 	function Run() {
@@ -251,7 +373,7 @@ class BuildNewNetwork extends Task {
 	
 	function EstimateNetworkStationCount(tile) {
 		local stationCount = 0;
-		local estimationNetwork = Network(network.railType, network.minDistance, network.maxDistance);
+		local estimationNetwork = Network(network.railType, RAIL_STATION_PLATFORM_LENGTH, network.minDistance, network.maxDistance);
 		foreach (direction in [Direction.NE, Direction.SW, Direction.NW, Direction.SE]) {
 			stationCount += EstimateCrossing(tile, direction, estimationNetwork);
 		}
@@ -557,6 +679,11 @@ class BuildBusStations extends Builder {
 
 class BuildTrack extends Builder {
 
+	// build styles
+	static STRAIGHT = 0;
+	static LOOSE = 1;
+	static FAST = 2;
+	
 	static SIGNAL_INTERVAL = 3;
 	static DEPOT_INTERVAL = 30;
 	static TREE_INTERVAL = 2;
@@ -568,10 +695,11 @@ class BuildTrack extends Builder {
 	ignored = null;
 	signalMode = null;
 	network = null;
+	style = null;
 	path = null;
 	lastDepot = null;
 	
-	constructor(from, to, ignored, signalMode, network) {
+	constructor(from, to, ignored, signalMode, network, style = null) {
 		this.a = from[0];
 		this.b = from[1];
 		this.c = to[0];
@@ -579,6 +707,7 @@ class BuildTrack extends Builder {
 		this.ignored = ignored;
 		this.signalMode = signalMode;
 		this.network = network;
+		this.style = style ? style : STRAIGHT;
 		//this.lastDepot = -DEPOT_INTERVAL;	// build one as soon as possible
 		this.lastDepot = 0;
 		this.path = null;
@@ -608,18 +737,19 @@ class BuildTrack extends Builder {
 		
 		local bridgeLength = AIController.GetSetting("MaxBridgeLength");
 		pathfinder.cost.max_bridge_length = bridgeLength;
-		pathfinder.cost.max_tunnel_length = 10;
+		pathfinder.cost.max_tunnel_length = 5;
 		pathfinder.estimate_multiplier = AIController.GetSetting("PathfinderMultiplier");
 		
 		pathfinder.cost.max_cost = pathfinder.cost.tile * 4 * AIMap.DistanceManhattan(a, d);
 		
-		local loose = false;
-		if (loose) {
+		if (style == STRAIGHT) {
+			pathfinder.cost.diagonal_tile = 200;
+		} else if (style == LOOSE) {
 			pathfinder.cost.diagonal_tile = 40;
 			pathfinder.cost.turn = 25;
 			pathfinder.cost.slope = 300;
 		} else {
-			pathfinder.cost.diagonal_tile = 200;
+			pathfinder.cost.diagonal_tile = 70;
 		}
 		
 		// high multiplier settings make it very bridge happy, so increase the cost
@@ -1043,14 +1173,14 @@ class ExtendCrossing extends TaskList {
 					ConnectCrossing(crossing, direction, crossingTile, crossingEntranceDirection, network),
 					ConnectStation(crossingTile, crossingExitDirection, stationTile, network),
 					BuildBusStations(stationTile, town),
-					BuildTrains(stationTile, network),
+					BuildTrains(stationTile, network, PAX),
 				];
 			} else {
 				subtasks = [
 					BuildTerminusStation(stationTile, direction, network, town),
 					ConnectStation(crossing, direction, stationTile, network),
 					BuildBusStations(stationTile, town),
-					BuildTrains(stationTile, network),
+					BuildTrains(stationTile, network, PAX),
 				];
 			}
 		}
@@ -1253,15 +1383,17 @@ class BuildTrains extends TaskList {
 	
 	stationTile = null;
 	network = null;
+	cargo = null;
 	flags = null;
 	cheap = null;
 	depot = null;
 	engine = null;
 	
-	constructor(stationTile, network, flags = null, cheap = false) {
+	constructor(stationTile, network, cargo, flags = null, cheap = false) {
 		TaskList.constructor(this, null);
 		this.stationTile = stationTile;
 		this.network = network;
+		this.cargo = cargo;
 		this.flags = flags == null ? AIOrder.AIOF_NONE : flags;
 		this.cheap = cheap;
 	}
@@ -1300,7 +1432,7 @@ class BuildTrains extends TaskList {
 				local first = subtasks.len() == 0;
 				local fromFlags = first ? flags | AIOrder.AIOF_FULL_LOAD_ANY : flags;
 				local toFlags = flags;
-				subtasks.append(BuildTrain(from, to, depot, network, fromFlags, toFlags));
+				subtasks.append(BuildTrain(from, to, depot, network, fromFlags, toFlags, cargo));
 			}
 		}
 		
@@ -1347,7 +1479,6 @@ class BuildTrains extends TaskList {
 
 class BuildTrain extends Builder {
 	
-	static TRAIN_LENGTH = 3;	// in tiles
 	static bannedEngines = [];
 	
 	from = null;
@@ -1357,16 +1488,18 @@ class BuildTrain extends Builder {
 	cheap = null;
 	fromFlags = null;
 	toFlags = null;
+	cargo = null;
 	train = null;
 	hasMail = null;
 	
-	constructor(from, to, depot, network, fromFlags, toFlags, cheap = false) {
+	constructor(from, to, depot, network, fromFlags, toFlags, cargo = null, cheap = false) {
 		this.from = from;
 		this.to = to;
 		this.depot = depot;
 		this.network = network;
 		this.fromFlags = fromFlags;
 		this.toFlags = toFlags;
+		this.cargo = cargo ? cargo : PAX;
 		this.cheap = cheap;
 		this.train = null;
 		this.hasMail = false;
@@ -1391,27 +1524,30 @@ class BuildTrain extends Builder {
 			CheckError();
 		}
 		
-		// one mail wagon
-		if (!hasMail) {
-			local wagonType = GetWagon(MAIL, network.railType);
-			if (wagonType) {
-				local wagon = AIVehicle.BuildVehicle(depot, wagonType);
-				CheckError();
-				AIVehicle.MoveWagon(wagon, 0, train, 0);
-				CheckError();
-			} else {
-				// no mail wagons available - can happen in some train sets
-				// just skip it, we'll build another passenger wagon instead
+		if (cargo == PAX) {
+			// include one mail wagon
+			if (!hasMail) {
+				local wagonType = GetWagon(MAIL, network.railType);
+				if (wagonType) {
+					local wagon = AIVehicle.BuildVehicle(depot, wagonType);
+					CheckError();
+					AIVehicle.MoveWagon(wagon, 0, train, 0);
+					CheckError();
+				} else {
+					// no mail wagons available - can happen in some train sets
+					// just skip it, we'll build another passenger wagon instead
+				}
+				
+				// moving it into the train makes it stop existing as a separate vehicleID,
+				// so use a boolean flag, not a vehicle ID
+				hasMail = true;
 			}
-			
-			// moving it into the train makes it stop existing as a separate vehicleID,
-			// so use a boolean flag, not a vehicle ID
-			hasMail = true;
 		}
 		
+		
 		// and fill the rest of the train with passenger wagons
-		local wagonType = GetWagon(PAX, network.railType);
-		while (AIVehicle.GetLength(train)/16 < TRAIN_LENGTH) {
+		local wagonType = GetWagon(cargo, network.railType);
+		while (AIVehicle.GetLength(train)/16 < network.trainLength) {
 			local wagon = AIVehicle.BuildVehicle(depot, wagonType);
 			CheckError();
 			
@@ -1428,7 +1564,7 @@ class BuildTrain extends Builder {
 		}
 		
 		// see if we went over - newgrfs can introduce non-half-tile wagons
-		if (AIVehicle.GetLength(train)/16 > TRAIN_LENGTH) {
+		if (AIVehicle.GetLength(train)/16 > network.trainLength) {
 			AIVehicle.SellWagon(train, 1);
 		}
 
@@ -1548,6 +1684,20 @@ function Swap(tiles) {
 }
 
 /**
+ * Returns the proper direction for a station at a, with the tracks heading to b.
+ */
+function StationDirection(a, b) {
+	local dx = AIMap.GetTileX(a) - AIMap.GetTileX(b);
+	local dy = AIMap.GetTileY(a) - AIMap.GetTileY(b);
+	
+	if (abs(dx) > abs(dy)) {
+		return dx > 0 ? Direction.SW : Direction.NE;
+	} else {
+		return dy > 0 ? Direction.SE : Direction.NW;
+	}
+}
+
+/**
  * Find a site for a station at the given town.
  */
 function FindStationSite(town, stationRotation, destination) {
@@ -1566,7 +1716,7 @@ function FindStationSite(town, stationRotation, destination) {
 	
 	// must accept passengers
 	// we can capture more production by joining bus stations 
-	area.Valuate(AcceptsCargo, stationRotation, [0, 0], [2, RAIL_STATION_PLATFORM_LENGTH], PAX, RAIL_STATION_RADIUS);
+	area.Valuate(CargoValue, stationRotation, [0, 0], [2, RAIL_STATION_PLATFORM_LENGTH], PAX, RAIL_STATION_RADIUS, true);
 	area.KeepValue(1);
 	
 	// any production will do (we can capture more with bus stations)
@@ -1579,6 +1729,28 @@ function FindStationSite(town, stationRotation, destination) {
 	//area.KeepBottom(1);
 	
 	// pick the tile closest to the city center
+	area.Valuate(AITile.GetDistanceManhattanToTile, location);
+	area.KeepBottom(1);
+	
+	return area.IsEmpty() ? null : area.Begin();
+}
+
+/**
+ * Find a site for a station at the given town.
+ */
+function FindIndustryStationSite(industry, producing, stationRotation, destination) {
+	local location = AIIndustry.GetLocation(industry);
+	local area = producing ? AITileList_IndustryProducing(industry, RAIL_STATION_RADIUS) : AITileList_IndustryAccepting(industry, RAIL_STATION_RADIUS);
+	
+	// room for a station
+	area.Valuate(IsBuildableRectangle, stationRotation, [0, 0], [RAIL_STATION_WIDTH, RAIL_STATION_LENGTH], true);
+	area.KeepValue(1);
+	
+	// pick the tile farthest from the destination for increased profit
+	//area.Valuate(AITile.GetDistanceManhattanToTile, destination);
+	//area.KeepTop(1);
+	
+	// pick the tile closest to the industry for looks
 	area.Valuate(AITile.GetDistanceManhattanToTile, location);
 	area.KeepBottom(1);
 	
@@ -1603,13 +1775,14 @@ function IsBuildableRectangle(location, rotation, from, to, mustBeFlat) {
 	return true;
 }
 
-function AcceptsCargo(location, rotation, from, to, cargo, radius) {
-	// check if any tile in the rectangle has >= 8 cargo acceptance
+function CargoValue(location, rotation, from, to, cargo, radius, accept) {
+	// check if any tile in the rectangle has >= 8 cargo acceptance/production
+	local f = accept ? AITile.GetCargoAcceptance : AITile.GetCargoProduction;
 	local coords = RelativeCoordinates(location, rotation);
 	for (local x = from[0]; x < to[0]; x++) {
 		for (local y = from[1]; y < to[1]; y++) {
 			local tile = coords.GetTile([x, y]);
-			if (AITile.GetCargoAcceptance(tile, cargo, 1, 1, radius) > 7) {
+			if (f(tile, cargo, 1, 1, radius) > 7) {
 				return 1;
 			}
 		}

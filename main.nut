@@ -7,7 +7,7 @@ require("builder.nut");
 import("pathfinder.road", "RoadPathFinder", 3);
 // TODO: rail pathfinder
 
-const MIN_DISTANCE =  20;
+const MIN_DISTANCE =  30;
 const MAX_DISTANCE = 100;
 const INDEPENDENTLY_WEALTHY = 1000000;	// no longer need a loan
 
@@ -166,7 +166,8 @@ class Bootstrap extends Task {
 		local lines = AIController.GetSetting("BootstrapLines");
 		Debug("Starting with " + lines + " single track lines");
 		for (local i = 0; i < lines; i++) {
-			tasks.push(BuildLine());
+			// tasks.push(BuildLine());
+			tasks.push(BuildCargoLine());
 		}
 	}
 	

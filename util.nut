@@ -62,6 +62,8 @@ function Sum(list) {
  * Create a string of all elements of an array, separated by a comma.
  */
 function ArrayToString(a) {
+	if (a == null) return "";
+	
 	local s = "";
 	foreach (index, item in a) {
 		if (index > 0) s += ", ";
