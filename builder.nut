@@ -1,7 +1,7 @@
 const RAIL_STATION_RADIUS = 4;
-const RAIL_STATION_PLATFORM_LENGTH = 3;
-const RAIL_STATION_LENGTH = 8;	// actual building and rails plus room for entrance/exit
 const RAIL_STATION_WIDTH = 3;
+const RAIL_STATION_PLATFORM_LENGTH = 3;
+const RAIL_STATION_LENGTH = 6; // actual building and rails plus room for entrance/exit
 
 class Builder extends Task {
 	
@@ -232,12 +232,12 @@ class BuildCargoLine extends TaskList {
 			local nameA = AIIndustry.GetName(a);
 			local dirA = StationDirection(locA, locB);
 			local rotA = BuildTerminusStation.StationRotationForDirection(dirA);
-			local siteA = FindIndustryStationSite(a, true, rotA, locB);
+			local siteA = FindIndustryStationSite(a, true, rotA, locB, CARGO_STATION_LENGTH);
 
 			local nameB = AIIndustry.GetName(b);
 			local dirB = StationDirection(locB, locA);
 			local rotB = BuildTerminusStation.StationRotationForDirection(dirB);
-			local siteB = FindIndustryStationSite(b, false, rotB, locA);
+			local siteB = FindIndustryStationSite(b, false, rotB, locA, CARGO_STATION_LENGTH);
 			
 			if (siteA && siteB) {
 				Debug("Connecting " + nameA + " and " + nameB);
@@ -1738,12 +1738,12 @@ function FindStationSite(town, stationRotation, destination) {
 /**
  * Find a site for a station at the given town.
  */
-function FindIndustryStationSite(industry, producing, stationRotation, destination) {
+function FindIndustryStationSite(industry, producing, stationRotation, destination, platformLength) {
 	local location = AIIndustry.GetLocation(industry);
 	local area = producing ? AITileList_IndustryProducing(industry, RAIL_STATION_RADIUS) : AITileList_IndustryAccepting(industry, RAIL_STATION_RADIUS);
 	
 	// room for a station
-	area.Valuate(IsBuildableRectangle, stationRotation, [0, 0], [RAIL_STATION_WIDTH, RAIL_STATION_LENGTH], true);
+	area.Valuate(IsBuildableRectangle, stationRotation, [0, 0], [RAIL_STATION_WIDTH, platformLength + 3], true);
 	area.KeepValue(1);
 	
 	// pick the tile farthest from the destination for increased profit
