@@ -35,6 +35,7 @@ class ChooChoo extends AIController {
 		AIRoad.SetCurrentRoadType(AIRoad.ROADTYPE_ROAD);
 		AIRail.SetCurrentRailType(AIRailTypeList().Begin());
 		
+		::COMPANY <- AICompany.ResolveCompanyID(AICompany.COMPANY_SELF);
 		::PAX <- GetPassengerCargoID();
 		::MAIL <- GetMailCargoID();
 		::SIGN <- 0;

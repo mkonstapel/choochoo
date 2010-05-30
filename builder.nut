@@ -459,8 +459,10 @@ class BuildCrossing extends Builder {
 		BuildSignal([2,0], [ 2,-1], type);
 		BuildSignal([1,0], [ 1,-1], type);
 		
-		//BuildRail([-1,0], [0,0], [1,0]);
-		//BuildWaypoint([0,0]);
+		// place our HQ if we don't have one yet
+		if (AICompany.GetCompanyHQ(COMPANY) == AIMap.TILE_INVALID) {
+			AICompany.BuildCompanyHQ(GetTile([-1, -1]));
+		}
 		
 		tasks.extend(extenders);
 	}
@@ -1416,8 +1418,7 @@ class AppeaseLocalAuthority extends Task {
 		area.Valuate(AITile.IsBuildable);
 		area.KeepValue(1);
 		
-		local company = AICompany.ResolveCompanyID(AICompany.COMPANY_SELF);
-		local rating = AITown.GetRating(town, company);
+		local rating = AITown.GetRating(town, COMPANY);
 		for (local tile = area.Begin(); area.HasNext(); tile = area.Next()) {
 			if (rating > -200) {
 				break;
