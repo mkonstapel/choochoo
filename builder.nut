@@ -1152,8 +1152,9 @@ class ExtendCrossing extends TaskList {
 			local towns = FindTowns();
 			local town = null;
 			local stationTile = null;
+			local stationRotation = BuildTerminusStation.StationRotationForDirection(direction);
 			for (town = towns.Begin(); towns.HasNext(); town = towns.Next()) {
-				stationTile = FindStationSite(town, BuildTerminusStation.StationRotationForDirection(direction), crossing);
+				stationTile = FindStationSite(town, stationRotation, crossing);
 				if (stationTile) break;
 			}
 			
@@ -1167,18 +1168,24 @@ class ExtendCrossing extends TaskList {
 				local crossingExitDirection = CrossingExitDirection(crossingTile, stationTile);
 				
 				subtasks = [
+					LevelTerrain(stationTile, stationRotation, [0, 0], [RAIL_STATION_WIDTH-1, RAIL_STATION_LENGTH-2]),
+					AppeaseLocalAuthority(town),
 					BuildTerminusStation(stationTile, direction, network, town),
 					LevelTerrain(crossingTile, Rotation.ROT_0, [-1, -1], [Crossing.WIDTH + 1, Crossing.WIDTH + 1]),
 					BuildCrossing(crossingTile, network),
 					ConnectCrossing(crossing, direction, crossingTile, crossingEntranceDirection, network),
 					ConnectStation(crossingTile, crossingExitDirection, stationTile, network),
+					AppeaseLocalAuthority(town),
 					BuildBusStations(stationTile, town),
 					BuildTrains(stationTile, network, PAX),
 				];
 			} else {
 				subtasks = [
+					LevelTerrain(stationTile, stationRotation, [0, 0], [RAIL_STATION_WIDTH-1, RAIL_STATION_LENGTH-2]),
+					AppeaseLocalAuthority(town),
 					BuildTerminusStation(stationTile, direction, network, town),
 					ConnectStation(crossing, direction, stationTile, network),
+					AppeaseLocalAuthority(town),
 					BuildBusStations(stationTile, town),
 					BuildTrains(stationTile, network, PAX),
 				];
@@ -1377,6 +1384,46 @@ class ExtendCrossingCleanup extends Builder {
 	}
 }
 
+class AppeaseLocalAuthority extends Task {
+	
+	town = null;
+	
+	constructor(town) {
+		this.town = town;
+	}
+	
+	function _tostring() {
+		return "AppeaseLocalAuthority";
+	}
+	
+	function Run() {
+		local location = AITown.GetLocation(town);
+		MoveConstructionSign(location, this);
+		
+		local area = AITileList();
+		SafeAddRectangle(area, location, 20);
+		area.Valuate(AITile.IsWithinTownInfluence, town);
+		area.KeepValue(1);
+		area.Valuate(AITile.IsBuildable);
+		area.KeepValue(1);
+		
+		local company = AICompany.ResolveCompanyID(AICompany.COMPANY_SELF);
+		local rating = AITown.GetRating(town, company);
+		for (local tile = area.Begin(); area.HasNext(); tile = area.Next()) {
+			if (rating > -200) {
+				break;
+			}
+			
+			AITile.PlantTree(tile);
+			if (AIError.GetLastError() == AIError.ERR_UNKNOWN) {
+				// too many trees on tile, continue
+			} else {
+				CheckError();
+			}
+		}
+	}
+}
+
 class BuildTrains extends TaskList {
 	
 	static TRAINS_ADDED_PER_STATION = 4;
@@ -1547,7 +1594,7 @@ class BuildTrain extends Builder {
 		
 		// and fill the rest of the train with passenger wagons
 		local wagonType = GetWagon(cargo, network.railType);
-		while (AIVehicle.GetLength(train)/16 < network.trainLength) {
+		while (TrainLength(train) <= network.trainLength) {
 			local wagon = AIVehicle.BuildVehicle(depot, wagonType);
 			CheckError();
 			
@@ -1564,7 +1611,7 @@ class BuildTrain extends Builder {
 		}
 		
 		// see if we went over - newgrfs can introduce non-half-tile wagons
-		if (AIVehicle.GetLength(train)/16 > network.trainLength) {
+		while (TrainLength(train) > network.trainLength) {
 			AIVehicle.SellWagon(train, 1);
 		}
 
@@ -1646,8 +1693,8 @@ class LevelTerrain extends Builder {
 			if (AITile.GetMinHeight(tile) < min) min = AITile.GetMinHeight(tile);
 		}
 		
-		// prefer rounding up
-		local targetHeight = (min + max + 1) / 2;
+		// prefer rounding down - cheaper when we're near the sea
+		local targetHeight = (min + max) / 2;
 		for (local tile = tiles.Begin(); tiles.HasNext(); tile = tiles.Next()) {
 			LevelTile(tile, targetHeight);
 		}
@@ -1660,15 +1707,20 @@ class LevelTerrain extends Builder {
 	
 	function LevelTile(tile, height) {
 		// raise or lower each corner of the tile to the target height
+		//AISign.BuildSign(tile, "_");
 		foreach (corner in [AITile.CORNER_N, AITile.CORNER_E, AITile.CORNER_S, AITile.CORNER_W]) {
 			while (AITile.GetCornerHeight(tile, corner) < height) {
 				AITile.RaiseTile(tile, 1 << corner);
-				CheckError();
+				// stop on errors - we may be able to build anyway
+				// due to foundations on slopes
+				//CheckError();
+				if (AIError.GetLastError() != AIError.ERR_NONE) break;
 			}
 			
 			while (AITile.GetCornerHeight(tile, corner) > height) {
 				AITile.LowerTile(tile, 1 << corner);
-				CheckError();
+				//CheckError();
+				if (AIError.GetLastError() != AIError.ERR_NONE) break;
 			}
 		}
 	}
@@ -1710,10 +1762,6 @@ function FindStationSite(town, stationRotation, destination) {
 	area.Valuate(AITile.GetClosestTown)
 	area.KeepValue(town);
 	
-	// room for a station
-	area.Valuate(IsBuildableRectangle, stationRotation, [0, 0], [RAIL_STATION_WIDTH, RAIL_STATION_LENGTH], true);
-	area.KeepValue(1);
-	
 	// must accept passengers
 	// we can capture more production by joining bus stations 
 	area.Valuate(CargoValue, stationRotation, [0, 0], [2, RAIL_STATION_PLATFORM_LENGTH], PAX, RAIL_STATION_RADIUS, true);
@@ -1723,6 +1771,20 @@ function FindStationSite(town, stationRotation, destination) {
 	// but we need some, or we could connect, for example, a steel mill that only accepts passengers
 	area.Valuate(AITile.GetCargoProduction, PAX, 1, 1, RAIL_STATION_RADIUS);
 	area.KeepAboveValue(0);
+	
+	// room for a station - try to find a flat area first
+	local flat = AIList();
+	flat.AddList(area);
+	flat.Valuate(IsBuildableRectangle, stationRotation, [0, 0], [RAIL_STATION_WIDTH, RAIL_STATION_LENGTH], true);
+	flat.KeepValue(1);
+	
+	if (flat.Count() > 0) {
+		area = flat;
+	} else {
+		// try again, with terraforming
+		area.Valuate(IsBuildableRectangle, stationRotation, [0, 0], [RAIL_STATION_WIDTH, RAIL_STATION_LENGTH], false);
+		area.KeepValue(1);
+	}
 	
 	// pick the tile closest to the crossing
 	//area.Valuate(AITile.GetDistanceManhattanToTile, destination);
@@ -1762,11 +1824,31 @@ function IsBuildableRectangle(location, rotation, from, to, mustBeFlat) {
 	// TODO: don't require it to be flat, check if it can be leveled
 	local coords = RelativeCoordinates(location, rotation);
 	local height = AITile.GetHeight(location);
+	
 	for (local x = from[0]; x < to[0]; x++) {
 		for (local y = from[1]; y < to[1]; y++) {
 			local tile = coords.GetTile([x, y]);
 			local flat = AITile.GetHeight(tile) == height && AITile.GetMinHeight(tile) == height && AITile.GetMaxHeight(tile) == height;
 			if (!AITile.IsBuildable(tile) || (mustBeFlat && !flat)) {
+				return false;
+			}
+			
+			local area = AITileList();
+			SafeAddRectangle(area, tile, 1);
+			area.Valuate(AITile.GetMinHeight);
+			area.KeepAboveValue(height - 2);
+			area.Valuate(AITile.GetMaxHeight);
+			area.KeepBelowValue(height + 2);
+			area.Valuate(AITile.IsBuildable);
+			area.KeepValue(1);
+			
+			local flattenable = (
+				area.Count() == 9 &&
+				abs(AITile.GetHeight(tile) - height) <= 1 &&
+				abs(AITile.GetMinHeight(tile) - height) <= 1 &&
+				abs(AITile.GetMaxHeight(tile) - height) <= 1);
+			
+			if (!AITile.IsBuildable(tile) || !flattenable || (mustBeFlat && !flat)) {
 				return false;
 			}
 		}

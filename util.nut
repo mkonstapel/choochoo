@@ -178,6 +178,11 @@ function GetCargoID(cargoClass) {
 	throw "missing required cargo class";
 }
 
+function TrainLength(train) {
+	// train length in tiles
+	return (AIVehicle.GetLength(train) + 15) / 16;
+}
+
 class Counter {
 	
 	count = 0;
