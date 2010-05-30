@@ -114,8 +114,10 @@ class ChooChoo extends AIController {
 					}
 				}
 				
+				// maximum sign length is 30 characters; pound sign seems to require two (bytes?)
+				local currency = total >= 100000 ? "" : "£";
+				AISign.SetName(sign, "Money: need " + currency + total/1000 + "K [" + bar + "]");
 				//AISign.SetName(sign, "Money: " + ((100 * GetBankBalance()) / total) + "% of £" + total/1000 + "K");
-				AISign.SetName(sign, "Money: [" + bar + "] of £" + total/1000 + "K");
 			}
 			
 			FullyMaxLoan();
