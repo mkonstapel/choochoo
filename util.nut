@@ -183,6 +183,10 @@ function TrainLength(train) {
 	return (AIVehicle.GetLength(train) + 15) / 16;
 }
 
+function HaveHQ() {
+	return AICompany.GetCompanyHQ(COMPANY) != AIMap.TILE_INVALID;
+}
+
 class Counter {
 	
 	count = 0;

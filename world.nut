@@ -138,6 +138,26 @@ class Crossing extends WorldObject {
 		return TileStrip(a, b);
 	}
 	
+	function CountConnections() {
+		local count = 0;
+		
+		local exits = [
+			GetExit(Direction.NE),
+			GetExit(Direction.SE),
+			GetExit(Direction.SW),
+			GetExit(Direction.NW),
+		];
+		
+		foreach (exit in exits) {
+			// TODO: this may be incorrect if another track runs right past the crossing
+			if (AITile.GetOwner(exit[1]) == COMPANY && AIRail.IsRailTile(exit[1])) {
+				count++;
+			}
+		}
+		
+		return count;
+	}
+	
 	function GetName() {
 		local waypoints = [ [0,0], [0,2], [2,3], [3,1], [1,0] ];
 		foreach (tile in waypoints) {

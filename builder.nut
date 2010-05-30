@@ -354,7 +354,7 @@ class BuildNewNetwork extends Task {
 				EstimateNetworkStationCount(tile) >= 2) break;
 			
 			count++;
-			if (count > MAX_ATTEMPTS) {
+			if (count >= MAX_ATTEMPTS) {
 				Warning("Tried " + count + " locations to start a new network, map may be full. Trying again tomorrow...");
 				throw TaskRetryException(TICKS_PER_DAY);
 			}
@@ -459,12 +459,11 @@ class BuildCrossing extends Builder {
 		BuildSignal([2,0], [ 2,-1], type);
 		BuildSignal([1,0], [ 1,-1], type);
 		
-		// place our HQ if we don't have one yet
-		if (AICompany.GetCompanyHQ(COMPANY) == AIMap.TILE_INVALID) {
-			AICompany.BuildCompanyHQ(GetTile([-1, -1]));
-		}
-		
 		tasks.extend(extenders);
+		
+		if (!HaveHQ()) {
+			tasks.append(BuildHQ(location));
+		}
 	}
 	
 	function _tostring() {
@@ -508,6 +507,27 @@ class BuildCrossing extends Builder {
 		RemoveRail([1,1], [2,1], [2,2]);
 	}
 	
+}
+
+class BuildHQ extends Builder {
+	
+	constructor(location) {
+		Builder.constructor(location);
+	}
+	
+	function _tostring() {
+		return "BuildHQ";
+	}
+	
+	function Run() {
+		// build our HQ at a four point crossing, if we don't have one yet
+		if (HaveHQ()) return;
+		
+		local crossing = Crossing(location);
+		if (crossing.CountConnections() == 4) {
+			AICompany.BuildCompanyHQ(GetTile([-1, -1]));
+		}
+	}	
 }
 
 /**
@@ -696,8 +716,8 @@ class BuildTrack extends Builder {
 	static FAST = 2;
 	
 	static SIGNAL_INTERVAL = 3;
-	static DEPOT_INTERVAL = 30;
-	static TREE_INTERVAL = 2;
+	//static DEPOT_INTERVAL = 30;
+	static DEPOT_INTERVAL = 0;
 	
 	a = null;
 	b = null;
@@ -830,7 +850,7 @@ class BuildTrack extends Builder {
 						AIRail.BuildSignal(prev, front, AIRail.SIGNALTYPE_NORMAL);
 					}
 					
-					local possibleDepot = prevprevprev && node.GetParent();
+					local possibleDepot = DEPOT_INTERVAL > 0 && prevprevprev && node.GetParent();
 					local depotSite = possibleDepot ? GetDepotSite(prevprevprev, prevprev, prev, node.GetTile(), node.GetParent().GetTile(), forward, true) : null;
 					if (count % SIGNAL_INTERVAL == 1 && count - lastDepot > DEPOT_INTERVAL && depotSite) {
 						if (AIRail.BuildRailDepot(depotSite, prev) &&
@@ -1150,8 +1170,6 @@ class ExtendCrossing extends TaskList {
 		// we can be cancelled if BuildCrossing failed
 		if (cancelled) return;
 		
-		MoveConstructionSign(crossing, this);
-		
 		// see if we've not already built this direction
 		// if we have subtasks but we do find rails, assume we're still building
 		local exit = Crossing(crossing).GetExit(direction);
@@ -1160,6 +1178,7 @@ class ExtendCrossing extends TaskList {
 		}
 		
 		if (!subtasks) {
+			MoveConstructionSign(crossing, this);
 			local towns = FindTowns();
 			local town = null;
 			local stationTile = null;
@@ -1476,7 +1495,7 @@ class BuildTrains extends TaskList {
 			local depot = depotList.Begin();
 			local from = AIStation.GetStationID(stationTile);
 			MoveConstructionSign(depot, this);
-																							
+			
 			// add trains to the N stations with the greatest capacity deficit
 			local stationList = ArrayToList(network.stations);
 			stationList.RemoveItem(from);
