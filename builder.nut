@@ -637,10 +637,12 @@ class BuildBusStations extends Builder {
 
 	stationTile = null;
 	town = null;
+	stations = null;
 		
 	constructor(stationTile, town) {
 		this.stationTile = stationTile;
 		this.town = town;
+		this.stations = [];
 	}
 	
 	function _tostring() {
@@ -662,6 +664,7 @@ class BuildBusStations extends Builder {
 		// try all road tiles; if a station is built, don't build another in its vicinity
 		for (local tile = area.Begin(); area.HasNext(); tile = area.Next()) {
 			if (BuildStationAt(tile)) {
+				stations.append(tile);
 				area.RemoveRectangle(tile - AIMap.GetTileIndex(2, 2), tile + AIMap.GetTileIndex(2, 2));
 			}
 		}
@@ -674,6 +677,12 @@ class BuildBusStations extends Builder {
 	function BuildStation(tile, facing) {
 		local front = tile + (facing ? AIMap.GetTileIndex(0,1) : AIMap.GetTileIndex(1,0));
 		return AIRoad.BuildDriveThroughRoadStation(tile, front, AIRoad.ROADVEHTYPE_BUS, AIStation.GetStationID(stationTile));
+	}
+	
+	function Failed() {
+		foreach (tile in stations) {
+			AIRoad.RemoveRoadStation(tile);
+		}
 	}
 }
 
@@ -1598,6 +1607,9 @@ class BuildTrain extends Builder {
 			local wagon = AIVehicle.BuildVehicle(depot, wagonType);
 			CheckError();
 			
+			AIVehicle.RefitVehicle(wagon, cargo);
+			CheckError();
+			
 			if (!AIVehicle.MoveWagon(wagon, 0, train, 0)) {
 				// can't add passenger wagons to this type of engine, so don't build it again
 				bannedEngines.append(AIVehicle.GetEngineType(train));
@@ -1649,6 +1661,7 @@ class BuildTrain extends Builder {
 	}
 	
 	function GetWagon(cargoID, railType) {
+		// select the largest appropriate wagon type
 		local engineList = AIEngineList(AIVehicle.VT_RAIL);
 		engineList.Valuate(AIEngine.CanRefitCargo, cargoID);
 		engineList.KeepValue(1);
@@ -1658,7 +1671,18 @@ class BuildTrain extends Builder {
 		
 		engineList.Valuate(AIEngine.CanRunOnRail, railType);
 		engineList.KeepValue(1);
-
+		
+		// prefer engines that can carry this cargo without a refit,
+		// because their refitted capacity may be different from
+		// their "native" capacity - for example, NARS Ore Hoppers
+		local native = AIList();
+		native.AddList(engineList);
+		native.Valuate(AIEngine.GetCargoType);
+		native.KeepValue(cargoID);
+		if (!native.IsEmpty()) {
+			engineList = native;
+		}
+		
 		engineList.Valuate(AIEngine.GetCapacity)
 		engineList.KeepTop(1);
 		
