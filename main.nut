@@ -104,7 +104,18 @@ class ChooChoo extends AIController {
 		MaxLoan();
 		while (GetBankBalance() < amount) {
 			if (buildSign) {
-				AISign.SetName(sign, "Money: " + ((100 * GetBankBalance()) / total) + "% of £" + total/1000 + "K");
+				local percentage = (100 * GetBankBalance()) / total;
+				local bar = "";
+				for (local i = 0; i < 100; i += 10) {
+					if (percentage > i) {
+						bar += "I";
+					} else {
+						bar += ".";
+					}
+				}
+				
+				//AISign.SetName(sign, "Money: " + ((100 * GetBankBalance()) / total) + "% of £" + total/1000 + "K");
+				AISign.SetName(sign, "Money: [" + bar + "] of £" + total/1000 + "K");
 			}
 			
 			FullyMaxLoan();
