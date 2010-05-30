@@ -1751,21 +1751,33 @@ class LevelTerrain extends Builder {
 	
 	function LevelTile(tile, height) {
 		// raise or lower each corner of the tile to the target height
-		//AISign.BuildSign(tile, "_");
 		foreach (corner in [AITile.CORNER_N, AITile.CORNER_E, AITile.CORNER_S, AITile.CORNER_W]) {
 			while (AITile.GetCornerHeight(tile, corner) < height) {
 				AITile.RaiseTile(tile, 1 << corner);
-				// stop on errors - we may be able to build anyway
-				// due to foundations on slopes
-				//CheckError();
-				if (AIError.GetLastError() != AIError.ERR_NONE) break;
+				CheckTerraformingError();
 			}
 			
 			while (AITile.GetCornerHeight(tile, corner) > height) {
 				AITile.LowerTile(tile, 1 << corner);
-				//CheckError();
-				if (AIError.GetLastError() != AIError.ERR_NONE) break;
+				CheckTerraformingError();
 			}
+		}
+	}
+	
+	function CheckTerraformingError() {
+		switch (AIError.GetLastError()) {
+			case AIError.ERR_NONE:
+				// all's well
+				break;
+			case AIError.ERR_NOT_ENOUGH_CASH:
+				// normal error handling: wait for money and retry
+				CheckError();
+				break;
+			default:
+				// we can't level the terrain as requested,
+				// but because of foundations built on slopes,
+				// we may be able to continue, so don't abort yet
+				break;
 		}
 	}
 	
