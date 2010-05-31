@@ -362,7 +362,7 @@ class BuildNewNetwork extends Task {
 		
 		AIRail.SetCurrentRailType(network.railType);
 		tasks.insert(1, TaskList(this, [
-			LevelTerrain(tile, Rotation.ROT_0, [-1, -1], [Crossing.WIDTH, Crossing.WIDTH]),
+			LevelTerrain(tile, Rotation.ROT_0, [0, 0], [Crossing.WIDTH-1, Crossing.WIDTH-1]),
 			BuildCrossing(tile, network)
 		]));
 	}
@@ -1201,7 +1201,7 @@ class ExtendCrossing extends TaskList {
 					LevelTerrain(stationTile, stationRotation, [0, 0], [RAIL_STATION_WIDTH-1, RAIL_STATION_LENGTH-2]),
 					AppeaseLocalAuthority(town),
 					BuildTerminusStation(stationTile, direction, network, town),
-					LevelTerrain(crossingTile, Rotation.ROT_0, [-1, -1], [Crossing.WIDTH + 1, Crossing.WIDTH + 1]),
+					LevelTerrain(crossingTile, Rotation.ROT_0, [0, 0], [Crossing.WIDTH-1, Crossing.WIDTH-1]),
 					BuildCrossing(crossingTile, network),
 					ConnectCrossing(crossing, direction, crossingTile, crossingEntranceDirection, network),
 					ConnectStation(crossingTile, crossingExitDirection, stationTile, network),
