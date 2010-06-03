@@ -1754,12 +1754,28 @@ class LevelTerrain extends Builder {
 		foreach (corner in [AITile.CORNER_N, AITile.CORNER_E, AITile.CORNER_S, AITile.CORNER_W]) {
 			while (AITile.GetCornerHeight(tile, corner) < height) {
 				AITile.RaiseTile(tile, 1 << corner);
-				CheckTerraformingError();
+				if (AIError.GetLastError() == AIError.ERR_NONE) {
+					// all's well, continue leveling
+				} else if (AIError.GetLastError() == AIError.ERR_NOT_ENOUGH_CASH) {
+					// normal error handling: wait for money and retry
+					CheckError();
+				} else {
+					// we can't level the terrain as requested,
+					// but because of foundations built on slopes,
+					// we may be able to continue, so don't abort the task
+					break;
+				}
 			}
 			
 			while (AITile.GetCornerHeight(tile, corner) > height) {
 				AITile.LowerTile(tile, 1 << corner);
-				CheckTerraformingError();
+				if (AIError.GetLastError() == AIError.ERR_NONE) {
+					// continue
+				} else if (AIError.GetLastError() == AIError.ERR_NOT_ENOUGH_CASH) {
+					CheckError();
+				} else {
+					break;
+				}
 			}
 		}
 	}
