@@ -1232,8 +1232,10 @@ class ExtendCrossing extends TaskList {
 			}
 			
 			// build an extra train for the second station in a network
-			if (network.stations.len() == 2) {
-				subtasks.append(BuildTrains(stationTile, network, PAX));
+			// at this point, that means we only have one station in the network
+			if (network.stations.len() == 1) {
+				local firstStation = AIStation.GetLocation(network.stations[0]);
+				subtasks.append(BuildTrains(firstStation, network, PAX));
 			}
 		}
 		
