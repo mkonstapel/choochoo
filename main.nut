@@ -4,9 +4,6 @@ require("task.nut");
 require("finance.nut");
 require("builder.nut");
 
-import("pathfinder.road", "RoadPathFinder", 3);
-// TODO: rail pathfinder
-
 const MIN_DISTANCE =  30;
 const MAX_DISTANCE = 100;
 const INDEPENDENTLY_WEALTHY = 1000000;	// no longer need a loan
