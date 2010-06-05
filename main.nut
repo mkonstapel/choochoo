@@ -177,9 +177,7 @@ class Bootstrap extends Task {
 	}
 	
 	function Run() {
-		local lines = AIController.GetSetting("BootstrapLines");
-		Debug("Starting with " + lines + " single track lines");
-		for (local i = 0; i < lines; i++) {
+		for (local i = 0; i < AIController.GetSetting("BootstrapLines"); i++) {
 			// tasks.push(BuildLine());
 			tasks.push(BuildCargoLine());
 		}
