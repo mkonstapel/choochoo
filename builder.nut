@@ -205,6 +205,8 @@ class BuildLine extends TaskList {
 
 class BuildCargoLine extends TaskList {
 	
+	static CARGO_MIN_DISTANCE = 50;
+	static CARGO_MAX_DISTANCE = 150;
 	static TILES_PER_DAY = 1;
 	static CARGO_STATION_LENGTH = 4;
 	
@@ -256,15 +258,17 @@ class BuildCargoLine extends TaskList {
 			local exitA = Swap(TerminusStation(siteA, rotA, CARGO_STATION_LENGTH).GetEntrance());
 			local exitB = TerminusStation(siteB, rotB, CARGO_STATION_LENGTH).GetEntrance();
 			
+			// build the first track and two trains first, which can then finance the upgrade to double track
 			local network = Network(AIRailTypeList().Begin(), CARGO_STATION_LENGTH, MIN_DISTANCE, MAX_DISTANCE);
+			local firstTrack = BuildTrack(stationA.GetExit(), stationB.GetEntrance(), reserved, SignalMode.NONE, network);
 			subtasks = [
-				BuildTerminusStation(siteA, dirA, network, a, false, CARGO_STATION_LENGTH),
-				BuildTerminusStation(siteB, dirB, network, b, false, CARGO_STATION_LENGTH),
-				BuildTrack(exitA, exitB, [], SignalMode.NONE, network, BuildTrack.FAST),
-				//BuildTrack(stationA.GetExit(), stationB.GetEntrance(), reserved, SignalMode.FORWARD, network, BuildTrack.FAST),
-				//BuildTrack(Swap(stationA.GetEntrance()), Swap(stationB.GetExit()), [], SignalMode.BACKWARD, network, BuildTrack.FAST),
+				BuildTerminusStation(siteA, dirA, network, a, true, CARGO_STATION_LENGTH),
+				BuildTerminusStation(siteB, dirB, network, b, true, CARGO_STATION_LENGTH),
+				firstTrack,
 				BuildTrains(siteA, network, cargo, AIOrder.AIOF_FULL_LOAD_ANY),
 				BuildTrains(siteA, network, cargo, AIOrder.AIOF_FULL_LOAD_ANY),
+				BuildTrack(Swap(stationA.GetEntrance()), Swap(stationB.GetExit()), [], SignalMode.BACKWARD, network),
+				BuildSignals(firstTrack, SignalMode.FORWARD),
 			];
 		}
 		
@@ -328,8 +332,8 @@ class BuildCargoLine extends TaskList {
 		producers.Sort(AIList.SORT_BY_VALUE, true);
 		for (local producer = producers.Begin(); producers.HasNext(); producer = producers.Next()) {
 			consumers.Valuate(AIIndustry.GetDistanceManhattanToTile, AIIndustry.GetLocation(producer));
-			consumers.KeepAboveValue(MIN_DISTANCE);
-			consumers.KeepBelowValue(MAX_DISTANCE);
+			consumers.KeepAboveValue(CARGO_MIN_DISTANCE);
+			consumers.KeepBelowValue(CARGO_MAX_DISTANCE);
 			if (!consumers.IsEmpty()) {
 				return [producer, consumers.Begin()];
 			}
@@ -372,7 +376,7 @@ class BuildNewNetwork extends Task {
 		
 		AIRail.SetCurrentRailType(network.railType);
 		tasks.insert(1, TaskList(this, [
-			LevelTerrain(tile, Rotation.ROT_0, [0, 0], [Crossing.WIDTH-1, Crossing.WIDTH-1]),
+			LevelTerrain(tile, Rotation.ROT_0, [1, 1], [Crossing.WIDTH-2, Crossing.WIDTH-2]),
 			BuildCrossing(tile, network)
 		]));
 	}
@@ -580,6 +584,7 @@ class BuildTerminusStation extends Builder {
 		network.depots.append(GetTile([2,p]));
 		
 		BuildSignal([0, p+1], [0, p+2], AIRail.SIGNALTYPE_PBS);
+		BuildSignal([1, p+1], [1, p],   AIRail.SIGNALTYPE_NORMAL);
 		network.stations.append(AIStation.GetStationID(location));
 	}
 	
@@ -759,7 +764,7 @@ class BuildTrack extends Builder {
 	}
 	
 	function Run() {
-		//MoveConstructionSign(a, this);
+		MoveConstructionSign(a, this);
 		
 		/*
 		AISign.BuildSign(a, "a");
@@ -771,6 +776,10 @@ class BuildTrack extends Builder {
 		if (!path) path = FindPath(a, b, c, d, ignored);
 		if (!path) throw TaskFailedException("no path");
 		BuildPath(path);
+	}
+	
+	function GetPath() {
+		return path;
 	}
 	
 	function FindPath(a, b, c, d, ignored) {
@@ -829,17 +838,20 @@ class BuildTrack extends Builder {
 		while (node != null) {
 			if (prevprev != null) {
 				if (AIMap.DistanceManhattan(prev, node.GetTile()) > 1) {
+					local length = AIMap.DistanceManhattan(node.GetTile(), prev) + 1;
 					if (AITunnel.GetOtherTunnelEnd(prev) == node.GetTile()) {
 						// since we can resume building, check if there already is a tunnel
 						if (!AITunnel.IsTunnelTile(prev)) {
 							AITunnel.BuildTunnel(AIVehicle.VT_RAIL, prev);
+							costEstimate = GetMaxBridgeCost(length);
 							CheckError();
 						}
 					} else {
-						local bridge_list = AIBridgeList_Length(AIMap.DistanceManhattan(node.GetTile(), prev) + 1);
+						local bridge_list = AIBridgeList_Length(length);
 						bridge_list.Valuate(AIBridge.GetMaxSpeed);
 						bridge_list.Sort(AIAbstractList.SORT_BY_VALUE, false);
 						AIBridge.BuildBridge(AIVehicle.VT_RAIL, bridge_list.Begin(), prev, node.GetTile());
+						costEstimate = GetMaxBridgeCost(length);
 						CheckError();
 					}
 					prevprev = prev;
@@ -847,6 +859,10 @@ class BuildTrack extends Builder {
 					node = node.GetParent();
 				} else {
 					local built = AIRail.BuildRail(prevprev, prev, node.GetTile());
+					
+					// reset our cost estimate, because we can continue building track even with
+					// only a little money
+					costEstimate = 1000;
 					CheckError();
 					
 					// since we can be restarted, we can process a tile more than once
@@ -974,6 +990,59 @@ class BuildTrack extends Builder {
 						AIRail.RemoveRail(depotSite, prev, prevprev);
 						AIRail.RemoveRail(depotSite, prev, node.GetTile());
 					}
+				}
+			}
+			
+			if (node != null) {
+				prevprevprev = prevprev;
+				prevprev = prev;
+				prev = node.GetTile();
+				node = node.GetParent();
+			}
+		}
+		
+		Debug("Done!");
+	}
+}
+
+class BuildSignals extends Builder {
+	
+	trackBuilder = null;
+	signalMode = null;
+	
+	constructor(trackBuilder, signalMode) {
+		this.trackBuilder = trackBuilder;
+		this.signalMode = signalMode;
+	}
+	
+	function Run() {
+		local path = trackBuilder.GetPath();
+		Debug("Building signals...");
+		local node = path;
+		local prev = null;
+		local prevprev = null;
+		local prevprevprev = null;
+		local count = 1;	// don't start with signals right away
+		while (node != null) {
+			if (prevprev != null) {
+				if (AIMap.DistanceManhattan(prev, node.GetTile()) > 1) {
+					// tunnel or bridge - no signals
+					prevprev = prev;
+					prev = node.GetTile();
+					node = node.GetParent();
+				} else {
+					// since we can be restarted, we can process a tile more than once
+					// don't build signals again, or they'll be flipped around!
+					local forward = signalMode == SignalMode.FORWARD;
+					local front = forward ? node.GetTile() : prevprev;
+					if (signalMode != SignalMode.NONE &&
+					    count % BuildTrack.SIGNAL_INTERVAL == 0 &&
+					    AIRail.GetSignalType(prev, front) == AIRail.SIGNALTYPE_NONE)
+					{
+						AIRail.BuildSignal(prev, front, AIRail.SIGNALTYPE_NORMAL);
+					}
+					
+					count++;
 				}
 			}
 			
@@ -1211,7 +1280,7 @@ class ExtendCrossing extends TaskList {
 					LevelTerrain(stationTile, stationRotation, [0, 0], [RAIL_STATION_WIDTH-1, RAIL_STATION_LENGTH-2]),
 					AppeaseLocalAuthority(town),
 					BuildTerminusStation(stationTile, direction, network, town),
-					LevelTerrain(crossingTile, Rotation.ROT_0, [0, 0], [Crossing.WIDTH-1, Crossing.WIDTH-1]),
+					LevelTerrain(crossingTile, Rotation.ROT_0, [1, 1], [Crossing.WIDTH-2, Crossing.WIDTH-2]),
 					BuildCrossing(crossingTile, network),
 					ConnectCrossing(crossing, direction, crossingTile, crossingEntranceDirection, network),
 					ConnectStation(crossingTile, crossingExitDirection, stationTile, network),
@@ -1608,13 +1677,12 @@ class BuildTrain extends Builder {
 		if (!train || !AIVehicle.IsValidVehicle(train)) {
 			//Debug("Building locomotive at " + AIMap.GetTileX(depot) + "," + AIMap.GetTileY(depot));
 			local engineType = GetEngine(network.railType, cheap);
+			
+			// don't try building the train until we (probably) have enough
+			// for the wagons as well, or it may sit in a depot for ages
+			CheckFunds(engineType);
+			
 			train = AIVehicle.BuildVehicle(depot, engineType);
-			
-			// estimate the cost of the train
-			if (AIError.GetLastError() == AIError.ERR_NOT_ENOUGH_CASH) {
-				throw NeedMoneyException(AIEngine.GetPrice(engineType));
-			}
-			
 			CheckError();
 		}
 		
@@ -1670,6 +1738,18 @@ class BuildTrain extends Builder {
 		AIOrder.AppendOrder(train, AIStation.GetLocation(to), toFlags);
 		AIVehicle.StartStopVehicle(train);
 	}
+	
+	function CheckFunds(engineType) {
+		// assume half tile wagons
+		local wagonType = GetWagon(cargo, network.railType);
+		local numWagons = network.trainLength * 2;
+		local estimate = AIEngine.GetPrice(engineType) + numWagons * AIEngine.GetPrice(wagonType);
+		Debug("Train will cost approx. " + estimate);
+		if (GetBankBalance() < estimate) {
+			throw NeedMoneyException(estimate);
+		}
+	}
+		
 	
 	function GetEngine(railType, cheap) {
 		local engineList = AIEngineList(AIVehicle.VT_RAIL);
@@ -1755,16 +1835,12 @@ class LevelTerrain extends Builder {
 			if (AITile.GetMinHeight(tile) < min) min = AITile.GetMinHeight(tile);
 		}
 		
-		// prefer rounding down - cheaper when we're near the sea
-		local targetHeight = (min + max) / 2;
+		// prefer rounding up, because foundations can help us raise
+		// tiles to the appropriate height
+		local targetHeight = (min + max + 1) / 2;
 		for (local tile = tiles.Begin(); tiles.HasNext(); tile = tiles.Next()) {
 			LevelTile(tile, targetHeight);
 		}
-			
-		// TODO: this levels the area between the north corners of the resulting tiles
-		// so due to rotation, we may be one tile short
-		//AITile.LevelTiles(GetTile(from), GetTile(to));
-		//CheckError();
 	}
 	
 	function LevelTile(tile, height) {
