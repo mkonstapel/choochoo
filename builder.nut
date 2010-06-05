@@ -105,6 +105,7 @@ class Builder extends Task {
 	
 }
 
+/*
 class BuildLine extends TaskList {
 	
 	static MIN_TOWN_POPULATION = 500;
@@ -200,6 +201,7 @@ class BuildLine extends TaskList {
 	}
 	
 }
+*/
 
 class BuildCargoLine extends TaskList {
 	
@@ -246,6 +248,11 @@ class BuildCargoLine extends TaskList {
 				throw TaskRetryException();
 			}
 			
+			local stationA = TerminusStation(siteA, rotA, CARGO_STATION_LENGTH);
+			local stationB = TerminusStation(siteB, rotB, CARGO_STATION_LENGTH);
+			local reserved = stationA.GetReservedEntranceSpace();
+			reserved.extend(stationB.GetReservedExitSpace());
+			
 			local exitA = Swap(TerminusStation(siteA, rotA, CARGO_STATION_LENGTH).GetEntrance());
 			local exitB = TerminusStation(siteB, rotB, CARGO_STATION_LENGTH).GetEntrance();
 			
@@ -254,7 +261,10 @@ class BuildCargoLine extends TaskList {
 				BuildTerminusStation(siteA, dirA, network, a, false, CARGO_STATION_LENGTH),
 				BuildTerminusStation(siteB, dirB, network, b, false, CARGO_STATION_LENGTH),
 				BuildTrack(exitA, exitB, [], SignalMode.NONE, network, BuildTrack.FAST),
-				BuildTrains(siteA, network, cargo),
+				//BuildTrack(stationA.GetExit(), stationB.GetEntrance(), reserved, SignalMode.FORWARD, network, BuildTrack.FAST),
+				//BuildTrack(Swap(stationA.GetEntrance()), Swap(stationB.GetExit()), [], SignalMode.BACKWARD, network, BuildTrack.FAST),
+				BuildTrains(siteA, network, cargo, AIOrder.AIOF_FULL_LOAD_ANY),
+				BuildTrains(siteA, network, cargo, AIOrder.AIOF_FULL_LOAD_ANY),
 			];
 		}
 		
@@ -1220,6 +1230,11 @@ class ExtendCrossing extends TaskList {
 					BuildTrains(stationTile, network, PAX),
 				];
 			}
+			
+			// build an extra train for the second station in a network
+			if (network.stations.len() == 2) {
+				subtasks.append(BuildTrains(stationTile, network, PAX));
+			}
 		}
 		
 		RunSubtasks();
@@ -1460,17 +1475,19 @@ class BuildTrains extends TaskList {
 	stationTile = null;
 	network = null;
 	cargo = null;
-	flags = null;
+	fromFlags = null;
+	toFlags = null;
 	cheap = null;
 	depot = null;
 	engine = null;
 	
-	constructor(stationTile, network, cargo, flags = null, cheap = false) {
+	constructor(stationTile, network, cargo, fromFlags = null, toFlags = null, cheap = false) {
 		TaskList.constructor(this, null);
 		this.stationTile = stationTile;
 		this.network = network;
 		this.cargo = cargo;
-		this.flags = flags == null ? AIOrder.AIOF_NONE : flags;
+		this.fromFlags = fromFlags == null ? AIOrder.AIOF_NONE : fromFlags;
+		this.toFlags = toFlags == null ? AIOrder.AIOF_NONE : toFlags;
 		this.cheap = cheap;
 	}
 	
@@ -1505,9 +1522,8 @@ class BuildTrains extends TaskList {
 			subtasks = [];
 			for (local to = stationList.Begin(); stationList.HasNext(); to = stationList.Next()) {
 				// the first train always gets a full load order to boost ratings
-				local first = subtasks.len() == 0;
-				local fromFlags = first ? flags | AIOrder.AIOF_FULL_LOAD_ANY : flags;
-				local toFlags = flags;
+				local first = AIVehicleList_Station(from).Count() == 0;
+				local fromFlags = first ? fromFlags | AIOrder.AIOF_FULL_LOAD_ANY : fromFlags;
 				subtasks.append(BuildTrain(from, to, depot, network, fromFlags, toFlags, cargo));
 			}
 		}
@@ -1592,7 +1608,7 @@ class BuildTrain extends Builder {
 			local engineType = GetEngine(network.railType, cheap);
 			train = AIVehicle.BuildVehicle(depot, engineType);
 			
-			// locomotives are expensive compared to other things we build
+			// estimate the cost of the train
 			if (AIError.GetLastError() == AIError.ERR_NOT_ENOUGH_CASH) {
 				throw NeedMoneyException(AIEngine.GetPrice(engineType));
 			}
