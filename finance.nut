@@ -65,3 +65,24 @@ function GetMinimumSafeMoney() {
 	local maintenance = AIStationList(AIStation.STATION_ANY).Count() * MONTHLY_STATION_MAINTENANCE;
 	return 3*(runningCosts + maintenance);
 }
+
+/**
+ * See if we need to reserve money for autorenewing trains.
+ */
+function GetAutoRenewMoney() {
+	local vehicles = AIVehicleList();
+	vehicles.Valuate(AIVehicle.GetAgeLeft);
+	vehicles.KeepBelowValue(366);
+	vehicles.Sort(AIList.SORT_BY_VALUE, true);
+	for (local vehicle = vehicles.Begin(); vehicles.HasNext(); vehicle = vehicles.Next()) {
+		// save money for the next train to be renewed
+		// the oldest may no longer be available, in which case GetPrice() returns -1
+		local engine = AIVehicle.GetEngineType(vehicles.Begin());
+		if (AIEngine.IsValidEngine(engine)) {
+			return AIEngine.GetPrice(engine);
+		}
+	}
+	
+	return 0;
+}
+	

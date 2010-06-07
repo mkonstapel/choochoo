@@ -178,6 +178,15 @@ function GetCargoID(cargoClass) {
 	throw "missing required cargo class";
 }
 
+function GetMaxBridgeCost(length) {
+	local bridges = AIBridgeList_Length(length);
+	if (bridges.IsEmpty()) throw "Cannot build " + length + " tile bridges!";
+	bridges.Valuate(AIBridge.GetMaxSpeed);
+	bridges.KeepTop(1);
+	local bridge = bridges.Begin();
+	return AIBridge.GetPrice(bridge, length);
+}
+
 function TrainLength(train) {
 	// train length in tiles
 	return (AIVehicle.GetLength(train) + 15) / 16;
@@ -185,6 +194,72 @@ function TrainLength(train) {
 
 function HaveHQ() {
 	return AICompany.GetCompanyHQ(COMPANY) != AIMap.TILE_INVALID;
+}
+
+function GetEngine(cargo, railType, bannedEngines, cheap) {
+	local engineList = AIEngineList(AIVehicle.VT_RAIL);
+	engineList.Valuate(AIEngine.IsWagon);
+	engineList.KeepValue(0);
+	engineList.Valuate(AIEngine.CanRunOnRail, railType);
+	engineList.KeepValue(1);
+	engineList.Valuate(AIEngine.HasPowerOnRail, railType);
+	engineList.KeepValue(1);
+	engineList.Valuate(AIEngine.CanPullCargo, cargo);
+	engineList.KeepValue(1);
+	engineList.RemoveList(ArrayToList(bannedEngines));
+	
+	engineList.Valuate(AIEngine.GetPrice);
+	if (cheap) {
+		// go for the cheapest
+		engineList.KeepBottom(1);
+	} else {
+		// pick something middle of the range, by removing the top half
+		// this will hopefully give us something decent, even when faced with newgrf train sets
+		engineList.Sort(AIList.SORT_BY_VALUE, true);
+		engineList.RemoveTop(engineList.Count() / 2);
+	}
+	
+	if (engineList.IsEmpty()) throw TaskFailedException("no suitable engine");
+	return engineList.Begin();
+}
+
+function GetWagon(cargo, railType) {
+	// select the largest appropriate wagon type
+	local engineList = AIEngineList(AIVehicle.VT_RAIL);
+	engineList.Valuate(AIEngine.CanRefitCargo, cargo);
+	engineList.KeepValue(1);
+	engineList.Valuate(AIEngine.IsWagon);
+	engineList.KeepValue(1);
+	
+	engineList.Valuate(AIEngine.CanRunOnRail, railType);
+	engineList.KeepValue(1);
+	
+	// prefer engines that can carry this cargo without a refit,
+	// because their refitted capacity may be different from
+	// their "native" capacity - for example, NARS Ore Hoppers
+	local native = AIList();
+	native.AddList(engineList);
+	native.Valuate(AIEngine.GetCargoType);
+	native.KeepValue(cargo);
+	if (!native.IsEmpty()) {
+		engineList = native;
+	}
+	
+	engineList.Valuate(AIEngine.GetCapacity)
+	engineList.KeepTop(1);
+	
+	return engineList.IsEmpty() ? null : engineList.Begin();
+}
+
+function MaxDistance(cargo, trainLength) {
+	// maximum safe rail distance we can expect to build with our starting loan
+	local rail = AIRail.GetCurrentRailType();
+	local engine = GetEngine(cargo, rail, [], true);
+	local wagon = GetWagon(cargo, rail);
+	local trainCost = AIEngine.GetPrice(engine) + AIEngine.GetPrice(wagon) * (trainLength-1) * 2;
+	local bridgeCost = GetMaxBridgeCost(AIController.GetSetting("MaxBridgeLength"));
+	local tileCost = 500;
+	return (AICompany.GetMaxLoanAmount() - trainCost - bridgeCost) / tileCost;
 }
 
 class Counter {

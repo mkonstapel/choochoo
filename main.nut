@@ -27,7 +27,7 @@ class ChooChoo extends AIController {
 		AICompany.SetName("ChooChoo");
 		AICompany.SetAutoRenewStatus(true);
 		AICompany.SetAutoRenewMonths(0);
-		AICompany.SetAutoRenewMoney(INDEPENDENTLY_WEALTHY);
+		AICompany.SetAutoRenewMoney(0);
 		
 		AIRoad.SetCurrentRoadType(AIRoad.ROADTYPE_ROAD);
 		AIRail.SetCurrentRailType(AIRailTypeList().Begin());
@@ -39,6 +39,8 @@ class ChooChoo extends AIController {
 		::TICKS_PER_DAY <- 37;
 		
 		::tasks <- [];
+		
+		CheckGameSettings();
 		
 		if (AIStationList(AIStation.STATION_TRAIN).IsEmpty()) {
 			// start with some point to point lines
@@ -88,7 +90,8 @@ class ChooChoo extends AIController {
 	
 	function WaitForMoney(amount) {
 		local reserve = GetMinimumSafeMoney();
-		local total = amount + reserve;
+		local autorenew = GetAutoRenewMoney();
+		local total = amount + reserve + autorenew;
 		local buildSign = AIController.GetSetting("ActivitySigns");
 		local sign;
 		
@@ -97,7 +100,7 @@ class ChooChoo extends AIController {
 			sign = AISign.BuildSign(tile, "...");
 		}
 		
-		Debug("Waiting until we have £" + total + " (£" + amount + " to spend plus £" + reserve + " in reserve)");
+		Debug("Waiting until we have £" + total + " (£" + amount + " to spend plus £" + reserve + " in reserve and £" + autorenew + " for autorenew)");
 		MaxLoan();
 		while (GetBankBalance() < amount) {
 			if (buildSign) {
@@ -157,6 +160,36 @@ class ChooChoo extends AIController {
       			default:
       				// Debug("Unhandled event:" + e);
   			}
+		}
+	}
+	
+	function CheckGameSettings() {
+		local ok = true;
+		ok = CheckSetting("construction.road_stop_on_town_road", 1,
+			"Advanced Settings, Stations, Allow drive-through road stations on town owned roads") && ok;
+		ok = CheckSetting("station.distant_join_stations", 1,
+			"Advanced Settings, Stations, Allow to join stations not directly adjacent") && ok;
+		
+		if (ok) {
+			Debug("Game settings OK");
+		} else {
+			throw "ChooChoo is not compatible with current game settings.";
+		}
+	}
+	
+	function CheckSetting(name, value, description) {
+		if (!AIGameSettings.IsValid(name)) {
+			Warning("Setting " + name + " does not exist! ChooChoo may not work properly.");
+			return true;
+		}
+		
+		local gameValue = AIGameSettings.GetValue(name);
+		if (gameValue == value) {
+			return true;
+		} else {
+			Warning(name + " is " + (gameValue ? "on" : "off"));
+			Warning("You can change this setting under " + description);
+			return false;
 		}
 	}
 	
