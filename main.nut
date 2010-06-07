@@ -208,7 +208,6 @@ class Bootstrap extends Task {
 	
 	function Run() {
 		for (local i = 0; i < AIController.GetSetting("BootstrapLines"); i++) {
-			// tasks.push(BuildLine());
 			tasks.push(BuildCargoLine());
 		}
 	}

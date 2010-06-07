@@ -81,6 +81,13 @@ function TileToString(tile) {
 }
 
 /**
+ * Swap two tiles - used for swapping entrance/exit tile strips.
+ */
+function Swap(tiles) {
+	return [tiles[1], tiles[0]];
+}
+
+/**
  * Create an array from an AIList.
  */
 function ListToArray(l) {
