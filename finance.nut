@@ -16,8 +16,11 @@ function MaxLoan() {
 	// keep enough available in the form of loanable money to avoid bankrupcy
 	local safetyIntervals = Ceiling(GetMinimumSafeMoney().tofloat()/AICompany.GetLoanInterval());
 	local me = AICompany.ResolveCompanyID(AICompany.COMPANY_SELF);
-	if (AICompany.GetBankBalance(me) < INDEPENDENTLY_WEALTHY)
+	if (AICompany.GetBankBalance(me) < INDEPENDENTLY_WEALTHY) {
 		AICompany.SetLoanAmount(AICompany.GetMaxLoanAmount() - safetyIntervals * AICompany.GetLoanInterval());
+	} else {
+		AICompany.SetLoanAmount(0);
+	}
 }
 
 /**
@@ -77,7 +80,7 @@ function GetAutoRenewMoney() {
 	for (local vehicle = vehicles.Begin(); vehicles.HasNext(); vehicle = vehicles.Next()) {
 		// save money for the next train to be renewed
 		// the oldest may no longer be available, in which case GetPrice() returns -1
-		local engine = AIVehicle.GetEngineType(vehicles.Begin());
+		local engine = AIVehicle.GetEngineType(vehicle);
 		if (AIEngine.IsValidEngine(engine)) {
 			return AIEngine.GetPrice(engine);
 		}
