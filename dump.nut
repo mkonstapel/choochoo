@@ -1,5 +1,100 @@
 // dumped here in case it turns out to be useful
 
+class BuildLine extends TaskList {
+	
+	static MIN_TOWN_POPULATION = 500;
+	static MIN_TOWN_DISTANCE = 30;
+	static MAX_TOWN_DISTANCE = 100;
+	
+	static wrapper = [];
+	
+	constructor() {
+		TaskList.constructor(this, null);
+	}
+	
+	function _tostring() {
+		return "BuildLine";
+	}
+	
+	function Run() {
+		if (!subtasks) {
+			local towns = FindTownPair();
+			local a = towns[0];
+			local b = towns[1];
+			
+			local nameA = AITown.GetName(a);
+			local dirA = StationDirection(AITown.GetLocation(a), AITown.GetLocation(B));
+			local rotA = BuildTerminusStation.StationRotationForDirection(dirA);
+			local siteA = FindStationSite(a, rotA, AITown.GetLocation(b));
+	
+			local nameB = AITown.GetName(b);
+			local locB = AITown.GetLocation(b);
+			local dirB = StationDirection(AITown.GetLocation(b), AITown.GetLocation(a));
+			local rotB = BuildTerminusStation.StationRotationForDirection(dirB);
+			local siteB = FindStationSite(b, rotB, AITown.GetLocation(a));
+			
+			if (siteA && siteB) {
+				Debug("Connecting " + nameA + " and " + nameB);
+			} else {
+				Debug("Cannot build a station at " + (siteA ? nameB : nameA));
+				throw TaskRetryException();
+			}
+			
+			local exitA = Swap(TerminusStation(siteA, rotA, RAIL_STATION_PLATFORM_LENGTH).GetEntrance());
+			local exitB = TerminusStation(siteB, rotB, RAIL_STATION_PLATFORM_LENGTH).GetEntrance();
+			
+			local network = Network(AIRailTypeList().Begin(), RAIL_STATION_PLATFORM_LENGTH, MIN_TOWN_DISTANCE, MAX_TOWN_DISTANCE);
+			subtasks = [
+				BuildTerminusStation(siteA, dirA, network, a, false),
+				BuildTerminusStation(siteB, dirB, network, b, false),
+				BuildTrack(exitA, exitB, [], SignalMode.NONE, network, BuildTrack.FAST),
+				BuildBusStations(siteA, a),
+				BuildBusStations(siteB, b),
+				BuildTrains(siteA, network, PAX, null, true),
+				BuildTrains(siteB, network, PAX, null, true),
+			];
+		}
+		
+		RunSubtasks();
+	}
+	
+	function FindTownPair() {
+		local pairs;
+		
+		if (wrapper.len() == 0) {
+			Debug("Generating list of viable town pairs...");
+			local towns = AITownList();
+			towns.Valuate(AITown.GetPopulation);
+			towns.KeepAboveValue(MIN_TOWN_POPULATION);
+			
+			local copy = AIList();
+			copy.AddList(towns);
+			
+			pairs = AIList();
+			for (local a = towns.Begin(); towns.HasNext(); a = towns.Next()) {
+				for (local b = copy.Begin(); copy.HasNext(); b = copy.Next()) {
+					// store two 16-bit town IDs in one 32-bit list item, and valuate them with their distance
+					local pair = a + (b << 16);
+					pairs.AddItem(pair, AITown.GetDistanceManhattanToTile(a, AITown.GetLocation(b)));
+				}
+			}
+			
+			pairs.KeepAboveValue(MIN_TOWN_DISTANCE);
+			pairs.KeepBelowValue(MAX_TOWN_DISTANCE);
+			if (pairs.IsEmpty()) throw TaskFailedException("no suitable towns");
+			
+			wrapper.append(pairs);
+		} else {
+			pairs = wrapper[0];
+		}
+		
+		pairs.Valuate(AIBase.RandItem);
+		pairs.Sort(AIList.SORT_BY_VALUE, true);
+		local pair = pairs.Begin();
+		return [pair & 0xFFFF, pair >> 16];
+	}
+	
+}
 
 class BuildTruckRoute extends Task {
 	
