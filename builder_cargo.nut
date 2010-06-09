@@ -24,43 +24,39 @@ class BuildCargoLine extends TaskList {
 			local between = SelectIndustries(cargo, maxDistance);
 			local a = between[0];
 			local b = between[1];
-			local locA = AIIndustry.GetLocation(a);
-			local locB = AIIndustry.GetLocation(b);
+			Debug(AICargo.GetCargoLabel(cargo) + " from " + AIIndustry.GetName(a) + " to " + AIIndustry.GetName(b));
 			
-			Debug("From " + AIIndustry.GetName(a) + " to " + AIIndustry.GetName(b));
-			
-			local nameA = AIIndustry.GetName(a);
-			local dirA = StationDirection(locA, locB);
-			local rotA = BuildTerminusStation.StationRotationForDirection(dirA);
-			local siteA = FindIndustryStationSite(a, true, rotA, locB, CARGO_STATION_LENGTH);
-
-			local nameB = AIIndustry.GetName(b);
-			local dirB = StationDirection(locB, locA);
-			local rotB = BuildTerminusStation.StationRotationForDirection(dirB);
-			local siteB = FindIndustryStationSite(b, false, rotB, locA, CARGO_STATION_LENGTH);
-			
-			if (siteA && siteB) {
-				Debug("Connecting " + nameA + " and " + nameB);
-			} else {
-				Debug("Cannot build a station at " + (siteA ? nameB : nameA));
+			// [siteA, rotA, dirA, siteB, rotB, dirB]
+			local sites = FindStationSites(a, b);
+			if (sites == null) {
+				Debug("Cannot build both stations");
 				throw TaskRetryException();
 			}
 			
+			local siteA = sites[0];
+			local rotA = sites[1];
+			local dirA = sites[2];
 			local stationA = TerminusStation(siteA, rotA, CARGO_STATION_LENGTH);
-			local stationB = TerminusStation(siteB, rotB, CARGO_STATION_LENGTH);
-			local reserved = stationA.GetReservedEntranceSpace();
-			reserved.extend(stationB.GetReservedExitSpace());
 			
-			local exitA = Swap(TerminusStation(siteA, rotA, CARGO_STATION_LENGTH).GetEntrance());
-			local exitB = TerminusStation(siteB, rotB, CARGO_STATION_LENGTH).GetEntrance();
+			local siteB = sites[3];
+			local rotB = sites[4];
+			local dirB = sites[5];
+			local stationB = TerminusStation(siteB, rotB, CARGO_STATION_LENGTH);
+			
+			//local reserved = stationA.GetReservedEntranceSpace();
+			//reserved.extend(stationB.GetReservedExitSpace());
+			
+			//local exitA = Swap(TerminusStation(siteA, rotA, CARGO_STATION_LENGTH).GetEntrance());
+			//local exitB = TerminusStation(siteB, rotB, CARGO_STATION_LENGTH).GetEntrance();
 			
 			// build the first track and two trains first, which can then finance the upgrade to double track
 			local network = Network(AIRailTypeList().Begin(), CARGO_STATION_LENGTH, MIN_DISTANCE, MAX_DISTANCE);
-			local firstTrack = BuildTrack(stationA.GetExit(), stationB.GetEntrance(), reserved, SignalMode.NONE, network);
+			//local firstTrack = BuildTrack(stationA.GetExit(), stationB.GetEntrance(), reserved, SignalMode.NONE, network);
 			subtasks = [
-				BuildTerminusStation(siteA, dirA, network, a, true, CARGO_STATION_LENGTH),
-				BuildTerminusStation(siteB, dirB, network, b, true, CARGO_STATION_LENGTH),
-				firstTrack,
+				BuildCargoStation(siteA, dirA, network, a, CARGO_STATION_LENGTH),
+				BuildCargoStation(siteB, dirB, network, b, CARGO_STATION_LENGTH),
+				//firstTrack,
+				BuildTrack(Swap(stationA.GetEntrance()), stationB.GetEntrance(), [], SignalMode.NONE, network),
 				BuildTrains(siteA, network, cargo, AIOrder.AIOF_FULL_LOAD_ANY),
 				//BuildTrains(siteA, network, cargo, AIOrder.AIOF_FULL_LOAD_ANY),
 				//BuildTrack(Swap(stationA.GetEntrance()), Swap(stationB.GetExit()), [], SignalMode.BACKWARD, network),
@@ -118,7 +114,7 @@ class BuildCargoLine extends TaskList {
 		producers.Valuate(AIIndustry.GetLastMonthProduction, cargo);
 		producers.KeepAboveValue(50);
 		
-		// and no competition
+		// and no competition, nor an earlier station of our own
 		producers.Valuate(AIIndustry.GetAmountOfStationsAround);
 		producers.KeepValue(0);
 		
@@ -132,26 +128,8 @@ class BuildCargoLine extends TaskList {
 			consumers.KeepBelowValue(maxDistance);
 			
 			for (local consumer = consumers.Begin(); consumers.HasNext(); consumer = consumers.Next()) {
-				local a = producer;
-				local b = consumer;
-				local locA = AIIndustry.GetLocation(a);
-				local locB = AIIndustry.GetLocation(b);
-				
-				local nameA = AIIndustry.GetName(a);
-				local dirA = StationDirection(locA, locB);
-				local rotA = BuildTerminusStation.StationRotationForDirection(dirA);
-				local siteA = FindIndustryStationSite(a, true, rotA, locB, CARGO_STATION_LENGTH);
-	
-				local nameB = AIIndustry.GetName(b);
-				local dirB = StationDirection(locB, locA);
-				local rotB = BuildTerminusStation.StationRotationForDirection(dirB);
-				local siteB = FindIndustryStationSite(b, false, rotB, locA, CARGO_STATION_LENGTH);
-				
-				if (siteA && siteB) {
-					Debug("Connecting " + nameA + " and " + nameB);
+				if (FindStationSites(producer, consumer)) {
 					return [producer, consumer];
-				} else {
-					Debug("Cannot build a station at " + (siteA ? nameB : nameA));
 				}
 			}
 		}
@@ -160,6 +138,28 @@ class BuildCargoLine extends TaskList {
 		Warning("No route for " + AICargo.GetCargoLabel(cargo));
 		bannedCargo.append(cargo);
 		throw TaskRetryException();
+	}
+	
+	function FindStationSites(a, b) {
+		local locA = AIIndustry.GetLocation(a);
+		local locB = AIIndustry.GetLocation(b);
+		
+		local nameA = AIIndustry.GetName(a);
+		local dirA = StationDirection(locA, locB);
+		local rotA = BuildTerminusStation.StationRotationForDirection(dirA);
+		local siteA = FindIndustryStationSite(a, true, rotA, locB, CARGO_STATION_LENGTH + 1, 2);
+
+		local nameB = AIIndustry.GetName(b);
+		local dirB = StationDirection(locB, locA);
+		local rotB = BuildTerminusStation.StationRotationForDirection(dirB);
+		local siteB = FindIndustryStationSite(b, false, rotB, locA, CARGO_STATION_LENGTH + 1, 2);
+		
+		if (siteA && siteB) {
+			return [siteA, rotA, dirA, siteB, rotB, dirB];
+		} else {
+			Debug("Cannot build a station at " + (siteA ? nameB : nameA));
+			return null;
+		}
 	}
 
 }

@@ -51,9 +51,6 @@ class BuildTrains extends TaskList {
 			
 			subtasks = [];
 			for (local to = stationList.Begin(); stationList.HasNext(); to = stationList.Next()) {
-				// the first train always gets a full load order to boost ratings
-				local first = AIVehicleList_Station(from).Count() == 0;
-				local fromFlags = first ? fromFlags | AIOrder.AIOF_FULL_LOAD_ANY : fromFlags;
 				subtasks.append(BuildTrain(from, to, depot, network, fromFlags, toFlags, cargo));
 			}
 		}
@@ -192,6 +189,10 @@ class BuildTrain extends Builder {
 			AIVehicle.SellWagon(train, 1);
 		}
 
+		// the first train for a station always gets a full load order to boost ratings
+		local first = AIVehicleList_Station(from).Count() == 0;
+		fromFlags = first ? fromFlags | AIOrder.AIOF_FULL_LOAD_ANY : fromFlags;
+		
 		network.trains.append(train);
 		AIOrder.AppendOrder(train, AIStation.GetLocation(from), fromFlags);
 		AIOrder.AppendOrder(train, AIStation.GetLocation(to), toFlags);

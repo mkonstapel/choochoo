@@ -1,4 +1,95 @@
 /**
+ * Single platform terminus station.
+ */
+class BuildCargoStation extends Builder {
+	
+	network = null;
+	industry = null;
+	platformLength = null;
+	
+	constructor(location, direction, network, industry, platformLength) {
+		Builder.constructor(location, StationRotationForDirection(direction));
+		this.network = network;
+		this.industry = industry;
+		this.platformLength = platformLength;
+	}
+	
+	function Run() {
+		MoveConstructionSign(location, this);
+		
+		BuildPlatform();
+		local p = platformLength;
+		BuildSegment([0, p], [0, p+1]);
+		BuildDepot([1,p], [0,p]);
+		BuildRail([1, p], [0, p], [0, p-1]);
+		BuildRail([1, p], [0, p], [0, p+1]);
+		network.depots.append(GetTile([1,p]));
+		network.stations.append(AIStation.GetStationID(location));
+	}
+	
+	function StationRotationForDirection(direction) {
+		switch (direction) {
+			case Direction.NE: return Rotation.ROT_270;
+			case Direction.SE: return Rotation.ROT_180;
+			case Direction.SW: return Rotation.ROT_90;
+			case Direction.NW: return Rotation.ROT_0;
+			default: throw "invalid direction";
+		}
+	}
+	
+	function Failed() {
+		local station = AIStation.GetStationID(location);
+		foreach (index, entry in network.stations) {
+			if (entry == station) {
+				network.stations.remove(index);
+				break;
+			}
+		}
+		
+		foreach (y in Range(0, platformLength+1)) {
+			Demolish([0,y]);
+		}
+		
+		Demolish([1, platformLength]);	// depot
+	}
+	
+	/**
+	 * Build station platform. Returns stationID.
+	 */
+	function BuildPlatform() {
+		// template is oriented NW->SE
+		local direction;
+		if (this.rotation == Rotation.ROT_0 || this.rotation == Rotation.ROT_180) {
+			direction = AIRail.RAILTRACK_NW_SE;
+		} else {
+			direction = AIRail.RAILTRACK_NE_SW;
+		}
+		
+		// on the map, location of the station is the topmost tile
+		local platform;
+		if (this.rotation == Rotation.ROT_0) {
+			platform = GetTile([0, 0]);
+		} else if (this.rotation == Rotation.ROT_90) {
+			platform = GetTile([0, platformLength-1]);
+		} else if (this.rotation == Rotation.ROT_180) {
+			platform = GetTile([0, platformLength-1]);
+		} else if (this.rotation == Rotation.ROT_270) {
+			platform = GetTile([0,0]);
+		} else {
+			throw "invalid rotation";
+		}
+		
+		AIRail.BuildRailStation(platform, direction, 1, platformLength, AIStation.STATION_NEW);
+		CheckError();
+		return AIStation.GetStationID(platform);
+	}
+	
+	function _tostring() {
+		return "BuildCargoStation at " + AIIndustry.GetName(industry);
+	}
+}
+
+/**
  * 2-platform terminus station.
  */
 class BuildTerminusStation extends Builder {
