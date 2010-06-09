@@ -46,7 +46,7 @@ class BuildCargoStation extends Builder {
 			}
 		}
 		
-		foreach (y in Range(0, platformLength+1)) {
+		foreach (y in Range(0, platformLength+2)) {
 			Demolish([0,y]);
 		}
 		

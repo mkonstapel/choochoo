@@ -8,7 +8,6 @@ class BuildTrains extends TaskList {
 	fromFlags = null;
 	toFlags = null;
 	cheap = null;
-	depot = null;
 	engine = null;
 	
 	constructor(stationTile, network, cargo, fromFlags = null, toFlags = null, cheap = false) {
@@ -27,21 +26,9 @@ class BuildTrains extends TaskList {
 	
 	function Run() {
 		if (!subtasks) {
-			local depotList = AIList();
-			foreach (depot in network.depots) {
-				depotList.AddItem(depot, 0);
-			}
-			
-			depotList.Valuate(AIMap.DistanceManhattan, stationTile);
-			depotList.KeepBottom(1);
-			if (depotList.IsEmpty()) {
-				// nowhere to build trains
-				return;
-			}
-			
-			local depot = depotList.Begin();
 			local from = AIStation.GetStationID(stationTile);
-			MoveConstructionSign(depot, this);
+			local fromDepot = ClosestDepot(from);
+			MoveConstructionSign(fromDepot, this);
 			
 			// add trains to the N stations with the greatest capacity deficit
 			local stationList = ArrayToList(network.stations);
@@ -51,11 +38,23 @@ class BuildTrains extends TaskList {
 			
 			subtasks = [];
 			for (local to = stationList.Begin(); stationList.HasNext(); to = stationList.Next()) {
-				subtasks.append(BuildTrain(from, to, depot, network, fromFlags, toFlags, cargo));
+				local toDepot = ClosestDepot(to);
+				subtasks.append(BuildTrain(from, to, fromDepot, toDepot, network, fromFlags, toFlags, cargo));
 			}
 		}
 		
 		RunSubtasks();
+	}
+	
+	function ClosestDepot(station) {
+		local depotList = AIList();
+		foreach (depot in network.depots) {
+			depotList.AddItem(depot, 0);
+		}
+		
+		depotList.Valuate(AIMap.DistanceManhattan, AIStation.GetLocation(station));
+		depotList.KeepBottom(1);
+		return depotList.IsEmpty() ? null : depotList.Begin();
 	}
 	
 	/**
@@ -102,7 +101,8 @@ class BuildTrain extends Builder {
 	
 	from = null;
 	to = null;
-	depot = null;
+	fromDepot = null;
+	toDepot = null;
 	network = null;
 	cheap = null;
 	fromFlags = null;
@@ -111,10 +111,11 @@ class BuildTrain extends Builder {
 	train = null;
 	hasMail = null;
 	
-	constructor(from, to, depot, network, fromFlags, toFlags, cargo = null, cheap = false) {
+	constructor(from, to, fromDepot, toDepot, network, fromFlags, toFlags, cargo = null, cheap = false) {
 		this.from = from;
 		this.to = to;
-		this.depot = depot;
+		this.fromDepot = fromDepot;
+		this.toDepot = toDepot;
 		this.network = network;
 		this.fromFlags = fromFlags;
 		this.toFlags = toFlags;
@@ -125,20 +126,19 @@ class BuildTrain extends Builder {
 	}
 	
 	function _tostring() {
-		return "BuildTrain from " + AIStation.GetName(from) + " to " + AIStation.GetName(to) + " at " + TileToString(depot);
+		return "BuildTrain from " + AIStation.GetName(from) + " to " + AIStation.GetName(to) + " at " + TileToString(fromDepot);
 	}
 	
 	function Run() {
 		// we need an engine
 		if (!train || !AIVehicle.IsValidVehicle(train)) {
-			//Debug("Building locomotive at " + AIMap.GetTileX(depot) + "," + AIMap.GetTileY(depot));
 			local engineType = GetEngine(cargo, network.railType, bannedEngines, cheap);
 			
 			// don't try building the train until we (probably) have enough
 			// for the wagons as well, or it may sit in a depot for ages
 			CheckFunds(engineType);
 			
-			train = AIVehicle.BuildVehicle(depot, engineType);
+			train = AIVehicle.BuildVehicle(fromDepot, engineType);
 			CheckError();
 		}
 		
@@ -147,7 +147,7 @@ class BuildTrain extends Builder {
 			if (!hasMail) {
 				local wagonType = GetWagon(MAIL, network.railType);
 				if (wagonType) {
-					local wagon = AIVehicle.BuildVehicle(depot, wagonType);
+					local wagon = AIVehicle.BuildVehicle(fromDepot, wagonType);
 					CheckError();
 					AIVehicle.MoveWagon(wagon, 0, train, 0);
 					CheckError();
@@ -166,7 +166,7 @@ class BuildTrain extends Builder {
 		// and fill the rest of the train with passenger wagons
 		local wagonType = GetWagon(cargo, network.railType);
 		while (TrainLength(train) <= network.trainLength) {
-			local wagon = AIVehicle.BuildVehicle(depot, wagonType);
+			local wagon = AIVehicle.BuildVehicle(fromDepot, wagonType);
 			CheckError();
 			
 			AIVehicle.RefitVehicle(wagon, cargo);
@@ -195,7 +195,9 @@ class BuildTrain extends Builder {
 		
 		network.trains.append(train);
 		AIOrder.AppendOrder(train, AIStation.GetLocation(from), fromFlags);
+		AIOrder.AppendOrder(train, fromDepot, AIOrder.AIOF_NONE);
 		AIOrder.AppendOrder(train, AIStation.GetLocation(to), toFlags);
+		AIOrder.AppendOrder(train, toDepot, AIOrder.AIOF_NONE);
 		AIVehicle.StartStopVehicle(train);
 	}
 	
