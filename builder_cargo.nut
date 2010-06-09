@@ -53,10 +53,9 @@ class BuildCargoLine extends TaskList {
 			
 			local network = Network(AIRailTypeList().Begin(), CARGO_STATION_LENGTH, MIN_DISTANCE, maxDistance);
 			subtasks = [
-				// build the track first - if we don't find a path, we don't lose any money
-				BuildTrack(Swap(stationA.GetEntrance()), stationB.GetEntrance(), [], SignalMode.NONE, network, BuildTrack.FAST),
 				BuildCargoStation(siteA, dirA, network, a, CARGO_STATION_LENGTH),
 				BuildCargoStation(siteB, dirB, network, b, CARGO_STATION_LENGTH),
+				BuildTrack(Swap(stationA.GetEntrance()), stationB.GetEntrance(), [], SignalMode.NONE, network, BuildTrack.FAST),
 				//firstTrack,
 				BuildTrains(siteA, network, cargo, AIOrder.AIOF_FULL_LOAD_ANY),
 				//BuildTrains(siteA, network, cargo, AIOrder.AIOF_FULL_LOAD_ANY),
