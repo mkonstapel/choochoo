@@ -43,20 +43,21 @@ class BuildCargoLine extends TaskList {
 			local dirB = sites[5];
 			local stationB = TerminusStation(siteB, rotB, CARGO_STATION_LENGTH);
 			
+			// double track cargo lines discarded: we just use them for cheap starting income
+			// old strategy: build the first track and two trains first, which can then finance the upgrade to double track
 			//local reserved = stationA.GetReservedEntranceSpace();
 			//reserved.extend(stationB.GetReservedExitSpace());
-			
 			//local exitA = Swap(TerminusStation(siteA, rotA, CARGO_STATION_LENGTH).GetEntrance());
 			//local exitB = TerminusStation(siteB, rotB, CARGO_STATION_LENGTH).GetEntrance();
-			
-			// build the first track and two trains first, which can then finance the upgrade to double track
-			local network = Network(AIRailTypeList().Begin(), CARGO_STATION_LENGTH, MIN_DISTANCE, MAX_DISTANCE);
 			//local firstTrack = BuildTrack(stationA.GetExit(), stationB.GetEntrance(), reserved, SignalMode.NONE, network);
+			
+			local network = Network(AIRailTypeList().Begin(), CARGO_STATION_LENGTH, MIN_DISTANCE, maxDistance);
 			subtasks = [
+				// build the track first - if we don't find a path, we don't lose any money
+				BuildTrack(Swap(stationA.GetEntrance()), stationB.GetEntrance(), [], SignalMode.NONE, network, BuildTrack.FAST),
 				BuildCargoStation(siteA, dirA, network, a, CARGO_STATION_LENGTH),
 				BuildCargoStation(siteB, dirB, network, b, CARGO_STATION_LENGTH),
 				//firstTrack,
-				BuildTrack(Swap(stationA.GetEntrance()), stationB.GetEntrance(), [], SignalMode.NONE, network),
 				BuildTrains(siteA, network, cargo, AIOrder.AIOF_FULL_LOAD_ANY),
 				//BuildTrains(siteA, network, cargo, AIOrder.AIOF_FULL_LOAD_ANY),
 				//BuildTrack(Swap(stationA.GetEntrance()), Swap(stationB.GetExit()), [], SignalMode.BACKWARD, network),
