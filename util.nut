@@ -25,6 +25,21 @@ function Sign(x) {
 	return 0;
 }
 
+/**
+ * Calculates an integer square root.
+ */
+function Sqrt(i) {
+	if (i == 0)
+		return 0;   // Avoid divide by zero
+	local n = (i / 2) + 1;       // Initial estimate, never low
+	local n1 = (n + (i / n)) / 2;
+	while (n1 < n) {
+		n = n1;
+		n1 = (n + (i / n)) / 2;
+	}
+	return n;
+}
+
 function Range(from, to) {
 	local range = [];
 	for (local i=from; i<to; i++) {

@@ -224,6 +224,13 @@ class TerminusStation extends WorldObject {
 		return TileStrip([1, platformLength], [1, platformLength + 4]);
 	}
 	
+	function GetRoadDepot() {
+		return GetTile([2,3]);
+	}
+	
+	function GetRoadDepotExit() {
+		return GetTile([2,2]);
+	}
 }
 
 class Network {

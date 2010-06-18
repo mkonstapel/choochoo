@@ -28,7 +28,7 @@ class BuildTrains extends TaskList {
 		if (!subtasks) {
 			local from = AIStation.GetStationID(stationTile);
 			local fromDepot = ClosestDepot(from);
-			MoveConstructionSign(fromDepot, this);
+			SetConstructionSign(fromDepot, this);
 			
 			// add trains to the N stations with the greatest capacity deficit
 			local stationList = ArrayToList(network.stations);
@@ -189,15 +189,15 @@ class BuildTrain extends Builder {
 			AIVehicle.SellWagon(train, 1);
 		}
 
-		// the first train for a station always gets a full load order to boost ratings
-		local first = AIVehicleList_Station(from).Count() == 0;
-		fromFlags = first ? fromFlags | AIOrder.AIOF_FULL_LOAD_ANY : fromFlags;
+		// the first train for a station gets a full load order to boost ratings
+		//local first = AIVehicleList_Station(from).Count() == 0;
+		//fromFlags = first ? fromFlags | AIOrder.AIOF_FULL_LOAD_ANY : fromFlags;
 		
 		network.trains.append(train);
 		AIOrder.AppendOrder(train, AIStation.GetLocation(from), fromFlags);
-		AIOrder.AppendOrder(train, fromDepot, AIOrder.AIOF_NONE);
+		AIOrder.AppendOrder(train, fromDepot, AIOrder.AIOF_SERVICE_IF_NEEDED);
 		AIOrder.AppendOrder(train, AIStation.GetLocation(to), toFlags);
-		AIOrder.AppendOrder(train, toDepot, AIOrder.AIOF_NONE);
+		AIOrder.AppendOrder(train, toDepot, AIOrder.AIOF_SERVICE_IF_NEEDED);
 		AIVehicle.StartStopVehicle(train);
 	}
 	
@@ -206,9 +206,50 @@ class BuildTrain extends Builder {
 		local wagonType = GetWagon(cargo, network.railType);
 		local numWagons = network.trainLength * 2;
 		local estimate = AIEngine.GetPrice(engineType) + numWagons * AIEngine.GetPrice(wagonType);
-		Debug("Train will cost approx. " + estimate);
 		if (GetBankBalance() < estimate) {
 			throw NeedMoneyException(estimate);
 		}
 	}
+}
+
+class BuildBus extends Builder {
+	
+	from = null;
+	to = null;
+	depot = null;
+	
+	constructor(from, to, depot) {
+		this.from = from;
+		this.to = to;
+		this.depot = depot;
+	}
+	
+	function _tostring() {
+		return "BuildBus from " + AIStation.GetName(from) + " to " + AIStation.GetName(to) + " at " + TileToString(depot);
+	}
+	
+	function Run() {
+		local engineType = GetEngine(PAX);
+		local bus = AIVehicle.BuildVehicle(depot, engineType);
+		CheckError();
+		
+		AIOrder.AppendOrder(bus, AIStation.GetLocation(from), AIOrder.AIOF_NONE);
+		AIOrder.AppendOrder(bus, AIStation.GetLocation(to), AIOrder.AIOF_NONE);
+		AIOrder.AppendOrder(bus, depot, AIOrder.AIOF_NONE);
+		AIVehicle.StartStopVehicle(bus);
+	}
+	
+	function GetEngine(cargo) {
+		local engineList = AIEngineList(AIVehicle.VT_ROAD);
+		engineList.Valuate(AIEngine.GetPrice);
+		
+		// pick something middle of the range, by removing the top half
+		// this will hopefully give us something decent, even when faced with newgrf train sets
+		engineList.Sort(AIList.SORT_BY_VALUE, true);
+		engineList.RemoveTop(engineList.Count() / 2);
+		
+		if (engineList.IsEmpty()) throw TaskFailedException("no suitable engine");
+		return engineList.Begin();
+	}
+	
 }

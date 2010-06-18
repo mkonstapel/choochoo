@@ -98,4 +98,14 @@ class Builder extends Task {
 		// CheckError()?
 	}
 	
+	function BuildRoadDepot(tile, front) {
+		AIRoad.BuildRoadDepot(GetTile(tile), GetTile(front));
+		CheckError();
+	}
+	
+	function BuildRoadDriveThrough(tile, front, bus, station = AIStation.STATION_NEW) {
+		local type = bus ? AIRoad.ROADVEHTYPE_BUS : AIRoad.ROADVEHTYPE_TRUCK;
+		AIRoad.BuildDriveThroughRoadStation(GetTile(tile), GetTile(front), type, station);
+		CheckError();
+	}
 }

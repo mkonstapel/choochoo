@@ -15,7 +15,7 @@ class BuildCargoStation extends Builder {
 	}
 	
 	function Run() {
-		MoveConstructionSign(location, this);
+		SetConstructionSign(location, this);
 		
 		BuildPlatform();
 		local p = platformLength;
@@ -112,9 +112,9 @@ class BuildTerminusStation extends Builder {
 	}
 	
 	function Run() {
-		MoveConstructionSign(location, this);
+		SetConstructionSign(location, this);
 		
-		BuildPlatforms();
+		local stationID = BuildPlatforms();
 		local p = platformLength;
 		BuildSegment([0, p], [0, p+1]);
 		if (doubleTrack) BuildSegment([1, p], [1, p+1]);
@@ -130,7 +130,12 @@ class BuildTerminusStation extends Builder {
 		
 		BuildSignal([0, p+1], [0, p+2], AIRail.SIGNALTYPE_PBS);
 		BuildSignal([1, p+1], [1, p],   AIRail.SIGNALTYPE_PBS);
-		network.stations.append(AIStation.GetStationID(location));
+		network.stations.append(stationID);
+		
+		BuildRoadDepot([2,p-1], [2,p-2]);
+		BuildRoadDriveThrough([2,p-2], [2,p-3], true, stationID);
+		BuildRoadDriveThrough([2,p-3], [2,p-4], true, stationID);
+		BuildRoadDriveThrough([2,p-4], [2,p-5], true, stationID);
 	}
 	
 	function StationRotationForDirection(direction) {
@@ -152,13 +157,19 @@ class BuildTerminusStation extends Builder {
 			}
 		}
 		
-		foreach (x in Range(0, 2)) {
+		local depot = GetTile([2,platformLength]);
+		foreach (index, entry in network.depots) {
+			if (entry == depot) {
+				network.depots.remove(index);
+				break;
+			}
+		}
+		
+		foreach (x in Range(0, 3)) {
 			foreach (y in Range(0, platformLength+2)) {
 				Demolish([x,y]);
 			}
 		}
-		
-		Demolish([2, platformLength]);	// depot
 	}
 	
 	/**
@@ -176,18 +187,23 @@ class BuildTerminusStation extends Builder {
 		// on the map, location of the station is the topmost tile
 		local platform1;
 		local platform2;
+		local cover;
 		if (this.rotation == Rotation.ROT_0) {
 			platform1 = GetTile([0, 0]);
 			platform2 = GetTile([1, 0]);
+			cover = platform1;
 		} else if (this.rotation == Rotation.ROT_90) {
 			platform1 = GetTile([0, platformLength-1]);
 			platform2 = GetTile([1, platformLength-1]);
+			cover = GetTile([0,1]);
 		} else if (this.rotation == Rotation.ROT_180) {
 			platform1 = GetTile([0, platformLength-1]);
 			platform2 = GetTile([1, platformLength-1]);
+			cover = GetTile([1,1]);
 		} else if (this.rotation == Rotation.ROT_270) {
 			platform1 = GetTile([0,0]);
 			platform2 = GetTile([1,0]);
+			cover = platform2;
 		} else {
 			throw "invalid rotation";
 		}
@@ -203,6 +219,8 @@ class BuildTerminusStation extends Builder {
 			CheckError();
 			builtPlatform2 = true;
 		}
+		
+		AIRail.BuildRailStation(cover, direction, 2, 2, AIStation.GetStationID(platform1));
 		
 		return AIStation.GetStationID(platform1);
 	}
@@ -266,4 +284,119 @@ class BuildBusStations extends Builder {
 			AIRoad.RemoveRoadStation(tile);
 		}
 	}
+}
+
+class BuildBusService extends Builder {
+	
+	stationTile = null;
+	town = null;
+	busStation = null;
+	
+	constructor(stationTile, town) {
+		this.stationTile = stationTile;
+		this.town = town;
+		this.busStation = null;
+	}
+	
+	function _tostring() {
+		return "BuildBusService";
+	}
+	
+	function Run() {
+		local depot = TerminusStation.AtLocation(stationTile, RAIL_STATION_PLATFORM_LENGTH).GetRoadDepot();
+		if (!busStation) busStation = BuildBusStation();
+		if (!busStation) {
+			// no spot for a station
+			return;
+		}
+		
+		BuildBus(depot, stationTile, busStation);
+	}
+	
+	function BuildBusStation() {
+		// Find empty square as close to town centre as possible
+		local spotFound = false;
+		local curRange = 1;
+		local maxRange = Sqrt(AITown.GetPopulation(town)/100) + 4; // search larger area
+
+		while (curRange < maxRange) {
+			Debug("Searching range " + curRange);
+			local area = AITileList();
+			SafeAddRectangle(area, AITown.GetLocation(town), curRange);
+			Debug("Found " + area.Count() + " possible options");
+			area.Valuate(AITile.IsBuildable);
+			area.KeepValue(1);
+			if (area.Count()) {
+				Debug("Found " + area.Count() + " possible options");
+				for (local t = area.Begin(); area.HasNext(); t = area.Next()) {
+					local opening = GetRoadTile(t);
+					if (opening) {
+						if (AIRoad.BuildRoadStation(t, opening, AIRoad.ROADVEHTYPE_BUS, AIStation.STATION_NEW) && AIRoad.BuildRoad(opening, t)) {
+							return t;
+						} else {
+							Warning(AIError.GetLastErrorString());
+							//CheckError();
+						}
+					}
+				}
+			}
+			
+			curRange++;
+		}
+		
+		return null;
+	}
+	
+	function GetRoadTile(t) {
+		local adjacent = AITileList();
+		adjacent.AddTile(t - AIMap.GetTileIndex(1,0));
+		adjacent.AddTile(t - AIMap.GetTileIndex(0,1));
+		adjacent.AddTile(t - AIMap.GetTileIndex(-1,0));
+		adjacent.AddTile(t - AIMap.GetTileIndex(0,-1));
+		adjacent.Valuate(AIRoad.IsRoadTile);
+		adjacent.KeepValue(1);
+		adjacent.Valuate(AIRoad.IsRoadDepotTile);
+		adjacent.KeepValue(0);
+		adjacent.Valuate(AIRoad.IsRoadStationTile);
+		adjacent.KeepValue(0);
+		if (adjacent.Count())
+			return adjacent.Begin();
+		else
+			return null;
+	}
+	
+	function BuildBus(depot, from, to) {
+		local engineType = GetEngine(PAX);
+		local bus = AIVehicle.BuildVehicle(depot, engineType);
+		CheckError();
+		
+		AIOrder.AppendOrder(bus, from, AIOrder.AIOF_NONE);
+		AIOrder.AppendOrder(bus, to, AIOrder.AIOF_NONE);
+		AIOrder.AppendOrder(bus, depot, AIOrder.AIOF_NONE);
+		AIVehicle.StartStopVehicle(bus);
+	}
+	
+	function GetEngine(cargo) {
+		local engineList = AIEngineList(AIVehicle.VT_ROAD);
+		engineList.Valuate(AIEngine.CanRefitCargo, cargo);
+		engineList.KeepValue(1);
+		
+		// prefer engines that can carry this cargo without a refit,
+		// because their refitted capacity may be different from
+		// their "native" capacity
+		local native = AIList();
+		native.AddList(engineList);
+		native.Valuate(AIEngine.GetCargoType);
+		native.KeepValue(cargo);
+		if (!native.IsEmpty()) {
+			engineList = native;
+		}
+		
+		engineList.Valuate(AIEngine.GetCapacity)
+		engineList.KeepTop(1);
+		
+		if (engineList.IsEmpty()) throw TaskFailedException("no suitable engine");
+		return engineList.Begin();
+	}
+	
 }

@@ -32,7 +32,7 @@ class LevelTerrain extends Builder {
 	}
 	
 	function Run() {
-		MoveConstructionSign(location, this);
+		SetConstructionSign(location, this);
 		
 		local tiles = AITileList();
 		tiles.AddRectangle(GetTile(from), GetTile(to));
@@ -122,7 +122,7 @@ class AppeaseLocalAuthority extends Task {
 	
 	function Run() {
 		local location = AITown.GetLocation(town);
-		MoveConstructionSign(location, this);
+		SetConstructionSign(location, this);
 		
 		local area = AITileList();
 		SafeAddRectangle(area, location, 20);

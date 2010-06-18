@@ -86,7 +86,7 @@ class BuildCrossing extends Builder {
 	}
 	
 	function Run() {
-		MoveConstructionSign(location, this);
+		SetConstructionSign(location, this);
 		
 		// four segments of track
 		BuildSegment([0,1], [3,1]);
@@ -191,7 +191,7 @@ class ConnectStation extends TaskList {
 	}
 	
 	function Run() {
-		MoveConstructionSign(crossingTile, this);
+		SetConstructionSign(crossingTile, this);
 		
 		local crossing = Crossing(crossingTile);
 		
@@ -260,7 +260,7 @@ class ConnectCrossing extends TaskList {
 	}
 	
 	function Run() {
-		MoveConstructionSign(fromCrossingTile, this);
+		SetConstructionSign(fromCrossingTile, this);
 		
 		local fromCrossing = Crossing(fromCrossingTile);
 		local toCrossing = Crossing(toCrossingTile);
@@ -371,7 +371,7 @@ class ExtendCrossing extends TaskList {
 		}
 		
 		if (!subtasks) {
-			MoveConstructionSign(crossing, this);
+			SetConstructionSign(crossing, this);
 			local towns = FindTowns();
 			local town = null;
 			local stationTile = null;
@@ -394,23 +394,29 @@ class ExtendCrossing extends TaskList {
 					LevelTerrain(stationTile, stationRotation, [0, 0], [RAIL_STATION_WIDTH-1, RAIL_STATION_LENGTH-2]),
 					AppeaseLocalAuthority(town),
 					BuildTerminusStation(stationTile, direction, network, town),
+					AppeaseLocalAuthority(town),
+					BuildBusStations(stationTile, town),
 					LevelTerrain(crossingTile, Rotation.ROT_0, [1, 1], [Crossing.WIDTH-2, Crossing.WIDTH-2]),
 					BuildCrossing(crossingTile, network),
 					ConnectCrossing(crossing, direction, crossingTile, crossingEntranceDirection, network),
 					ConnectStation(crossingTile, crossingExitDirection, stationTile, network),
-					AppeaseLocalAuthority(town),
-					BuildBusStations(stationTile, town),
 					BuildTrains(stationTile, network, PAX),
+					BuildRoad(stationTile, town),
+					AppeaseLocalAuthority(town),
+					BuildBusService(stationTile, town),
 				];
 			} else {
 				subtasks = [
 					LevelTerrain(stationTile, stationRotation, [0, 0], [RAIL_STATION_WIDTH-1, RAIL_STATION_LENGTH-2]),
 					AppeaseLocalAuthority(town),
 					BuildTerminusStation(stationTile, direction, network, town),
-					ConnectStation(crossing, direction, stationTile, network),
 					AppeaseLocalAuthority(town),
 					BuildBusStations(stationTile, town),
+					ConnectStation(crossing, direction, stationTile, network),
 					BuildTrains(stationTile, network, PAX),
+					BuildRoad(stationTile, town),
+					AppeaseLocalAuthority(town),
+					BuildBusService(stationTile, town),
 				];
 			}
 			

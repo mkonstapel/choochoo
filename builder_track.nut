@@ -39,7 +39,7 @@ class BuildTrack extends Builder {
 	}
 	
 	function Run() {
-		MoveConstructionSign(a, this);
+		SetConstructionSign(a, this);
 		
 		/*
 		AISign.BuildSign(a, "a");
@@ -49,6 +49,7 @@ class BuildTrack extends Builder {
 		*/
 		
 		if (!path) path = FindPath(a, b, c, d, ignored);
+		ClearSecondarySign();
 		if (!path) throw TaskFailedException("no path");
 		BuildPath(path);
 	}
@@ -90,6 +91,7 @@ class BuildTrack extends Builder {
 		}
 		
 		Debug("Pathfinding...");
+		SetSecondarySign("Pathfinding...");
 		pathfinder.InitializePath([[b, a]], [[c, d]], ignored);
 		return pathfinder.FindPath(AIMap.DistanceManhattan(a, d) * 3 * TICKS_PER_DAY);
 	}

@@ -1,5 +1,6 @@
 require("pathfinder.nut");
 require("world.nut");
+require("signs.nut");
 require("task.nut");
 require("finance.nut");
 require("builder.nut");
@@ -35,8 +36,9 @@ class ChooChoo extends AIController {
 		::COMPANY <- AICompany.ResolveCompanyID(AICompany.COMPANY_SELF);
 		::PAX <- GetPassengerCargoID();
 		::MAIL <- GetMailCargoID();
-		::SIGN <- 0;
 		::TICKS_PER_DAY <- 37;
+		::SIGN1 <- -1;
+		::SIGN2 <- -1;
 		
 		::tasks <- [];
 		
@@ -92,33 +94,23 @@ class ChooChoo extends AIController {
 		local reserve = GetMinimumSafeMoney();
 		local autorenew = GetAutoRenewMoney();
 		local total = amount + reserve + autorenew;
-		local buildSign = AIController.GetSetting("ActivitySigns");
-		local sign;
-		
-		if (buildSign) {
-			local tile = AISign.GetLocation(SIGN) + AIMap.GetTileIndex(1, 1);
-			sign = AISign.BuildSign(tile, "...");
-		}
 		
 		Debug("Waiting until we have £" + total + " (£" + amount + " to spend plus £" + reserve + " in reserve and £" + autorenew + " for autorenew)");
 		MaxLoan();
 		while (GetBankBalance() < amount) {
-			if (buildSign) {
-				local percentage = (100 * GetBankBalance()) / total;
-				local bar = "";
-				for (local i = 0; i < 100; i += 10) {
-					if (percentage > i) {
-						bar += "I";
-					} else {
-						bar += ".";
-					}
+			local percentage = (100 * GetBankBalance()) / total;
+			local bar = "";
+			for (local i = 0; i < 100; i += 10) {
+				if (percentage > i) {
+					bar += "I";
+				} else {
+					bar += ".";
 				}
-				
-				// maximum sign length is 30 characters; pound sign seems to require two (bytes?)
-				local currency = total >= 100000 ? "" : "£";
-				AISign.SetName(sign, "Money: need " + currency + total/1000 + "K [" + bar + "]");
-				//AISign.SetName(sign, "Money: " + ((100 * GetBankBalance()) / total) + "% of £" + total/1000 + "K");
 			}
+			
+			// maximum sign length is 30 characters; pound sign seems to require two (bytes?)
+			local currency = total >= 100000 ? "" : "£";
+			SetSecondarySign("Money: need " + currency + total/1000 + "K [" + bar + "]");
 			
 			FullyMaxLoan();
 			HandleEvents();
@@ -126,9 +118,7 @@ class ChooChoo extends AIController {
 			MaxLoan();
 		}
 		
-		if (buildSign) {
-			AISign.RemoveSign(sign);
-		}
+		ClearSecondarySign();
 	}
 	
 	function HandleEvents() {

@@ -7,6 +7,7 @@ require("builder_main.nut");
 require("builder_misc.nut");
 require("builder_cargo.nut");
 require("builder_network.nut");
+require("builder_road.nut");
 require("builder_stations.nut");
 require("builder_track.nut");
 require("builder_trains.nut");
@@ -147,24 +148,4 @@ function CargoValue(location, rotation, from, to, cargo, radius, accept) {
 	}
 	
 	return 0;
-}
-
-function MoveConstructionSign(tile, task) {
-	AISign.RemoveSign(SIGN);
-	
-	if (!AIController.GetSetting("ActivitySigns")) return;
-	
-	local text = task.tostring();
-	local space = text.find(" ");
-	if (space) {
-		text = text.slice(0, space);
-	}
-	
-	text = "ChooChoo: " + text;
-	
-	if (text.len() > 30) {
-		text = text.slice(0, 29);
-	}
-	
-	SIGN = AISign.BuildSign(tile, text);
 }
