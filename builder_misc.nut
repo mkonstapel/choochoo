@@ -24,11 +24,13 @@ class LevelTerrain extends Builder {
 	location = null;
 	from = null;
 	to = null;
+	clear = null;
 	
-	constructor(location, rotation, from, to) {
+	constructor(location, rotation, from, to, clear = false) {
 		Builder.constructor(location, rotation);
 		this.from = from;
 		this.to = to;
+		this.clear = clear;
 	}
 	
 	function Run() {
@@ -50,6 +52,9 @@ class LevelTerrain extends Builder {
 		local targetHeight = (min + max + 1) / 2;
 		for (local tile = tiles.Begin(); tiles.HasNext(); tile = tiles.Next()) {
 			LevelTile(tile, targetHeight);
+			
+			// if desired, clear the area, preemptively removing any trees (for town ratings)
+			if (clear) AITile.DemolishTile(tile);
 		}
 	}
 	
@@ -123,26 +128,56 @@ class AppeaseLocalAuthority extends Task {
 	function Run() {
 		local location = AITown.GetLocation(town);
 		SetConstructionSign(location, this);
-		
-		local area = AITileList();
-		SafeAddRectangle(area, location, 20);
-		area.Valuate(AITile.IsWithinTownInfluence, town);
-		area.KeepValue(1);
+
+		local area = GetInfluenceArea(town);
 		area.Valuate(AITile.IsBuildable);
 		area.KeepValue(1);
 		
-		local rating = AITown.GetRating(town, COMPANY);
-		for (local tile = area.Begin(); area.HasNext(); tile = area.Next()) {
-			if (rating > -200) {
-				break;
+		// build from the outside in
+		area.Valuate(AITile.GetDistanceSquareToTile, location);
+		area.Sort(AIList.SORT_BY_VALUE, false);
+		
+		local countdown = 1000;	// "lots"
+		for (local tile = area.Begin(); area.HasNext() && countdown > 0; tile = area.Next()) {
+			local rating = AITown.GetRating(town, COMPANY);
+			if (rating == AITown.TOWN_RATING_NONE || rating > AITown.TOWN_RATING_POOR) {
+				// good enough ("none" will become "very good")
+				return;
 			}
 			
-			AITile.PlantTree(tile);
-			if (AIError.GetLastError() == AIError.ERR_UNKNOWN) {
-				// too many trees on tile, continue
+			if (rating == AITown.TOWN_RATING_APPALLING) {
+				// don't bother, as this would require hundreds of trees
+				Warning("Rating at " + AITown.GetName(town) + " is appalling, not going to try planting trees");
+				return;
+			}
+			
+			if (rating >= AITown.TOWN_RATING_POOR) {
+				// once we reach poor, the minimum to build a station, try to add some more
+				// for slack, in case we "accidentally" hit a tree later...
+				countdown = min(countdown, 20);
+			}
+			
+			while (AITile.PlantTree(tile) && countdown > 0) {
+				countdown--;
+			}
+			
+			if (AIError.GetLastError() == AIError.ERR_UNKNOWN || AIError.GetLastError() == AIError.ERR_SITE_UNSUITABLE) {
+				// too many trees or building on tile, continue
 			} else {
 				CheckError();
 			}
 		}
+	}
+	
+	function GetInfluenceArea(town) {
+		local location = AITown.GetLocation(town);
+		local distance = GetGameSetting("economy.dist_local_authority", 10);
+		local area = AITileList();
+		SafeAddRectangle(area, location, distance);
+		area.Valuate(AITile.GetDistanceManhattanToTile, location);
+		area.KeepBelowValue(distance);
+		area.Valuate(AITile.GetClosestTown);
+		area.KeepValue(town);
+		return area;
 	}
 }

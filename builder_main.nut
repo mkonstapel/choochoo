@@ -84,7 +84,19 @@ class Builder extends Task {
 	}
 	
 	function BuildDepot(tile, front) {
-		AIRail.BuildRailDepot(GetTile(tile), GetTile(front));
+		// trying to build a depot where one already exists results in AREA_NOT_CLEAR, not ALREADY_BUILT
+		tile = GetTile(tile);
+		front = GetTile(front);
+		if (AIRail.IsRailDepotTile(tile) && AIRail.GetRailDepotFrontTile(tile) == front) return;
+		AIRail.BuildRailDepot(tile, front);
+		CheckError();
+	}
+	
+	function BuildRoadDepot(tile, front) {
+		tile = GetTile(tile);
+		front = GetTile(front);
+		if (AIRoad.IsRoadDepotTile(tile) && AIRoad.GetRoadDepotFrontTile(tile) == front) return;
+		AIRoad.BuildRoadDepot(tile, front);
 		CheckError();
 	}
 	
@@ -98,14 +110,12 @@ class Builder extends Task {
 		// CheckError()?
 	}
 	
-	function BuildRoadDepot(tile, front) {
-		AIRoad.BuildRoadDepot(GetTile(tile), GetTile(front));
-		CheckError();
-	}
-	
 	function BuildRoadDriveThrough(tile, front, bus, station = AIStation.STATION_NEW) {
+		tile = GetTile(tile);
+		front = GetTile(front);
+		if (AIRoad.IsDriveThroughRoadStationTile(tile)) return;
 		local type = bus ? AIRoad.ROADVEHTYPE_BUS : AIRoad.ROADVEHTYPE_TRUCK;
-		AIRoad.BuildDriveThroughRoadStation(GetTile(tile), GetTile(front), type, station);
+		AIRoad.BuildDriveThroughRoadStation(tile, front, type, station);
 		CheckError();
 	}
 }

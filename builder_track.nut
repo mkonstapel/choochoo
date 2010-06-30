@@ -64,7 +64,12 @@ class BuildTrack extends Builder {
 		local bridgeLength = AIController.GetSetting("MaxBridgeLength");
 		pathfinder.cost.max_bridge_length = bridgeLength;
 		pathfinder.cost.max_tunnel_length = 5;
-		pathfinder.estimate_multiplier = AIController.GetSetting("PathfinderMultiplier");
+		switch (AIController.GetSetting("PathfinderMultiplier")) {
+			case 1:  pathfinder.estimate_multiplier = 1.1; break;
+			case 2:  pathfinder.estimate_multiplier = 1.4; break;
+			case 3:  pathfinder.estimate_multiplier = 1.7; break;
+			default: pathfinder.estimate_multiplier = 2.0; break;
+		}
 		
 		pathfinder.cost.max_cost = pathfinder.cost.tile * 4 * AIMap.DistanceManhattan(a, d);
 		

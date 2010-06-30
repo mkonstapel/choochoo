@@ -284,6 +284,10 @@ function MaxDistance(cargo, trainLength) {
 	return (AICompany.GetMaxLoanAmount() - trainCost - bridgeCost) / tileCost;
 }
 
+function GetGameSetting(setting, defaultValue) {
+	return AIGameSettings.IsValid(setting) ? AIGameSettings.GetValue(setting) : defaultValue;
+}
+
 class Counter {
 	
 	count = 0;

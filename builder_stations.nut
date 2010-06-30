@@ -286,56 +286,89 @@ class BuildBusStations extends Builder {
 	}
 }
 
-class BuildBusService extends Builder {
+class BuildBusService extends TaskList {
 	
 	stationTile = null;
 	town = null;
-	busStation = null;
 	
 	constructor(stationTile, town) {
+		TaskList.constructor(this, null);
 		this.stationTile = stationTile;
 		this.town = town;
-		this.busStation = null;
 	}
 	
 	function _tostring() {
-		return "BuildBusService";
+		return "BuildBusService at " + AITown.GetName(town);
 	}
 	
 	function Run() {
-		local depot = TerminusStation.AtLocation(stationTile, RAIL_STATION_PLATFORM_LENGTH).GetRoadDepot();
-		if (!busStation) busStation = BuildBusStation();
-		if (!busStation) {
-			// no spot for a station
-			return;
+		if (!subtasks) {
+			SetConstructionSign(stationTile, this);
+			subtasks = [
+				BuildRoad(stationTile, town),
+				AppeaseLocalAuthority(town),
+				BuildBusStation(stationTile, town),
+			];
 		}
 		
-		BuildBus(depot, stationTile, busStation);
+		RunSubtasks();
+	}
+}
+
+class BuildBusStation extends Task {
+	
+	busStationTile = null;
+	trainStationTile = null;
+	town = null;
+	
+	constructor(trainStationTile, town) {
+		this.busStationTile = null;
+		this.trainStationTile = trainStationTile;
+		this.town = town;
 	}
 	
-	function BuildBusStation() {
+	function _tostring() {
+		return "BuildBusStation at " + AITown.GetName(town);
+	}
+	
+	function Run() {
+		local depot = TerminusStation.AtLocation(trainStationTile, RAIL_STATION_PLATFORM_LENGTH).GetRoadDepot();
+		if (!busStationTile) busStationTile = BuildStation();
+		BuildBus(depot, trainStationTile, busStationTile);
+	}
+	
+	function BuildStation() {
 		// Find empty square as close to town centre as possible
 		local spotFound = false;
 		local curRange = 1;
 		local maxRange = Sqrt(AITown.GetPopulation(town)/100) + 4; // search larger area
-
 		while (curRange < maxRange) {
-			Debug("Searching range " + curRange);
 			local area = AITileList();
 			SafeAddRectangle(area, AITown.GetLocation(town), curRange);
-			Debug("Found " + area.Count() + " possible options");
 			area.Valuate(AITile.IsBuildable);
 			area.KeepValue(1);
 			if (area.Count()) {
-				Debug("Found " + area.Count() + " possible options");
 				for (local t = area.Begin(); area.HasNext(); t = area.Next()) {
 					local opening = GetRoadTile(t);
 					if (opening) {
-						if (AIRoad.BuildRoadStation(t, opening, AIRoad.ROADVEHTYPE_BUS, AIStation.STATION_NEW) && AIRoad.BuildRoad(opening, t)) {
-							return t;
-						} else {
-							Warning(AIError.GetLastErrorString());
-							//CheckError();
+						AIRoad.BuildRoad(opening, t);
+						if (AIError.GetLastError() == AIError.ERR_NONE || AIError.GetLastError() == AIError.ERR_ALREADY_BUILT) {
+							AIRoad.BuildRoadStation(t, opening, AIRoad.ROADVEHTYPE_BUS, AIStation.STATION_NEW);
+							switch (AIError.GetLastError()) {
+								case AIError.ERR_UNKNOWN: 
+								case AIError.ERR_AREA_NOT_CLEAR: 
+								case AIError.ERR_OWNED_BY_ANOTHER_COMPANY: 
+								case AIError.ERR_FLAT_LAND_REQUIRED: 
+								case AIError.ERR_LAND_SLOPED_WRONG: 
+								case AIError.ERR_SITE_UNSUITABLE: 
+								case AIError.ERR_TOO_CLOSE_TO_EDGE:
+									// try another tile
+									continue;
+								
+								default:
+									CheckError();
+									return t;
+							}
 						}
 					}
 				}

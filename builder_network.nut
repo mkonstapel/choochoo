@@ -17,12 +17,14 @@ class BuildNewNetwork extends Task {
 				AITile.IsBuildableRectangle(
 					tile - AIMap.GetTileIndex(Crossing.WIDTH, Crossing.WIDTH),
 					Crossing.WIDTH*3, Crossing.WIDTH*3) &&
-				EstimateNetworkStationCount(tile) >= 2) break;
+				EstimateNetworkStationCount(tile) >= 3) break;
 			
 			count++;
 			if (count >= MAX_ATTEMPTS) {
 				Warning("Tried " + count + " locations to start a new network, map may be full. Trying again tomorrow...");
 				throw TaskRetryException(TICKS_PER_DAY);
+			} else {
+				AIController.Sleep(1);
 			}
 		}
 		
@@ -342,6 +344,8 @@ class ExtendCrossing extends TaskList {
 	direction = null;
 	network = null;
 	cancelled = null;
+	town = null;
+	stationTile = null;
 	
 	constructor(crossing, direction, network) {
 		TaskList.constructor(this, null);
@@ -349,6 +353,8 @@ class ExtendCrossing extends TaskList {
 		this.direction = direction;
 		this.network = network;
 		this.cancelled = false;
+		this.town = null;
+		this.stationTile = null;
 	}
 	
 	function _tostring() {
@@ -373,9 +379,10 @@ class ExtendCrossing extends TaskList {
 		if (!subtasks) {
 			SetConstructionSign(crossing, this);
 			local towns = FindTowns();
-			local town = null;
-			local stationTile = null;
 			local stationRotation = BuildTerminusStation.StationRotationForDirection(direction);
+			
+			town = null;
+			stationTile = null;
 			for (town = towns.Begin(); towns.HasNext(); town = towns.Next()) {
 				stationTile = FindStationSite(town, stationRotation, crossing);
 				if (stationTile) break;
@@ -391,7 +398,7 @@ class ExtendCrossing extends TaskList {
 				local crossingExitDirection = CrossingExitDirection(crossingTile, stationTile);
 				
 				subtasks = [
-					LevelTerrain(stationTile, stationRotation, [0, 0], [RAIL_STATION_WIDTH-1, RAIL_STATION_LENGTH-2]),
+					LevelTerrain(stationTile, stationRotation, [0, 0], [RAIL_STATION_WIDTH-1, RAIL_STATION_LENGTH-2], true),
 					AppeaseLocalAuthority(town),
 					BuildTerminusStation(stationTile, direction, network, town),
 					AppeaseLocalAuthority(town),
@@ -401,22 +408,16 @@ class ExtendCrossing extends TaskList {
 					ConnectCrossing(crossing, direction, crossingTile, crossingEntranceDirection, network),
 					ConnectStation(crossingTile, crossingExitDirection, stationTile, network),
 					BuildTrains(stationTile, network, PAX),
-					BuildRoad(stationTile, town),
-					AppeaseLocalAuthority(town),
-					BuildBusService(stationTile, town),
 				];
 			} else {
 				subtasks = [
-					LevelTerrain(stationTile, stationRotation, [0, 0], [RAIL_STATION_WIDTH-1, RAIL_STATION_LENGTH-2]),
+					LevelTerrain(stationTile, stationRotation, [0, 0], [RAIL_STATION_WIDTH-1, RAIL_STATION_LENGTH-2], true),
 					AppeaseLocalAuthority(town),
 					BuildTerminusStation(stationTile, direction, network, town),
 					AppeaseLocalAuthority(town),
 					BuildBusStations(stationTile, town),
 					ConnectStation(crossing, direction, stationTile, network),
 					BuildTrains(stationTile, network, PAX),
-					BuildRoad(stationTile, town),
-					AppeaseLocalAuthority(town),
-					BuildBusService(stationTile, town),
 				];
 			}
 			
@@ -429,6 +430,7 @@ class ExtendCrossing extends TaskList {
 		}
 		
 		RunSubtasks();
+		tasks.insert(1, BuildBusService(stationTile, town));
 	}
 	
 	function CrossingExitDirection(crossingTile, stationTile) {

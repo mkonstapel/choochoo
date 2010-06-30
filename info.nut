@@ -12,8 +12,8 @@ class ChooChoo extends AIInfo {
 	    AddSetting({name = "MaxBridgeLength", description = "Maximum bridge length", min_value = 0, max_value = 40, easy_value = 20, medium_value = 20, hard_value = 20, custom_value = 20, flags = AICONFIG_INGAME});
 	    AddSetting({name = "JunctionNames", description = "Name junctions with waypoints", easy_value = 1, medium_value = 1, hard_value = 1, custom_value = 1, flags = AICONFIG_BOOLEAN|AICONFIG_INGAME});
 	    AddSetting({name = "ActivitySigns", description = "Place signs showing what ChooChoo is doing", easy_value = 1, medium_value = 1, hard_value = 0, custom_value = 1, flags = AICONFIG_BOOLEAN|AICONFIG_INGAME});
-	    AddSetting({name = "PathfinderMultiplier", description = "Pathfinder speed: higher values are faster, but less accurate", min_value = 2, max_value = 5, easy_value = 2, medium_value = 3, hard_value = 5, custom_value = 3, flags = AICONFIG_INGAME});
-	    AddLabels("PathfinderMultiplier", {_2 = "Slow", _3 = "Medium", _4 = "Fast", _5 = "Very fast"});
+	    AddSetting({name = "PathfinderMultiplier", description = "Pathfinder speed: higher values are faster, but less accurate", min_value = 1, max_value = 4, easy_value = 1, medium_value = 2, hard_value = 3, custom_value = 3, flags = AICONFIG_INGAME});
+	    AddLabels("PathfinderMultiplier", {_1 = "Slow", _2 = "Medium", _3 = "Fast", _4 = "Very fast"});
 	}
 }
 
