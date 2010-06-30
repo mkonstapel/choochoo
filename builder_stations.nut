@@ -130,12 +130,13 @@ class BuildTerminusStation extends Builder {
 		
 		BuildSignal([0, p+1], [0, p+2], AIRail.SIGNALTYPE_PBS);
 		BuildSignal([1, p+1], [1, p],   AIRail.SIGNALTYPE_PBS);
-		network.stations.append(stationID);
 		
 		BuildRoadDepot([2,p-1], [2,p-2]);
 		BuildRoadDriveThrough([2,p-2], [2,p-3], true, stationID);
 		BuildRoadDriveThrough([2,p-3], [2,p-4], true, stationID);
 		BuildRoadDriveThrough([2,p-4], [2,p-5], true, stationID);
+		
+		network.stations.append(stationID);
 	}
 	
 	function StationRotationForDirection(direction) {

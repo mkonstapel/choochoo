@@ -208,6 +208,10 @@ class TerminusStation extends WorldObject {
 		return TerminusStation(location, rotation, platformLength);
 	}
 	
+	function _tostring() {
+		return AIStation.GetName(AIStation.GetStationID(location));
+	}
+	
 	function GetEntrance() {
 		return TileStrip([0, platformLength + 2], [0, platformLength + 1]);
 	}
@@ -222,6 +226,22 @@ class TerminusStation extends WorldObject {
 
 	function GetReservedExitSpace() {
 		return TileStrip([1, platformLength], [1, platformLength + 4]);
+	}
+	
+	function GetRearEntrance() {
+		return TileStrip([1, -1], [1, 0]);
+	}
+	
+	function GetRearExit() {
+		return TileStrip([0, 0], [0, -1]);
+	}
+	
+	function GetReservedRearEntranceSpace() {
+		return TileStrip([1, -1], [1, -3]);
+	}
+
+	function GetReservedRearExitSpace() {
+		return TileStrip([0, 0], [0, -3]);
 	}
 	
 	function GetRoadDepot() {

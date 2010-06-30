@@ -121,6 +121,16 @@ function ArrayToList(a) {
 }
 
 /**
+ * Return an array that contains all elements of a and b.
+ */
+function Join(a, b) {
+	local r = [];
+	r.extend(a);
+	r.extend(b);
+	return r;
+}
+
+/**
  * Add a rectangular area to an AITileList containing tiles that are within /radius/
  * tiles from the center tile, taking the edges of the map into account.
  */  
