@@ -335,6 +335,7 @@ class BuildBusStation extends Task {
 	function Run() {
 		local depot = TerminusStation.AtLocation(trainStationTile, RAIL_STATION_PLATFORM_LENGTH).GetRoadDepot();
 		if (!busStationTile) busStationTile = BuildStation();
+		if (!busStationTile) throw TaskFailedException("Couldn't build a station in " + AITown.GetName(town));
 		BuildBus(depot, trainStationTile, busStationTile);
 	}
 	
@@ -354,7 +355,10 @@ class BuildBusStation extends Task {
 					if (opening) {
 						AIRoad.BuildRoad(opening, t);
 						if (AIError.GetLastError() == AIError.ERR_NONE || AIError.GetLastError() == AIError.ERR_ALREADY_BUILT) {
-							AIRoad.BuildRoadStation(t, opening, AIRoad.ROADVEHTYPE_BUS, AIStation.STATION_NEW);
+							if (AIRoad.BuildRoadStation(t, opening, AIRoad.ROADVEHTYPE_BUS, AIStation.STATION_NEW)) {
+								return t;
+							}
+							
 							switch (AIError.GetLastError()) {
 								case AIError.ERR_UNKNOWN: 
 								case AIError.ERR_AREA_NOT_CLEAR: 
@@ -368,7 +372,6 @@ class BuildBusStation extends Task {
 								
 								default:
 									CheckError();
-									return t;
 							}
 						}
 					}

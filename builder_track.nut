@@ -4,6 +4,7 @@ class BuildTrack extends Builder {
 	static STRAIGHT = 0;
 	static LOOSE = 1;
 	static FAST = 2;
+	static FOLLOW = 3;
 	
 	static SIGNAL_INTERVAL = 3;
 	//static DEPOT_INTERVAL = 30;
@@ -29,6 +30,7 @@ class BuildTrack extends Builder {
 		this.signalMode = signalMode;
 		this.network = network;
 		this.style = style ? style : STRAIGHT;
+		
 		//this.lastDepot = -DEPOT_INTERVAL;	// build one as soon as possible
 		this.lastDepot = 0;
 		this.path = null;
@@ -48,7 +50,7 @@ class BuildTrack extends Builder {
 		AISign.BuildSign(d, "d");
 		*/
 		
-		if (!path) path = FindPath(a, b, c, d, ignored);
+		if (!path) path = FindPath();
 		ClearSecondarySign();
 		if (!path) throw TaskFailedException("no path");
 		BuildPath(path);
@@ -58,7 +60,7 @@ class BuildTrack extends Builder {
 		return path;
 	}
 	
-	function FindPath(a, b, c, d, ignored) {
+	function FindPath() {
 		local pathfinder = Rail();
 		
 		local bridgeLength = AIController.GetSetting("MaxBridgeLength");
@@ -71,10 +73,20 @@ class BuildTrack extends Builder {
 			default: pathfinder.estimate_multiplier = 2.0; break;
 		}
 		
-		pathfinder.cost.max_cost = pathfinder.cost.tile * 4 * AIMap.DistanceManhattan(a, d);
+		local u = pathfinder.cost.tile;
+		pathfinder.cost.max_cost = u * 4 * AIMap.DistanceManhattan(a, d);
 		
 		if (style == STRAIGHT) {
-			pathfinder.cost.diagonal_tile = 200;
+			// straight, avoiding obstacles
+			pathfinder.cost.diagonal_tile = u;
+			pathfinder.cost.turn = 2*u;
+			pathfinder.cost.adj_obstacle = 4*u;
+		} else if (style == FOLLOW) {
+			// cheaper turns, bonus for nearby track
+			pathfinder.cost.diagonal_tile = u;
+			pathfinder.cost.turn = u;
+			pathfinder.cost.adj_obstacle = 0;
+			pathfinder.cost.adj_rail = -u;
 		} else if (style == LOOSE) {
 			pathfinder.cost.diagonal_tile = 40;
 			pathfinder.cost.turn = 25;

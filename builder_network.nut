@@ -227,7 +227,7 @@ class ConnectStation extends TaskList {
 				}
 			}
 			
-			subtasks.append(BuildTrack(Swap(station.GetEntrance()), Swap(crossing.GetExit(direction)), reserved, SignalMode.BACKWARD, network));
+			subtasks.append(BuildTrack(Swap(station.GetEntrance()), Swap(crossing.GetExit(direction)), reserved, SignalMode.BACKWARD, network, BuildTrack.FOLLOW));
 		}
 		
 		RunSubtasks();
@@ -301,7 +301,7 @@ class ConnectCrossing extends TaskList {
 				}
 			}
 			
-			subtasks.append(BuildTrack(Swap(toCrossing.GetEntrance(toDirection)), Swap(fromCrossing.GetExit(fromDirection)), reserved, SignalMode.BACKWARD, network));
+			subtasks.append(BuildTrack(Swap(toCrossing.GetEntrance(toDirection)), Swap(fromCrossing.GetExit(fromDirection)), reserved, SignalMode.BACKWARD, network, BuildTrack.FOLLOW));
 		}
 		
 		RunSubtasks();
@@ -413,7 +413,7 @@ class ExtendStation extends TaskList {
 					AppeaseLocalAuthority(town),
 					BuildBusStations(toStationTile, town),
 					BuildTrack(fromStation.GetRearExit(), toStation.GetEntrance(), Join(fromStation.GetReservedRearEntranceSpace(), toStation.GetReservedExitSpace()), SignalMode.FORWARD, network),
-					BuildTrack(Swap(fromStation.GetRearEntrance()), Swap(toStation.GetExit()), [], SignalMode.BACKWARD, network),
+					BuildTrack(Swap(fromStation.GetRearEntrance()), Swap(toStation.GetExit()), [], SignalMode.BACKWARD, network, BuildTrack.FOLLOW),
 					BuildTrains(toStationTile, network, PAX),
 				];
 			}

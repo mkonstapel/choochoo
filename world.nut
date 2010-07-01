@@ -221,11 +221,11 @@ class TerminusStation extends WorldObject {
 	}
 	
 	function GetReservedEntranceSpace() {
-		return TileStrip([0, platformLength], [0, platformLength + 4]);
+		return TileStrip([0, platformLength], [0, platformLength + 2]);
 	}
 
 	function GetReservedExitSpace() {
-		return TileStrip([1, platformLength], [1, platformLength + 4]);
+		return TileStrip([1, platformLength], [1, platformLength + 2]);
 	}
 	
 	function GetRearEntrance() {
@@ -237,11 +237,11 @@ class TerminusStation extends WorldObject {
 	}
 	
 	function GetReservedRearEntranceSpace() {
-		return TileStrip([1, -1], [1, -3]);
+		return TileStrip([1, -1], [1, -2]);
 	}
 
 	function GetReservedRearExitSpace() {
-		return TileStrip([0, 0], [0, -3]);
+		return TileStrip([0, 0], [0, -2]);
 	}
 	
 	function GetRoadDepot() {
