@@ -130,6 +130,11 @@ class BuildTrain extends Builder {
 	}
 	
 	function Run() {
+		// there appears to be a bug
+		if (!AIStation.IsValidStation(from) || !AIStation.IsValidStation(to)) {
+			throw TaskFailedException("Invalid route: " + this);
+		}
+		
 		// we need an engine
 		if (!train || !AIVehicle.IsValidVehicle(train)) {
 			local engineType = GetEngine(cargo, network.railType, bannedEngines, cheap);
