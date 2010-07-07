@@ -1,13 +1,28 @@
-function Debug(s) {
-	AILog.Info(GetDate() + ": " + s);
+function Debug(...) {
+	local s = "";
+	for(local i = 0; i< vargc; i++) {
+		s = s + " " + vargv[i];
+	}
+	
+	AILog.Info(GetDate() + ":" + s);
 }
 
-function Warning(s) {
-	AILog.Warning(GetDate() + ": " + s);
+function Warning(...) {
+	local s = "";
+	for(local i = 0; i< vargc; i++) {
+		s = s + " " + vargv[i];
+	}
+	
+	AILog.Warning(GetDate() + ":" + s);
 }
 
-function Error(s) {
-	AILog.Error(GetDate() + ": " + s);
+function Error(...) {
+	local s = "";
+	for(local i = 0; i< vargc; i++) {
+		s = s + " " + vargv[i];
+	}
+	
+	AILog.Error(GetDate() + ":" + s);
 }
 
 function GetDate() {
@@ -123,7 +138,7 @@ function ArrayToList(a) {
 /**
  * Return an array that contains all elements of a and b.
  */
-function Join(a, b) {
+function Concat(a, b) {
 	local r = [];
 	r.extend(a);
 	r.extend(b);
@@ -290,7 +305,7 @@ function MaxDistance(cargo, trainLength) {
 	local wagon = GetWagon(cargo, rail);
 	local trainCost = AIEngine.GetPrice(engine) + AIEngine.GetPrice(wagon) * (trainLength-1) * 2;
 	local bridgeCost = GetMaxBridgeCost(AIController.GetSetting("MaxBridgeLength"));
-	local tileCost = 500;
+	local tileCost = AIRail.GetBuildCost(rail, AIRail.BT_TRACK);
 	return (AICompany.GetMaxLoanAmount() - trainCost - bridgeCost) / tileCost;
 }
 
