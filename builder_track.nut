@@ -84,7 +84,8 @@ class BuildTrack extends Builder {
 		} else if (style == FOLLOW) {
 			// cheaper turns, bonus for nearby track
 			pathfinder.cost.diagonal_tile = u;
-			pathfinder.cost.turn = u;
+			pathfinder.cost.turn = u/2;
+			pathfinder.cost.slope = u/2;
 			pathfinder.cost.adj_obstacle = 0;
 			pathfinder.cost.adj_rail = -u;
 		} else if (style == LOOSE) {
