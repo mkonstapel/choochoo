@@ -18,6 +18,8 @@ class BuildCargoLine extends TaskList {
 	function Run() {
 		if (!subtasks) {
 			local cargo = SelectCargo();
+			local railType = SelectRailType(cargo);
+			AIRail.SetCurrentRailType(railType);
 			local maxDistance = min(CARGO_MAX_DISTANCE, MaxDistance(cargo, CARGO_STATION_LENGTH));
 			Debug("Max distance for " + AICargo.GetCargoLabel(cargo) + ": " + maxDistance);
 			
@@ -51,10 +53,11 @@ class BuildCargoLine extends TaskList {
 			//local exitB = TerminusStation(siteB, rotB, CARGO_STATION_LENGTH).GetEntrance();
 			//local firstTrack = BuildTrack(stationA.GetExit(), stationB.GetEntrance(), reserved, SignalMode.NONE, network);
 			
-			local network = Network(AIRailTypeList().Begin(), CARGO_STATION_LENGTH, MIN_DISTANCE, maxDistance);
+			local network = Network(railType, CARGO_STATION_LENGTH, MIN_DISTANCE, maxDistance);
 			subtasks = [
-				BuildCargoStation(siteA, dirA, network, a, CARGO_STATION_LENGTH),
-				BuildCargoStation(siteB, dirB, network, b, CARGO_STATION_LENGTH),
+				// location, direction, network, atIndustry, toIndustry, cargo isSource, platformLength
+				BuildCargoStation(siteA, dirA, network, a, b, cargo, true, CARGO_STATION_LENGTH),
+				BuildCargoStation(siteB, dirB, network, b, a, cargo, false, CARGO_STATION_LENGTH),
 				BuildTrack(Swap(stationA.GetEntrance()), stationB.GetEntrance(), [], SignalMode.NONE, network, BuildTrack.FAST),
 				//firstTrack,
 				BuildTrains(siteA, network, cargo, AIOrder.AIOF_FULL_LOAD_ANY),
@@ -65,6 +68,35 @@ class BuildCargoLine extends TaskList {
 		}
 		
 		RunSubtasks();
+	}
+	
+	function SelectRailType(cargo) {
+		// select a rail type for which we can build a locomotive that can pull wagons for the desired cargo
+		local railTypes = AIRailTypeList();
+		railTypes.Valuate(CarriesCargo, cargo);
+		railTypes.KeepValue(1);
+		railTypes.Valuate(AIRail.GetBuildCost, AIRail.BT_TRACK);
+		railTypes.KeepAboveValue(0);	// filter out NuTracks planning tracks, which are free
+		railTypes.KeepBottom(1);		// use the cheap stuff for cargo
+		if (railTypes.IsEmpty()) {
+			bannedCargo.append(cargo);
+			throw TaskFailedException("no rail type for " + AICargo.GetCargoLabel(cargo));
+		} else {
+			return railTypes.Begin();
+		}
+	}
+	
+	function CarriesCargo(railType, cargo) {
+		local engineList = AIEngineList(AIVehicle.VT_RAIL);
+		engineList.Valuate(AIEngine.IsWagon);
+		engineList.KeepValue(0);
+		engineList.Valuate(AIEngine.CanRunOnRail, railType);
+		engineList.KeepValue(1);
+		engineList.Valuate(AIEngine.HasPowerOnRail, railType);
+		engineList.KeepValue(1);
+		engineList.Valuate(AIEngine.CanPullCargo, cargo);
+		engineList.KeepValue(1);
+		return engineList.IsEmpty() ? 0 : 1;
 	}
 	
 	function SelectCargo() {
@@ -147,12 +179,12 @@ class BuildCargoLine extends TaskList {
 		local nameA = AIIndustry.GetName(a);
 		local dirA = StationDirection(locA, locB);
 		local rotA = BuildTerminusStation.StationRotationForDirection(dirA);
-		local siteA = FindIndustryStationSite(a, true, rotA, locB, CARGO_STATION_LENGTH + 1, 2);
+		local siteA = FindIndustryStationSite(a, true, rotA, locB, CARGO_STATION_LENGTH + 3, 2);
 
 		local nameB = AIIndustry.GetName(b);
 		local dirB = StationDirection(locB, locA);
 		local rotB = BuildTerminusStation.StationRotationForDirection(dirB);
-		local siteB = FindIndustryStationSite(b, false, rotB, locA, CARGO_STATION_LENGTH + 1, 2);
+		local siteB = FindIndustryStationSite(b, false, rotB, locA, CARGO_STATION_LENGTH + 3, 2);
 		
 		if (siteA && siteB) {
 			return [siteA, rotA, dirA, siteB, rotB, dirB];
@@ -161,5 +193,26 @@ class BuildCargoLine extends TaskList {
 			return null;
 		}
 	}
-
+	
+	/**
+	 * Find a site for a station at the given industry.
+	 */
+	function FindIndustryStationSite(industry, producing, stationRotation, destination, length, width) {
+		local location = AIIndustry.GetLocation(industry);
+		local area = producing ? AITileList_IndustryProducing(industry, RAIL_STATION_RADIUS) : AITileList_IndustryAccepting(industry, RAIL_STATION_RADIUS);
+		
+		// room for a station
+		area.Valuate(IsBuildableRectangle, stationRotation, [0, 0], [width, length], true);
+		area.KeepValue(1);
+		
+		// pick the tile farthest from the destination for increased profit
+		//area.Valuate(AITile.GetDistanceManhattanToTile, destination);
+		//area.KeepTop(1);
+		
+		// pick the tile closest to the industry for looks
+		area.Valuate(AITile.GetDistanceManhattanToTile, location);
+		area.KeepBottom(1);
+		
+		return area.IsEmpty() ? null : area.Begin();
+	}
 }
