@@ -4,13 +4,19 @@
 class BuildCargoStation extends Builder {
 	
 	network = null;
-	industry = null;
+	atIndustry = null;
+	toIndustry = null;
+	cargo = null;
+	isSource = null;
 	platformLength = null;
 	
-	constructor(location, direction, network, industry, platformLength) {
+	constructor(location, direction, network, atIndustry, toIndustry, cargo, isSource, platformLength) {
 		Builder.constructor(location, StationRotationForDirection(direction));
 		this.network = network;
-		this.industry = industry;
+		this.atIndustry = atIndustry;
+		this.toIndustry = toIndustry;
+		this.cargo = cargo;
+		this.isSource = isSource;
 		this.platformLength = platformLength;
 	}
 	
@@ -79,13 +85,17 @@ class BuildCargoStation extends Builder {
 			throw "invalid rotation";
 		}
 		
-		AIRail.BuildRailStation(platform, direction, 1, platformLength, AIStation.STATION_NEW);
+		// AIRail.BuildRailStation(platform, direction, 1, platformLength, AIStation.STATION_NEW);
+		local distance = AIIndustry.GetDistanceManhattanToTile(atIndustry, AIIndustry.GetLocation(toIndustry));
+		AIRail.BuildNewGRFRailStation(platform, direction, 1, platformLength, AIStation.STATION_NEW,
+			cargo, atIndustry, toIndustry, distance, isSource);
+
 		CheckError();
 		return AIStation.GetStationID(platform);
 	}
 	
 	function _tostring() {
-		return "BuildCargoStation at " + AIIndustry.GetName(industry);
+		return "BuildCargoStation at " + AIIndustry.GetName(atIndustry);
 	}
 }
 
@@ -299,16 +309,17 @@ class BuildBusService extends TaskList {
 	}
 	
 	function _tostring() {
-		return "BuildBusService at " + AITown.GetName(town);
+		return "BuildBusService from " + AIStation.GetName(AIStation.GetStationID(stationTile)) + " to " + AITown.GetName(town);
 	}
 	
 	function Run() {
 		if (!subtasks) {
 			SetConstructionSign(stationTile, this);
 			subtasks = [
-				BuildRoad(stationTile, town),
 				AppeaseLocalAuthority(town),
-				BuildBusStation(stationTile, town),
+				BuildTownBusStation(town),
+				BuildRoad(stationTile, town),
+				BuildBus(stationTile, town),
 			];
 		}
 		
@@ -316,63 +327,58 @@ class BuildBusService extends TaskList {
 	}
 }
 
-class BuildBusStation extends Task {
+class BuildTownBusStation extends Task {
 	
-	busStationTile = null;
-	trainStationTile = null;
 	town = null;
 	
-	constructor(trainStationTile, town) {
-		this.busStationTile = null;
-		this.trainStationTile = trainStationTile;
+	constructor(town) {
 		this.town = town;
 	}
 	
 	function _tostring() {
-		return "BuildBusStation at " + AITown.GetName(town);
+		return "BuildTownBusStation at " + AITown.GetName(town);
 	}
 	
 	function Run() {
-		local depot = TerminusStation.AtLocation(trainStationTile, RAIL_STATION_PLATFORM_LENGTH).GetRoadDepot();
-		if (!busStationTile) busStationTile = BuildStation();
-		if (!busStationTile) throw TaskFailedException("Couldn't build a station in " + AITown.GetName(town));
-		BuildBus(depot, trainStationTile, busStationTile);
-	}
-	
-	function BuildStation() {
-		// Find empty square as close to town centre as possible
+		if (FindTownBusStation(town)) return;
+		
+		SetConstructionSign(AITown.GetLocation(town), this);
 		local spotFound = false;
 		local curRange = 1;
-		local maxRange = Sqrt(AITown.GetPopulation(town)/100) + 4; // search larger area
+		local maxRange = Sqrt(AITown.GetPopulation(town)/100) + 4; 
+		local area = AITileList();
+		
 		while (curRange < maxRange) {
-			local area = AITileList();
 			SafeAddRectangle(area, AITown.GetLocation(town), curRange);
-			area.Valuate(AITile.IsBuildable);
+			area.Valuate(AIRoad.IsRoadTile);
 			area.KeepValue(1);
+			area.Valuate(AIRoad.IsDriveThroughRoadStationTile);
+			area.KeepValue(0);
+			area.Valuate(AIRoad.GetNeighbourRoadCount);
+			area.KeepBelowValue(3);	// 1 and 2 are OK
+			
 			if (area.Count()) {
 				for (local t = area.Begin(); area.HasNext(); t = area.Next()) {
-					local opening = GetRoadTile(t);
-					if (opening) {
-						AIRoad.BuildRoad(opening, t);
-						if (AIError.GetLastError() == AIError.ERR_NONE || AIError.GetLastError() == AIError.ERR_ALREADY_BUILT) {
-							if (AIRoad.BuildRoadStation(t, opening, AIRoad.ROADVEHTYPE_BUS, AIStation.STATION_NEW)) {
-								return t;
-							}
+					local front = GetAdjRoadTile(t);
+					if (front) {
+						if (AIRoad.BuildDriveThroughRoadStation(t, front, AIRoad.ROADVEHTYPE_BUS, AIStation.STATION_NEW)) {
+							return t;
+						}
 							
-							switch (AIError.GetLastError()) {
-								case AIError.ERR_UNKNOWN: 
-								case AIError.ERR_AREA_NOT_CLEAR: 
-								case AIError.ERR_OWNED_BY_ANOTHER_COMPANY: 
-								case AIError.ERR_FLAT_LAND_REQUIRED: 
-								case AIError.ERR_LAND_SLOPED_WRONG: 
-								case AIError.ERR_SITE_UNSUITABLE: 
-								case AIError.ERR_TOO_CLOSE_TO_EDGE:
-									// try another tile
-									continue;
-								
-								default:
-									CheckError();
-							}
+						switch (AIError.GetLastError()) {
+							case AIError.ERR_UNKNOWN: 
+							case AIError.ERR_AREA_NOT_CLEAR: 
+							case AIError.ERR_OWNED_BY_ANOTHER_COMPANY: 
+							case AIError.ERR_FLAT_LAND_REQUIRED: 
+							case AIError.ERR_LAND_SLOPED_WRONG: 
+							case AIError.ERR_SITE_UNSUITABLE: 
+							case AIError.ERR_TOO_CLOSE_TO_EDGE:
+							case AIRoad.ERR_ROAD_DRIVE_THROUGH_WRONG_DIRECTION:
+								// try another tile
+								continue;
+							
+							default:
+								CheckError();
 						}
 					}
 				}
@@ -384,7 +390,7 @@ class BuildBusStation extends Task {
 		return null;
 	}
 	
-	function GetRoadTile(t) {
+	function GetAdjRoadTile(t) {
 		local adjacent = AITileList();
 		adjacent.AddTile(t - AIMap.GetTileIndex(1,0));
 		adjacent.AddTile(t - AIMap.GetTileIndex(0,1));
@@ -402,13 +408,42 @@ class BuildBusStation extends Task {
 			return null;
 	}
 	
-	function BuildBus(depot, from, to) {
+	function Failed() {
+		// remove the bus station if it has no vehicles
+		local stationTile = FindTownBusStation(town);
+		if (!stationTile) return;
+		local station = AIStation.GetStationID(stationTile);
+		if (AIVehicleList_Station(station).IsEmpty()) {
+			AIRoad.RemoveRoadStation(stationTile);
+		}
+	}
+}
+
+class BuildBus extends Task {
+	
+	trainStationTile = null;
+	town = null;
+	
+	constructor(trainStationTile, town) {
+		this.trainStationTile = trainStationTile;
+		this.town = town;
+	}
+	
+	function _tostring() {
+		return "BuildBus from " + AIStation.GetName(AIStation.GetStationID(trainStationTile)) + " to " + AITown.GetName(town);
+	}
+	
+	function Run() {
+		local depot = TerminusStation.AtLocation(trainStationTile, RAIL_STATION_PLATFORM_LENGTH).GetRoadDepot();
+		local busStationTile = FindTownBusStation(town);
+		if (!busStationTile) throw TaskFailedException("No bus station in " + AITown.GetName(town));
+		
 		local engineType = GetEngine(PAX);
 		local bus = AIVehicle.BuildVehicle(depot, engineType);
 		CheckError();
 		
-		AIOrder.AppendOrder(bus, from, AIOrder.AIOF_NONE);
-		AIOrder.AppendOrder(bus, to, AIOrder.AIOF_NONE);
+		AIOrder.AppendOrder(bus, trainStationTile, AIOrder.AIOF_NONE);
+		AIOrder.AppendOrder(bus, busStationTile, AIOrder.AIOF_NONE);
 		AIOrder.AppendOrder(bus, depot, AIOrder.AIOF_NONE);
 		AIVehicle.StartStopVehicle(bus);
 	}
@@ -436,4 +471,22 @@ class BuildBusStation extends Task {
 		return engineList.Begin();
 	}
 	
+}
+
+function FindTownBusStation(town) {
+	// find a road station in town that is not also a train station
+	local area = AITileList();
+	SafeAddRectangle(area, AITown.GetLocation(town), 20);
+	area.Valuate(AITile.GetClosestTown);
+	area.KeepValue(town);
+	area.Valuate(AIRoad.IsDriveThroughRoadStationTile);
+	area.KeepValue(1);
+	for (local tile = area.Begin(); area.HasNext(); tile = area.Next()) {
+		local station = AIStation.GetStationID(tile);
+		if (AIStation.HasStationType(station, AIStation.STATION_BUS_STOP) && !AIStation.HasStationType(station, AIStation.STATION_TRAIN)) {
+			return tile;
+		}
+	}
+	
+	return null;
 }
