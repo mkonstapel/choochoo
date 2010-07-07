@@ -1,3 +1,4 @@
+require("util.nut");
 require("pathfinder.nut");
 require("world.nut");
 require("signs.nut");
@@ -7,6 +8,7 @@ require("builder.nut");
 
 const MIN_DISTANCE =  30;
 const MAX_DISTANCE = 100;
+const MAX_BUS_ROUTE_DISTANCE = 40;
 const INDEPENDENTLY_WEALTHY = 1000000;	// no longer need a loan
 
 enum Direction {
@@ -31,7 +33,6 @@ class ChooChoo extends AIController {
 		AICompany.SetAutoRenewMoney(0);
 		
 		AIRoad.SetCurrentRoadType(AIRoad.ROADTYPE_ROAD);
-		AIRail.SetCurrentRailType(AIRailTypeList().Begin());
 		
 		::COMPANY <- AICompany.ResolveCompanyID(AICompany.COMPANY_SELF);
 		::PAX <- GetPassengerCargoID();

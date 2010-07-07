@@ -412,7 +412,7 @@ class ExtendStation extends TaskList {
 					BuildTerminusStation(toStationTile, direction, network, town),
 					AppeaseLocalAuthority(town),
 					BuildBusStations(toStationTile, town),
-					BuildTrack(fromStation.GetRearExit(), toStation.GetEntrance(), Join(fromStation.GetReservedRearEntranceSpace(), toStation.GetReservedExitSpace()), SignalMode.FORWARD, network),
+					BuildTrack(fromStation.GetRearExit(), toStation.GetEntrance(), Concat(fromStation.GetReservedRearEntranceSpace(), toStation.GetReservedExitSpace()), SignalMode.FORWARD, network),
 					BuildTrack(Swap(fromStation.GetRearEntrance()), Swap(toStation.GetExit()), [], SignalMode.BACKWARD, network, BuildTrack.FOLLOW),
 					BuildTrains(toStationTile, network, PAX),
 				];
@@ -428,11 +428,18 @@ class ExtendStation extends TaskList {
 		
 		RunSubtasks();
 		
-		// onward!
-		// TODO: append instead? doing this before the bus service gives us a better chance
-		// at finding a path for the rails
-		//tasks.insert(1, ExtendStation(toStationTile, direction, network));
-		tasks.insert(1, BuildBusService(toStationTile, town));
+		// TODO: append instead? before or after bus?
+		tasks.insert(1, ExtendStation(fromStationTile, direction, network));
+		
+		local towns = AITownList();
+		towns.Valuate(AITown.GetDistanceManhattanToTile, fromStationTile);
+		towns.KeepBelowValue(MAX_BUS_ROUTE_DISTANCE);
+		
+		// sort descending, then append back-to-front so the closest actually goes first
+		towns.Sort(AIList.SORT_BY_VALUE, false);
+		for (local town = towns.Begin(); towns.HasNext(); town = towns.Next()) {
+			tasks.insert(1, BuildBusService(fromStationTile, town));
+		}
 	}
 	
 	function CrossingExitDirection(crossingTile, stationTile) {
@@ -544,6 +551,7 @@ class ExtendStation extends TaskList {
 class ExtendCrossing extends TaskList {
 
 	static MIN_TOWN_POPULATION = 200;
+	
 	crossing = null;
 	direction = null;
 	network = null;
@@ -602,6 +610,8 @@ class ExtendCrossing extends TaskList {
 				local crossingExitDirection = CrossingExitDirection(crossingTile, stationTile);
 				
 				subtasks = [
+					AppeaseLocalAuthority(town),
+					BuildTownBusStation(town),
 					LevelTerrain(stationTile, stationRotation, [0, 0], [RAIL_STATION_WIDTH-1, RAIL_STATION_LENGTH-2], true),
 					AppeaseLocalAuthority(town),
 					BuildTerminusStation(stationTile, direction, network, town),
@@ -615,6 +625,8 @@ class ExtendCrossing extends TaskList {
 				];
 			} else {
 				subtasks = [
+					AppeaseLocalAuthority(town),
+					BuildTownBusStation(town),
 					LevelTerrain(stationTile, stationRotation, [0, 0], [RAIL_STATION_WIDTH-1, RAIL_STATION_LENGTH-2], true),
 					AppeaseLocalAuthority(town),
 					BuildTerminusStation(stationTile, direction, network, town),
@@ -637,7 +649,16 @@ class ExtendCrossing extends TaskList {
 		
 		// TODO: append instead? before or after bus?
 		//tasks.insert(1, ExtendStation(stationTile, direction, network));
-		tasks.insert(1, BuildBusService(stationTile, town));
+		
+		local towns = AITownList();
+		towns.Valuate(AITown.GetDistanceManhattanToTile, stationTile);
+		towns.KeepBelowValue(MAX_BUS_ROUTE_DISTANCE);
+		
+		// sort descending, then append back-to-front so the closest actually goes first
+		towns.Sort(AIList.SORT_BY_VALUE, false);
+		for (local town = towns.Begin(); towns.HasNext(); town = towns.Next()) {
+			tasks.insert(1, BuildBusService(stationTile, town));
+		}
 	}
 	
 	function CrossingExitDirection(crossingTile, stationTile) {

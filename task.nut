@@ -42,8 +42,10 @@ class NeedMoneyException {
 class Task {
 	
 	static MAX_ERR_UNKNOWN = 10;
+	static MAX_RETRY = 50;
 	
 	errUnknownCount = 0;
+	errRetryCount = 0;
 	costEstimate = 5000;
 	
 	function Run() {
@@ -70,7 +72,8 @@ class Task {
 				throw NeedMoneyException(costEstimate);
 				
 			case AIError.ERR_VEHICLE_IN_THE_WAY:
-				throw TaskRetryException();
+				errRetryCount++;
+				throw errRetryCount < MAX_RETRY ? TaskRetryException() : TaskFailedException("too many retries");
 			
 			case AIError.ERR_PRECONDITION_FAILED:
 			case AIError.ERR_PRECONDITION_STRING_TOO_LONG:

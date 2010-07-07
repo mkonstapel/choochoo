@@ -74,28 +74,6 @@ function FindStationSite(town, stationRotation, destination) {
 	return area.IsEmpty() ? null : area.Begin();
 }
 
-/**
- * Find a site for a station at the given town.
- */
-function FindIndustryStationSite(industry, producing, stationRotation, destination, length, width) {
-	local location = AIIndustry.GetLocation(industry);
-	local area = producing ? AITileList_IndustryProducing(industry, RAIL_STATION_RADIUS) : AITileList_IndustryAccepting(industry, RAIL_STATION_RADIUS);
-	
-	// room for a station
-	area.Valuate(IsBuildableRectangle, stationRotation, [0, 0], [width, length], true);
-	area.KeepValue(1);
-	
-	// pick the tile farthest from the destination for increased profit
-	//area.Valuate(AITile.GetDistanceManhattanToTile, destination);
-	//area.KeepTop(1);
-	
-	// pick the tile closest to the industry for looks
-	area.Valuate(AITile.GetDistanceManhattanToTile, location);
-	area.KeepBottom(1);
-	
-	return area.IsEmpty() ? null : area.Begin();
-}
-
 function IsBuildableRectangle(location, rotation, from, to, mustBeFlat) {
 	// check if the area is clear and flat
 	// TODO: don't require it to be flat, check if it can be leveled
