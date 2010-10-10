@@ -463,6 +463,8 @@ class BuildBus extends Task {
 		local engineList = AIEngineList(AIVehicle.VT_ROAD);
 		engineList.Valuate(AIEngine.CanRefitCargo, cargo);
 		engineList.KeepValue(1);
+		engineList.Valuate(AIEngine.GetRoadType);
+		engineList.KeepValue(AIRoad.ROADTYPE_ROAD);
 		
 		// prefer engines that can carry this cargo without a refit,
 		// because their refitted capacity may be different from
