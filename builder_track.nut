@@ -64,7 +64,7 @@ class BuildTrack extends Task {
 	function FindPath() {
 		local pathfinder = Rail();
 		
-		local bridgeLength = AIController.GetSetting("MaxBridgeLength");
+		local bridgeLength = GetMaxBridgeLength();
 		pathfinder.cost.max_bridge_length = bridgeLength;
 		pathfinder.cost.max_tunnel_length = 5;
 		switch (AIController.GetSetting("PathfinderMultiplier")) {

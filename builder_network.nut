@@ -209,10 +209,6 @@ class ConnectStation extends Task {
 			subtasks = [];
 			local station = TerminusStation.AtLocation(stationTile, RAIL_STATION_PLATFORM_LENGTH);
 			
-			// if we ran these subtasks as a task list, we can't signal failure to our parent task list
-			// so, we run them inline, making sure we can be restarted
-			// TODO: clean this up?
-			
 			local reserved = station.GetReservedEntranceSpace();
 			reserved.extend(crossing.GetReservedExitSpace(direction));
 			foreach (d in [Direction.NE, Direction.SW, Direction.NW, Direction.SE]) {
@@ -244,7 +240,6 @@ class ConnectStation extends Task {
 		local exit = crossing.GetExit(direction);
 		AIRail.RemoveSignal(exit[0], exit[1]);
 		
-		Debug("Jucntion: " + crossing.GetName());
 		if (StartsWith(crossing.GetName(), "unnamed") && AIController.GetSetting("JunctionNames")) {
 			BuildSign(exit[0], "waypoint");
 			BuildWaypoint(exit[0]);

@@ -251,7 +251,6 @@ function GetMaxBridgeLength() {
 		length--;
 	}
 	
-	Debug("Maximum bridge length:", length);
 	return length;
 }
 
