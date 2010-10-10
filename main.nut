@@ -55,7 +55,7 @@ class ChooChoo extends AIController {
 			HandleEvents();
 			
 			if (tasks.len() == 0) {
-				tasks.push(BuildNewNetwork());
+				tasks.push(BuildNewNetwork(null));
 			}
 			
 			Debug("Tasks: " + ArrayToString(tasks));

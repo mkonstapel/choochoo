@@ -1,4 +1,4 @@
-class BuildTrains extends TaskList {
+class BuildTrains extends Task {
 	
 	static TRAINS_ADDED_PER_STATION = 4;
 	
@@ -10,8 +10,8 @@ class BuildTrains extends TaskList {
 	cheap = null;
 	engine = null;
 	
-	constructor(stationTile, network, cargo, fromFlags = null, toFlags = null, cheap = false) {
-		TaskList.constructor(this, null);
+	constructor(parentTask, stationTile, network, cargo, fromFlags = null, toFlags = null, cheap = false) {
+		Task.constructor(parentTask);
 		this.stationTile = stationTile;
 		this.network = network;
 		this.cargo = cargo;

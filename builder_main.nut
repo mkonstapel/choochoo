@@ -4,7 +4,8 @@ class Builder extends Task {
 	location = null;
 	rotation = null;
 	
-	constructor(location, rotation = Rotation.ROT_0) {
+	constructor(parentTask, location, rotation = Rotation.ROT_0) {
+		Task.constructor(parentTask);
 		this.relativeCoordinates = RelativeCoordinates(location, rotation);
 		this.location = location;
 		this.rotation = rotation;

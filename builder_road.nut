@@ -1,12 +1,13 @@
 import("pathfinder.road", "Road", 3);
 
-class BuildRoad extends Builder {
+class BuildRoad extends Task {
 
 	stationTile = null;
 	town = null;
 	path = null;
 	
-	constructor(stationTile, town) {
+	constructor(parentTask, stationTile, town) {
+		Task.constructor(parentTask);
 		this.stationTile = stationTile;
 		this.town = town;
 		this.path = null;
@@ -44,14 +45,12 @@ class BuildRoad extends Builder {
 			throw NeedMoneyException(maxBridgeCost*2);
 		}
 		
-		Debug("Pathfinding...");
 		SetSecondarySign("Pathfinding...");
 		pathfinder.InitializePath([a], [b]);
 		return pathfinder.FindPath(AIMap.DistanceManhattan(a, b) * 3 * TICKS_PER_DAY);
 	}
 	
 	function BuildPath(path) {
-		Debug("Building...");
 		while (path != null) {
 			local par = path.GetParent();
 			if (par != null) {
@@ -82,11 +81,10 @@ class BuildRoad extends Builder {
 			}
 			path = par;
 		}
-		
-		Debug("Done!");
 	}
 	
 	function Failed() {
+		Task.Failed();
 		// TODO: remove road
 	}
 	

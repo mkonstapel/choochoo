@@ -10,8 +10,8 @@ class BuildCargoStation extends Builder {
 	isSource = null;
 	platformLength = null;
 	
-	constructor(location, direction, network, atIndustry, toIndustry, cargo, isSource, platformLength) {
-		Builder.constructor(location, StationRotationForDirection(direction));
+	constructor(parentTask, location, direction, network, atIndustry, toIndustry, cargo, isSource, platformLength) {
+		Builder.constructor(parentTask, location, StationRotationForDirection(direction));
 		this.network = network;
 		this.atIndustry = atIndustry;
 		this.toIndustry = toIndustry;
@@ -44,6 +44,8 @@ class BuildCargoStation extends Builder {
 	}
 	
 	function Failed() {
+		Task.Failed();
+		
 		local station = AIStation.GetStationID(location);
 		foreach (index, entry in network.stations) {
 			if (entry == station) {
@@ -111,8 +113,8 @@ class BuildTerminusStation extends Builder {
 	builtPlatform2 = null;
 	doubleTrack = null;
 	
-	constructor(location, direction, network, town, doubleTrack = true, platformLength = RAIL_STATION_PLATFORM_LENGTH) {
-		Builder.constructor(location, StationRotationForDirection(direction));
+	constructor(parentTask, location, direction, network, town, doubleTrack = true, platformLength = RAIL_STATION_PLATFORM_LENGTH) {
+		Builder.constructor(parentTask, location, StationRotationForDirection(direction));
 		this.network = network;
 		this.town = town;
 		this.platformLength = platformLength;
@@ -160,6 +162,8 @@ class BuildTerminusStation extends Builder {
 	}
 	
 	function Failed() {
+		Task.Failed();
+		
 		local station = AIStation.GetStationID(location);
 		foreach (index, entry in network.stations) {
 			if (entry == station) {
@@ -244,13 +248,14 @@ class BuildTerminusStation extends Builder {
 /**
  * Increase the capture area of a train station by joining bus stations to it.
  */
-class BuildBusStations extends Builder {
+class BuildBusStations extends Task {
 
 	stationTile = null;
 	town = null;
 	stations = null;
 		
-	constructor(stationTile, town) {
+	constructor(parentTask, stationTile, town) {
+		Task.constructor(parentTask);
 		this.stationTile = stationTile;
 		this.town = town;
 		this.stations = [];
@@ -291,19 +296,21 @@ class BuildBusStations extends Builder {
 	}
 	
 	function Failed() {
+		Task.Failed();
+		
 		foreach (tile in stations) {
 			AIRoad.RemoveRoadStation(tile);
 		}
 	}
 }
 
-class BuildBusService extends TaskList {
+class BuildBusService extends Task {
 	
 	stationTile = null;
 	town = null;
 	
-	constructor(stationTile, town) {
-		TaskList.constructor(this, null);
+	constructor(parentTask, stationTile, town) {
+		Task.constructor(parentTask);
 		this.stationTile = stationTile;
 		this.town = town;
 	}
@@ -316,10 +323,10 @@ class BuildBusService extends TaskList {
 		if (!subtasks) {
 			SetConstructionSign(stationTile, this);
 			subtasks = [
-				AppeaseLocalAuthority(town),
-				BuildTownBusStation(town),
-				BuildRoad(stationTile, town),
-				BuildBus(stationTile, town),
+				AppeaseLocalAuthority(this, town),
+				BuildTownBusStation(this, town),
+				BuildRoad(this, stationTile, town),
+				BuildBus(this, stationTile, town),
 			];
 		}
 		
@@ -331,7 +338,8 @@ class BuildTownBusStation extends Task {
 	
 	town = null;
 	
-	constructor(town) {
+	constructor(parentTask, town) {
+		Task.constructor(parentTask);
 		this.town = town;
 	}
 	
@@ -409,6 +417,8 @@ class BuildTownBusStation extends Task {
 	}
 	
 	function Failed() {
+		Task.Failed();
+		
 		// remove the bus station if it has no vehicles
 		local stationTile = FindTownBusStation(town);
 		if (!stationTile) return;
@@ -424,7 +434,8 @@ class BuildBus extends Task {
 	trainStationTile = null;
 	town = null;
 	
-	constructor(trainStationTile, town) {
+	constructor(parentTask, trainStationTile, town) {
+		Task.constructor(parentTask);
 		this.trainStationTile = trainStationTile;
 		this.town = town;
 	}

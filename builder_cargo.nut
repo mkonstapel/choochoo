@@ -1,4 +1,4 @@
-class BuildCargoLine extends TaskList {
+class BuildCargoLine extends Task {
 	
 	static CARGO_MIN_DISTANCE = 30;
 	static CARGO_MAX_DISTANCE = 150;
@@ -7,8 +7,8 @@ class BuildCargoLine extends TaskList {
 	
 	static bannedCargo = [];
 	
-	constructor() {
-		TaskList.constructor(this, null);
+	constructor(parentTask=null) {
+		Task.constructor(parentTask, null);
 	}
 	
 	function _tostring() {
@@ -21,12 +21,12 @@ class BuildCargoLine extends TaskList {
 			local railType = SelectRailType(cargo);
 			AIRail.SetCurrentRailType(railType);
 			local maxDistance = min(CARGO_MAX_DISTANCE, MaxDistance(cargo, CARGO_STATION_LENGTH));
-			Debug("Max distance for " + AICargo.GetCargoLabel(cargo) + ": " + maxDistance);
+			// Debug("Max distance for " + AICargo.GetCargoLabel(cargo) + ": " + maxDistance);
 			
 			local between = SelectIndustries(cargo, maxDistance);
 			local a = between[0];
 			local b = between[1];
-			Debug(AICargo.GetCargoLabel(cargo) + " from " + AIIndustry.GetName(a) + " to " + AIIndustry.GetName(b));
+			Debug("Selected:", AICargo.GetCargoLabel(cargo), "from", AIIndustry.GetName(a), "to", AIIndustry.GetName(b));
 			
 			// [siteA, rotA, dirA, siteB, rotB, dirB]
 			local sites = FindStationSites(a, b);
@@ -56,14 +56,14 @@ class BuildCargoLine extends TaskList {
 			local network = Network(railType, CARGO_STATION_LENGTH, MIN_DISTANCE, maxDistance);
 			subtasks = [
 				// location, direction, network, atIndustry, toIndustry, cargo isSource, platformLength
-				BuildCargoStation(siteA, dirA, network, a, b, cargo, true, CARGO_STATION_LENGTH),
-				BuildCargoStation(siteB, dirB, network, b, a, cargo, false, CARGO_STATION_LENGTH),
-				BuildTrack(Swap(stationA.GetEntrance()), stationB.GetEntrance(), [], SignalMode.NONE, network, BuildTrack.FAST),
+				BuildCargoStation(this, siteA, dirA, network, a, b, cargo, true, CARGO_STATION_LENGTH),
+				BuildCargoStation(this, siteB, dirB, network, b, a, cargo, false, CARGO_STATION_LENGTH),
+				BuildTrack(this, Swap(stationA.GetEntrance()), stationB.GetEntrance(), [], SignalMode.NONE, network, BuildTrack.FAST),
 				//firstTrack,
-				BuildTrains(siteA, network, cargo, AIOrder.AIOF_FULL_LOAD_ANY),
-				//BuildTrains(siteA, network, cargo, AIOrder.AIOF_FULL_LOAD_ANY),
-				//BuildTrack(Swap(stationA.GetEntrance()), Swap(stationB.GetExit()), [], SignalMode.BACKWARD, network),
-				//BuildSignals(firstTrack, SignalMode.FORWARD),
+				BuildTrains(this, siteA, network, cargo, AIOrder.AIOF_FULL_LOAD_ANY),
+				//BuildTrains(this, siteA, network, cargo, AIOrder.AIOF_FULL_LOAD_ANY),
+				//BuildTrack(this, Swap(stationA.GetEntrance()), Swap(stationB.GetExit()), [], SignalMode.BACKWARD, network),
+				//BuildSignals(this, firstTrack, SignalMode.FORWARD),
 			];
 		}
 		

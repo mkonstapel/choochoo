@@ -27,7 +27,7 @@ function Error(...) {
 
 function GetDate() {
 	local date = AIDate.GetCurrentDate();
-	return "" + AIDate.GetYear(date) + "-" + AIDate.GetMonth(date) + "-" + AIDate.GetDayOfMonth(date);
+	return "" + AIDate.GetYear(date) + "-" + ZeroPad(AIDate.GetMonth(date)) + "-" + ZeroPad(AIDate.GetDayOfMonth(date));
 }
 
 function PrintError() {
@@ -108,6 +108,26 @@ function ArrayToString(a) {
  */
 function TileToString(tile) {
 	return "(" + AIMap.GetTileX(tile) + ", " + AIMap.GetTileY(tile) + ")";
+}
+
+/**
+ * Concatenate the same string, n times.
+ */
+function StringN(s, n) {
+	local r = "";
+	for (local i=0; i<n; i++) {
+		r += s;
+	}
+	
+	return r;
+}
+
+function ZeroPad(i) {
+	return i < 10 ? "0" + i : "" + i;
+}
+
+function StartsWith(a, b) {
+	return a.find(b) == 0;
 }
 
 /**
@@ -225,6 +245,16 @@ function GetCargoID(cargoClass) {
 	throw "missing required cargo class";
 }
 
+function GetMaxBridgeLength() {
+	local length = AIController.GetSetting("MaxBridgeLength");
+	while (length > 0 && AIBridgeList_Length(length).IsEmpty()) {
+		length--;
+	}
+	
+	Debug("Maximum bridge length:", length);
+	return length;
+}
+
 function GetMaxBridgeCost(length) {
 	local bridges = AIBridgeList_Length(length);
 	if (bridges.IsEmpty()) throw "Cannot build " + length + " tile bridges!";
@@ -304,7 +334,7 @@ function MaxDistance(cargo, trainLength) {
 	local engine = GetEngine(cargo, rail, [], true);
 	local wagon = GetWagon(cargo, rail);
 	local trainCost = AIEngine.GetPrice(engine) + AIEngine.GetPrice(wagon) * (trainLength-1) * 2;
-	local bridgeCost = GetMaxBridgeCost(AIController.GetSetting("MaxBridgeLength"));
+	local bridgeCost = GetMaxBridgeCost(GetMaxBridgeLength());
 	local tileCost = AIRail.GetBuildCost(rail, AIRail.BT_TRACK);
 	return (AICompany.GetMaxLoanAmount() - trainCost - bridgeCost) / tileCost;
 }

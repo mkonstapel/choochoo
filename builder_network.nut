@@ -3,7 +3,8 @@ class BuildNewNetwork extends Task {
 	static MAX_ATTEMPTS = 50;
 	network = null;
 	
-	constructor(minDistance = MIN_DISTANCE, maxDistance = MAX_DISTANCE) {
+	constructor(parentTask, minDistance = MIN_DISTANCE, maxDistance = MAX_DISTANCE) {
+		Task.constructor(parentTask);
 		this.network = Network(AIRailTypeList().Begin(), RAIL_STATION_PLATFORM_LENGTH, minDistance, maxDistance);
 	}
 	
@@ -11,28 +12,33 @@ class BuildNewNetwork extends Task {
 		local tile;
 		local count = 0;
 		
-		while (true) {
-			tile = RandomTile();
-			if (AIMap.IsValidTile(tile) &&
-				AITile.IsBuildableRectangle(
-					tile - AIMap.GetTileIndex(Crossing.WIDTH, Crossing.WIDTH),
-					Crossing.WIDTH*3, Crossing.WIDTH*3) &&
-				EstimateNetworkStationCount(tile) >= 3) break;
-			
-			count++;
-			if (count >= MAX_ATTEMPTS) {
-				Warning("Tried " + count + " locations to start a new network, map may be full. Trying again tomorrow...");
-				throw TaskRetryException(TICKS_PER_DAY);
-			} else {
-				AIController.Sleep(1);
+		if (!subtasks) {
+			while (true) {
+				tile = RandomTile();
+				SetConstructionSign(tile, this);
+				if (AIMap.IsValidTile(tile) &&
+					AITile.IsBuildableRectangle(
+						tile - AIMap.GetTileIndex(Crossing.WIDTH, Crossing.WIDTH),
+						Crossing.WIDTH*3, Crossing.WIDTH*3) &&
+					EstimateNetworkStationCount(tile) >= 3) break;
+				
+				count++;
+				if (count >= MAX_ATTEMPTS) {
+					Warning("Tried " + count + " locations to start a new network, map may be full. Trying again tomorrow...");
+					throw TaskRetryException(TICKS_PER_DAY);
+				} else {
+					AIController.Sleep(1);
+				}
 			}
+			
+			AIRail.SetCurrentRailType(network.railType);
+			subtasks = [
+				LevelTerrain(this, tile, Rotation.ROT_0, [1, 1], [Crossing.WIDTH-2, Crossing.WIDTH-2]),
+				BuildCrossing(this, tile, network)
+			];
 		}
 		
-		AIRail.SetCurrentRailType(network.railType);
-		tasks.insert(1, TaskList(this, [
-			LevelTerrain(tile, Rotation.ROT_0, [1, 1], [Crossing.WIDTH-2, Crossing.WIDTH-2]),
-			BuildCrossing(tile, network)
-		]));
+		RunSubtasks();
 	}
 	
 	function _tostring() {
@@ -52,7 +58,7 @@ class BuildNewNetwork extends Task {
 	
 	function EstimateCrossing(tile, direction, estimationNetwork) {
 		// for now, ignore potential gains from newly built crossings
-		local extender = ExtendCrossing(tile, direction, estimationNetwork);
+		local extender = ExtendCrossing(this, tile, direction, estimationNetwork);
 		local towns = extender.FindTowns();
 		local town = null;
 		local stationTile = null;
@@ -74,16 +80,16 @@ class BuildCrossing extends Builder {
 	network = null;
 	extenders = null;
 	
-	constructor(location, network) {
-		Builder.constructor(location);
+	constructor(parentTask, location, network) {
+		Builder.constructor(parentTask, location);
 		this.network = network;
 		
 		// expand in opposite directions first, to maximize potential gains
 		this.extenders = [
-			ExtendCrossing(location, Direction.NE, network),
-			ExtendCrossing(location, Direction.SW, network),
-			ExtendCrossing(location, Direction.NW, network),
-			ExtendCrossing(location, Direction.SE, network),
+			ExtendCrossing(null, location, Direction.NE, network),
+			ExtendCrossing(null, location, Direction.SW, network),
+			ExtendCrossing(null, location, Direction.NW, network),
+			ExtendCrossing(null, location, Direction.SE, network),
 		]
 	}
 	
@@ -130,7 +136,7 @@ class BuildCrossing extends Builder {
 		tasks.extend(extenders);
 		
 		if (!HaveHQ()) {
-			tasks.append(BuildHQ(location));
+			tasks.append(BuildHQ(null, location));
 		}
 	}
 	
@@ -139,6 +145,8 @@ class BuildCrossing extends Builder {
 	}
 	
 	function Failed() {
+		Task.Failed();
+		
 		// cancel ExtendCrossing tasks we created
 		foreach (task in extenders) {
 			task.Cancel();
@@ -177,15 +185,15 @@ class BuildCrossing extends Builder {
 	
 }
 
-class ConnectStation extends TaskList {
+class ConnectStation extends Task {
 	
 	crossingTile = null;
 	direction = null;
 	stationTile = null;
 	network = null;
 	
-	constructor(crossingTile, direction, stationTile, network) {
-		TaskList.constructor(this, null);
+	constructor(parentTask, crossingTile, direction, stationTile, network) {
+		Task.constructor(parentTask);
 		this.crossingTile = crossingTile;
 		this.direction = direction;
 		this.stationTile = stationTile;
@@ -214,7 +222,7 @@ class ConnectStation extends TaskList {
 				}
 			}
 				
-			subtasks.append(BuildTrack(station.GetExit(), crossing.GetEntrance(direction), reserved, SignalMode.FORWARD, network));
+			subtasks.append(BuildTrack(this, station.GetExit(), crossing.GetEntrance(direction), reserved, SignalMode.FORWARD, network));
 			
 			// we don't have to reserve space for the path we just connected 
 			//local reserved = station.GetReservedExitSpace();
@@ -227,7 +235,7 @@ class ConnectStation extends TaskList {
 				}
 			}
 			
-			subtasks.append(BuildTrack(Swap(station.GetEntrance()), Swap(crossing.GetExit(direction)), reserved, SignalMode.BACKWARD, network, BuildTrack.FOLLOW));
+			subtasks.append(BuildTrack(this, Swap(station.GetEntrance()), Swap(crossing.GetExit(direction)), reserved, SignalMode.BACKWARD, network, BuildTrack.FOLLOW));
 		}
 		
 		RunSubtasks();
@@ -235,6 +243,25 @@ class ConnectStation extends TaskList {
 		// open up the exit by removing the signal
 		local exit = crossing.GetExit(direction);
 		AIRail.RemoveSignal(exit[0], exit[1]);
+		
+		Debug("Jucntion: " + crossing.GetName());
+		if (StartsWith(crossing.GetName(), "unnamed") && AIController.GetSetting("JunctionNames")) {
+			BuildSign(exit[0], "waypoint");
+			BuildWaypoint(exit[0]);
+		}
+	}
+	
+	function BuildWaypoint(tile) {
+		local town = AITile.GetClosestTown(tile);
+		if (AIRail.BuildRailWaypoint(tile) ) {
+			local waypoint = AIWaypoint.GetWaypointID(tile);
+			local suffixes = ["Junction", "Crossing", "Point", "Union", "Switch", "Cross", "Points"]
+			foreach (suffix in suffixes) {
+				if (AIWaypoint.SetName(waypoint, AITown.GetName(town) + " " + suffix)) {
+					break;
+				}
+			}
+		}
 	}
 	
 	function _tostring() {
@@ -244,7 +271,7 @@ class ConnectStation extends TaskList {
 	}
 }
 
-class ConnectCrossing extends TaskList {
+class ConnectCrossing extends Task {
 	
 	fromCrossingTile = null;
 	fromDirection = null;
@@ -252,8 +279,8 @@ class ConnectCrossing extends TaskList {
 	toDirection = null;
 	network = null;
 	
-	constructor(fromCrossingTile, fromDirection, toCrossingTile, toDirection, network) {
-		TaskList.constructor(this, null)
+	constructor(parentTask, fromCrossingTile, fromDirection, toCrossingTile, toDirection, network) {
+		Task.constructor(parentTask);
 		this.fromCrossingTile = fromCrossingTile;
 		this.fromDirection = fromDirection;
 		this.toCrossingTile = toCrossingTile;
@@ -284,7 +311,7 @@ class ConnectCrossing extends TaskList {
 				}
 			}
 			
-			subtasks.append(BuildTrack(toCrossing.GetExit(toDirection), fromCrossing.GetEntrance(fromDirection), reserved, SignalMode.FORWARD, network));
+			subtasks.append(BuildTrack(this, toCrossing.GetExit(toDirection), fromCrossing.GetEntrance(fromDirection), reserved, SignalMode.FORWARD, network));
 		
 			//local reserved = toCrossing.GetReservedExitSpace(toDirection);
 			//reserved.extend(fromCrossing.GetReservedEntranceSpace(fromDirection));
@@ -301,7 +328,7 @@ class ConnectCrossing extends TaskList {
 				}
 			}
 			
-			subtasks.append(BuildTrack(Swap(toCrossing.GetEntrance(toDirection)), Swap(fromCrossing.GetExit(fromDirection)), reserved, SignalMode.BACKWARD, network, BuildTrack.FOLLOW));
+			subtasks.append(BuildTrack(this, Swap(toCrossing.GetEntrance(toDirection)), Swap(fromCrossing.GetExit(fromDirection)), reserved, SignalMode.BACKWARD, network, BuildTrack.FOLLOW));
 		}
 		
 		RunSubtasks();
@@ -309,25 +336,26 @@ class ConnectCrossing extends TaskList {
 		// open up both crossings' exits
 		local exit = fromCrossing.GetExit(fromDirection);
 		AIRail.RemoveSignal(exit[0], exit[1]);
-		if (fromCrossing.GetName() == "unnamed junction" && AIController.GetSetting("JunctionNames")) {
+		if (StartsWith(fromCrossing.GetName(), "unnamed") && AIController.GetSetting("JunctionNames")) {
 			BuildWaypoint(exit[0]);
 		}
 		
 		exit = toCrossing.GetExit(toDirection);
 		AIRail.RemoveSignal(exit[0], exit[1]);
-		if (toCrossing.GetName() == "unnamed junction" && AIController.GetSetting("JunctionNames")) {
+		if (StartsWith(toCrossing.GetName(), "unnamed") && AIController.GetSetting("JunctionNames")) {
 			BuildWaypoint(exit[0]);
 		}
 	}
 	
 	function BuildWaypoint(tile) {
 		local town = AITile.GetClosestTown(tile);
-		AIRail.BuildRailWaypoint(tile);
-		local waypoint = AIWaypoint.GetWaypointID(tile);
-		local suffixes = ["Junction", "Crossing", "Point", "Union", "Switch", "Cross", "Points"]
-		foreach (suffix in suffixes) {
-			if (AIWaypoint.SetName(waypoint, AITown.GetName(town) + " " + suffix)) {
-				break;
+		if (AIRail.BuildRailWaypoint(tile)) {
+			local waypoint = AIWaypoint.GetWaypointID(tile);
+			local suffixes = ["Junction", "Crossing", "Point", "Union", "Switch", "Cross", "Points"]
+			foreach (suffix in suffixes) {
+				if (AIWaypoint.SetName(waypoint, AITown.GetName(town) + " " + suffix)) {
+					break;
+				}
 			}
 		}
 	}
@@ -337,7 +365,7 @@ class ConnectCrossing extends TaskList {
 	}
 }
 
-class ExtendStation extends TaskList {
+class ExtendStation extends Task {
 
 	// TODO raise
 	static MIN_TOWN_POPULATION = 0;
@@ -348,8 +376,8 @@ class ExtendStation extends TaskList {
 	network = null;
 	town = null;
 	
-	constructor(fromStationTile, direction, network) {
-		TaskList.constructor(this, null);
+	constructor(parentTask, fromStationTile, direction, network) {
+		Task.constructor(parentTask);
 		this.fromStationTile = fromStationTile;
 		this.direction = direction;
 		this.network = network;
@@ -548,7 +576,7 @@ class ExtendStation extends TaskList {
 	}
 }
 
-class ExtendCrossing extends TaskList {
+class ExtendCrossing extends Builder {
 
 	static MIN_TOWN_POPULATION = 200;
 	
@@ -559,8 +587,8 @@ class ExtendCrossing extends TaskList {
 	town = null;
 	stationTile = null;
 	
-	constructor(crossing, direction, network) {
-		TaskList.constructor(this, null);
+	constructor(parentTask, crossing, direction, network) {
+		Builder.constructor(parentTask, crossing);
 		this.crossing = crossing;
 		this.direction = direction;
 		this.network = network;
@@ -610,30 +638,30 @@ class ExtendCrossing extends TaskList {
 				local crossingExitDirection = CrossingExitDirection(crossingTile, stationTile);
 				
 				subtasks = [
-					AppeaseLocalAuthority(town),
-					BuildTownBusStation(town),
-					LevelTerrain(stationTile, stationRotation, [0, 0], [RAIL_STATION_WIDTH-1, RAIL_STATION_LENGTH-2], true),
-					AppeaseLocalAuthority(town),
-					BuildTerminusStation(stationTile, direction, network, town),
-					AppeaseLocalAuthority(town),
-					BuildBusStations(stationTile, town),
-					LevelTerrain(crossingTile, Rotation.ROT_0, [1, 1], [Crossing.WIDTH-2, Crossing.WIDTH-2]),
-					BuildCrossing(crossingTile, network),
-					ConnectCrossing(crossing, direction, crossingTile, crossingEntranceDirection, network),
-					ConnectStation(crossingTile, crossingExitDirection, stationTile, network),
-					BuildTrains(stationTile, network, PAX),
+					AppeaseLocalAuthority(this, town),
+					BuildTownBusStation(this, town),
+					LevelTerrain(this, stationTile, stationRotation, [0, 0], [RAIL_STATION_WIDTH-1, RAIL_STATION_LENGTH-2], true),
+					AppeaseLocalAuthority(this, town),
+					BuildTerminusStation(this, stationTile, direction, network, town),
+					AppeaseLocalAuthority(this, town),
+					BuildBusStations(this, stationTile, town),
+					LevelTerrain(this, crossingTile, Rotation.ROT_0, [1, 1], [Crossing.WIDTH-2, Crossing.WIDTH-2]),
+					BuildCrossing(this, crossingTile, network),
+					ConnectCrossing(this, crossing, direction, crossingTile, crossingEntranceDirection, network),
+					ConnectStation(this, crossingTile, crossingExitDirection, stationTile, network),
+					BuildTrains(this, stationTile, network, PAX),
 				];
 			} else {
 				subtasks = [
-					AppeaseLocalAuthority(town),
-					BuildTownBusStation(town),
-					LevelTerrain(stationTile, stationRotation, [0, 0], [RAIL_STATION_WIDTH-1, RAIL_STATION_LENGTH-2], true),
-					AppeaseLocalAuthority(town),
-					BuildTerminusStation(stationTile, direction, network, town),
-					AppeaseLocalAuthority(town),
-					BuildBusStations(stationTile, town),
-					ConnectStation(crossing, direction, stationTile, network),
-					BuildTrains(stationTile, network, PAX),
+					AppeaseLocalAuthority(this, town),
+					BuildTownBusStation(this, town),
+					LevelTerrain(this, stationTile, stationRotation, [0, 0], [RAIL_STATION_WIDTH-1, RAIL_STATION_LENGTH-2], true),
+					AppeaseLocalAuthority(this, town),
+					BuildTerminusStation(this, stationTile, direction, network, town),
+					AppeaseLocalAuthority(this, town),
+					BuildBusStations(this, stationTile, town),
+					ConnectStation(this, crossing, direction, stationTile, network),
+					BuildTrains(this, stationTile, network, PAX),
 				];
 			}
 			
@@ -641,7 +669,7 @@ class ExtendCrossing extends TaskList {
 			// at this point, that means we only have one station in the network
 			if (network.stations.len() == 1) {
 				local firstStation = AIStation.GetLocation(network.stations[0]);
-				subtasks.append(BuildTrains(firstStation, network, PAX));
+				subtasks.append(BuildTrains(this, firstStation, network, PAX));
 			}
 		}
 		
@@ -657,7 +685,7 @@ class ExtendCrossing extends TaskList {
 		// sort descending, then append back-to-front so the closest actually goes first
 		towns.Sort(AIList.SORT_BY_VALUE, false);
 		for (local town = towns.Begin(); towns.HasNext(); town = towns.Next()) {
-			tasks.insert(1, BuildBusService(stationTile, town));
+			tasks.insert(1, BuildBusService(null, stationTile, town));
 		}
 	}
 	
@@ -766,29 +794,12 @@ class ExtendCrossing extends TaskList {
 		return tiles.IsEmpty() ? null : tiles.Begin();
 	}
 	
-	function SubtaskFailed() {
+	function Failed() {
+		Task.Failed();
+		
 		// either we didn't find a town, or one of our subtasks failed
-		//tasks.push(ExtendCrossingCleanup(crossing, direction));
-		ExtendCrossingCleanup(crossing, direction).Run();
-	}
-}
-
-class ExtendCrossingCleanup extends Builder {
-	
-	direction = null;
-	
-	constructor(location, direction) {
-		Builder.constructor(location, Rotation.ROT_0);
-		this.direction = direction;
-	}
-	
-	function _tostring() {
-		return "Cleanup " + Crossing(location) + " " + DirectionName(direction);
-	}
-	
-	function Run() {
-		local entrance = Crossing(location).GetEntrance(direction);
-		local exit = Crossing(location).GetExit(direction);
+		local entrance = Crossing(crossing).GetEntrance(direction);
+		local exit = Crossing(crossing).GetExit(direction);
 		
 		// use the NE direction as a template and derive the others
 		// by rotation and offset

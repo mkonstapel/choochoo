@@ -1,4 +1,4 @@
-class BuildTrack extends Builder {
+class BuildTrack extends Task {
 
 	// build styles
 	static STRAIGHT = 0;
@@ -21,7 +21,8 @@ class BuildTrack extends Builder {
 	path = null;
 	lastDepot = null;
 	
-	constructor(from, to, ignored, signalMode, network, style = null) {
+	constructor(parentTask, from, to, ignored, signalMode, network, style = null) {
+		Task.constructor(parentTask); 
 		this.a = from[0];
 		this.b = from[1];
 		this.c = to[0];
@@ -108,14 +109,12 @@ class BuildTrack extends Builder {
 			throw NeedMoneyException(maxBridgeCost*2);
 		}
 		
-		Debug("Pathfinding...");
 		SetSecondarySign("Pathfinding...");
 		pathfinder.InitializePath([[b, a]], [[c, d]], ignored);
 		return pathfinder.FindPath(AIMap.DistanceManhattan(a, d) * 3 * TICKS_PER_DAY);
 	}
 	
 	function BuildPath(path) {
-		Debug("Building...");
 		local node = path;
 		local prev = null;
 		local prevprev = null;
@@ -189,8 +188,6 @@ class BuildTrack extends Builder {
 				node = node.GetParent();
 			}
 		}
-		
-		Debug("Done!");
 	}
 	
 	/**
@@ -249,6 +246,8 @@ class BuildTrack extends Builder {
 	}
 	
 	function Failed() {
+		Task.Failed();
+		
 		if (path == false) {
 			// no path found
 			return;

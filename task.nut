@@ -48,11 +48,60 @@ class Task {
 	errRetryCount = 0;
 	costEstimate = 5000;
 	
-	function Run() {
-		throw TaskFailedException("task not implemented");
+	parentTask = null;
+	subtasks = null;
+	currentTask = null;
+	completed = null;
+	
+	constructor(parentTask=null, subtasks=null) {
+		this.parentTask = parentTask;
+		this.subtasks = subtasks;
+		this.currentTask = null;
+		this.completed = [];
 	}
 	
-	function Failed() {}
+	function Run() {
+		RunSubtasks();
+	}
+	
+	function GetDepth() {
+		if (parentTask == this) {
+			throw "Task can't be its own parent! " + this;
+		}
+		
+		return parentTask == null ? 0 : 1 + parentTask.GetDepth();
+	}
+	
+	function RunSubtasks() {
+		if (completed == null) throw "Task " + this + " failed to call a parent constructor!";
+		
+		while (subtasks.len() > 0) {
+			currentTask = subtasks[0];
+			local indent = StringN(" ", 3*GetDepth());
+			Debug(indent + " - " + currentTask);
+			currentTask.Run();
+			subtasks.remove(0);
+			completed.append(currentTask);
+			currentTask = null;
+		}
+	}
+	
+	function Failed() {
+		// fail all completed subtasks, and the current one
+		foreach (task in completed) {
+			task.Failed();
+		}
+		
+		if (currentTask) {
+			currentTask.Failed();
+		}
+	}
+	
+	function _tostring() {
+		local s = "Task";
+		if (subtasks) s += ": (" + ArrayToString(subtasks) + ")";
+		return s;
+	}
 	
 	function CheckError() {
 		switch (AIError.GetLastError()) {
@@ -90,56 +139,6 @@ class Task {
 			default:
 				throw TaskFailedException(AIError.GetLastErrorString());
 		}
-	}
-}
-
-class TaskList extends Task {
-	
-	parentTask = null;
-	subtasks = null;
-	currentTask = null;
-	completed = null;
-	
-	constructor(parentTask, subtasks) {
-		this.parentTask = parentTask;
-		this.subtasks = subtasks;
-		this.currentTask = null;
-		this.completed = [];
-	}
-	
-	function Run() {
-		RunSubtasks();
-	}
-	
-	function RunSubtasks() {
-		while (subtasks.len() > 0) {
-			currentTask = subtasks[0];
-			Debug("Running subtask: " + currentTask);
-			currentTask.Run();
-			subtasks.remove(0);
-			completed.append(currentTask);
-			currentTask = null;
-		}
-	}
-	
-	function Failed() {
-		foreach (task in completed) {
-			task.Failed();
-		}
-		
-		if (currentTask) {
-			currentTask.Failed();
-		}
-		
-		SubtaskFailed();
-	}
-	
-	function SubtaskFailed() {
-		Warning(this + ": subtask failed");
-	}
-	
-	function _tostring() {
-		return parentTask + ": (" + ArrayToString(subtasks) + ")";
 	}
 }
 

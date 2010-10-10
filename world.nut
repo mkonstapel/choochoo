@@ -167,7 +167,7 @@ class Crossing extends WorldObject {
 			}
 		}
 		
-		return "unnamed junction";
+		return "unnamed junction at " + TileToString(location);
 	}
 	
 	function _tostring() {

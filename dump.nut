@@ -1,6 +1,6 @@
 // dumped here in case it turns out to be useful
 
-class BuildLine extends TaskList {
+class BuildLine extends Task {
 	
 	static MIN_TOWN_POPULATION = 500;
 	static MIN_TOWN_DISTANCE = 30;
@@ -8,8 +8,8 @@ class BuildLine extends TaskList {
 	
 	static wrapper = [];
 	
-	constructor() {
-		TaskList.constructor(this, null);
+	constructor(parentTask) {
+		Task.constructor(parentTask);
 	}
 	
 	function _tostring() {

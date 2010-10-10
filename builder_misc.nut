@@ -1,7 +1,7 @@
 class BuildHQ extends Builder {
 	
-	constructor(location) {
-		Builder.constructor(location);
+	constructor(parentTask, location) {
+		Builder.constructor(parentTask, location);
 	}
 	
 	function _tostring() {
@@ -26,8 +26,8 @@ class LevelTerrain extends Builder {
 	to = null;
 	clear = null;
 	
-	constructor(location, rotation, from, to, clear = false) {
-		Builder.constructor(location, rotation);
+	constructor(parentTask, location, rotation, from, to, clear = false) {
+		Builder.constructor(parentTask, location, rotation);
 		this.from = from;
 		this.to = to;
 		this.clear = clear;
@@ -117,12 +117,13 @@ class AppeaseLocalAuthority extends Task {
 	
 	town = null;
 	
-	constructor(town) {
+	constructor(parentTask, town) {
+		Task.constructor(parentTask);
 		this.town = town;
 	}
 	
 	function _tostring() {
-		return "AppeaseLocalAuthority";
+		return "AppeaseLocalAuthority at " + AITown.GetName(town);
 	}
 	
 	function Run() {
