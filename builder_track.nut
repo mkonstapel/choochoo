@@ -118,8 +118,8 @@ class BuildTrack extends Task {
 		
 		SetSecondarySign("Pathfinding...");
 		pathfinder.InitializePath([[b, a]], [[c, d]], ignored);
-		//return pathfinder.FindPath(AIMap.DistanceManhattan(a, d) * 3 * TICKS_PER_DAY);
-		return pathfinder.FindPath(-1);
+		return pathfinder.FindPath(AIMap.DistanceManhattan(a, d) * 5 * TICKS_PER_DAY);
+		//return pathfinder.FindPath(-1);
 	}
 	
 	function PathToList(path) {

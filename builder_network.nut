@@ -782,7 +782,7 @@ class ExtendCrossing extends Builder {
 	function FindCrossingSite(stationTile) {
 		local dx = AIMap.GetTileX(stationTile) - AIMap.GetTileX(crossing);
 		local dy = AIMap.GetTileY(stationTile) - AIMap.GetTileY(crossing);
-		if (abs(dx) < 2*Crossing.WIDTH || abs(dy) < 2*Crossing.WIDTH) return null;
+		if (abs(dx) < Crossing.WIDTH || abs(dy) < Crossing.WIDTH) return null;
 		
 		local centerTile = crossing;
 		if (direction == Direction.NE || direction == Direction.SW) {
