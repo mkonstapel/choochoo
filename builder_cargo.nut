@@ -1,11 +1,12 @@
 class BuildCargoLine extends Task {
 	
 	static CARGO_MIN_DISTANCE = 30;
-	static CARGO_MAX_DISTANCE = 150;
+	static CARGO_MAX_DISTANCE = 75;
 	static TILES_PER_DAY = 1;
-	static CARGO_STATION_LENGTH = 5;
+	static CARGO_STATION_LENGTH = 3;
 	
 	static bannedCargo = [];
+	static routes = [];
 	
 	constructor(parentTask=null) {
 		Task.constructor(parentTask, null);
@@ -16,7 +17,13 @@ class BuildCargoLine extends Task {
 	}
 	
 	function Run() {
+		if (routes.len() == 0) {
+			Debug("Calculating best cargo routes...");
+			routes.extend(CalculateRoutes());
+		}
+		
 		if (!subtasks) {
+			/*
 			local cargo = SelectCargo();
 			local railType = SelectRailType(cargo);
 			AIRail.SetCurrentRailType(railType);
@@ -26,6 +33,19 @@ class BuildCargoLine extends Task {
 			local between = SelectIndustries(cargo, maxDistance);
 			local a = between[0];
 			local b = between[1];
+			*/
+
+			local route = routes[0];
+			routes.remove(0);
+			
+			local cargo = route.cargo;
+			local a = route.from;
+			local b = route.to;
+			
+			local maxDistance = min(CARGO_MAX_DISTANCE, MaxDistance(cargo, CARGO_STATION_LENGTH));
+			local railType = SelectRailType(cargo);
+			AIRail.SetCurrentRailType(railType);
+						
 			Debug("Selected:", AICargo.GetCargoLabel(cargo), "from", AIIndustry.GetName(a), "to", AIIndustry.GetName(b));
 			
 			// [siteA, rotA, dirA, siteB, rotB, dirB]
@@ -144,7 +164,7 @@ class BuildCargoLine extends Task {
 		
 		// we want decent production
 		producers.Valuate(AIIndustry.GetLastMonthProduction, cargo);
-		producers.KeepAboveValue(50);
+		producers.KeepAboveValue(80);
 		
 		// and no competition, nor an earlier station of our own
 		producers.Valuate(AIIndustry.GetAmountOfStationsAround);
@@ -206,12 +226,12 @@ class BuildCargoLine extends Task {
 		area.KeepValue(1);
 		
 		// pick the tile farthest from the destination for increased profit
-		//area.Valuate(AITile.GetDistanceManhattanToTile, destination);
-		//area.KeepTop(1);
+		area.Valuate(AITile.GetDistanceManhattanToTile, destination);
+		area.KeepTop(1);
 		
 		// pick the tile closest to the industry for looks
-		area.Valuate(AITile.GetDistanceManhattanToTile, location);
-		area.KeepBottom(1);
+		//area.Valuate(AITile.GetDistanceManhattanToTile, location);
+		//area.KeepBottom(1);
 		
 		return area.IsEmpty() ? null : area.Begin();
 	}

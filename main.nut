@@ -5,6 +5,7 @@ require("signs.nut");
 require("task.nut");
 require("finance.nut");
 require("builder.nut");
+require("planner.nut");
 
 const MIN_DISTANCE =  30;
 const MAX_DISTANCE = 100;
@@ -44,6 +45,9 @@ class ChooChoo extends AIController {
 		::tasks <- [];
 		
 		CheckGameSettings();
+		
+		AIRail.SetCurrentRailType(AIRailTypeList().Begin());
+		//CalculateRoutes();
 		
 		if (AIStationList(AIStation.STATION_TRAIN).IsEmpty()) {
 			// start with some point to point lines
@@ -201,6 +205,9 @@ class Bootstrap extends Task {
 		for (local i = 0; i < AIController.GetSetting("BootstrapLines"); i++) {
 			tasks.push(BuildCargoLine());
 		}
+		
+		// too ugly
+		//tasks.push(BuildCargoLines());
 	}
 	
 }

@@ -142,13 +142,34 @@ class Task {
 	}
 }
 
+class WaitForMoney extends Task {
+	
+	parentTask = null;
+	amount = null;
+	
+	constructor(parentTask, amount) {
+		Task.constructor(parentTask);
+		this.amount = amount;
+	}
+	
+	function Run() {
+		if (GetBankBalance() < amount) {
+			throw NeedMoneyException(amount);
+		}
+	}
+	
+	function _tostring() {
+		return "WaitForMoney " + amount;
+	}
+}
+
 class Marker extends Task {
 	
 	parentTask = null;
 	value = null;
 	
 	constructor(parentTask, value) {
-		this.parentTask = parentTask;
+		Task.constructor(parentTask);
 		this.value = value;
 	}
 	

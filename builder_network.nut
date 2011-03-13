@@ -217,8 +217,9 @@ class ConnectStation extends Task {
 					reserved.extend(crossing.GetReservedExitSpace(d));
 				}
 			}
-				
-			subtasks.append(BuildTrack(this, station.GetExit(), crossing.GetEntrance(direction), reserved, SignalMode.FORWARD, network));
+			
+			local first = BuildTrack(this, station.GetExit(), crossing.GetEntrance(direction), reserved, SignalMode.FORWARD, network);
+			subtasks.append(first);
 			
 			// we don't have to reserve space for the path we just connected 
 			//local reserved = station.GetReservedExitSpace();
@@ -231,7 +232,7 @@ class ConnectStation extends Task {
 				}
 			}
 			
-			subtasks.append(BuildTrack(this, Swap(station.GetEntrance()), Swap(crossing.GetExit(direction)), reserved, SignalMode.BACKWARD, network, BuildTrack.FOLLOW));
+			subtasks.append(BuildTrack(this, Swap(station.GetEntrance()), Swap(crossing.GetExit(direction)), reserved, SignalMode.BACKWARD, network, BuildTrack.FOLLOW, first));
 		}
 		
 		RunSubtasks();
@@ -241,7 +242,6 @@ class ConnectStation extends Task {
 		AIRail.RemoveSignal(exit[0], exit[1]);
 		
 		if (StartsWith(crossing.GetName(), "unnamed") && AIController.GetSetting("JunctionNames")) {
-			BuildSign(exit[0], "waypoint");
 			BuildWaypoint(exit[0]);
 		}
 	}
@@ -519,8 +519,10 @@ class ExtendStation extends Task {
 			default: throw "invalid direction";
 		}
 		
-		towns.Valuate(AITown.GetDistanceManhattanToTile, fromStationTile);
-		towns.Sort(AIList.SORT_BY_VALUE, true);
+		//towns.Valuate(AITown.GetDistanceManhattanToTile, fromStationTile);
+		//towns.Sort(AIList.SORT_BY_VALUE, true);
+		towns.Valuate(AITown.GetPopulation);
+		towns.Sort(AIList.SORT_BY_VALUE, false);
 		return towns;
 	}
 	
@@ -627,12 +629,18 @@ class ExtendCrossing extends Builder {
 				throw TaskFailedException("no towns " + DirectionName(direction) + " of " + Crossing(crossing) + " where we can build a station");
 			}
 			
+			// TODO: proper cost estimate
+			// building stations is fairly cheap, but it's no use to start
+			// building stations if we don't have the money for pathfinding, tracks and trains 
+			local costEstimate = 80000;
+			
 			local crossingTile = FindCrossingSite(stationTile);
 			if (crossingTile) {
 				local crossingEntranceDirection = InverseDirection(direction);
 				local crossingExitDirection = CrossingExitDirection(crossingTile, stationTile);
 				
 				subtasks = [
+					WaitForMoney(this, costEstimate),
 					AppeaseLocalAuthority(this, town),
 					BuildTownBusStation(this, town),
 					LevelTerrain(this, stationTile, stationRotation, [0, 0], [RAIL_STATION_WIDTH-1, RAIL_STATION_LENGTH-2], true),
@@ -648,6 +656,7 @@ class ExtendCrossing extends Builder {
 				];
 			} else {
 				subtasks = [
+					WaitForMoney(this, costEstimate),
 					AppeaseLocalAuthority(this, town),
 					BuildTownBusStation(this, town),
 					LevelTerrain(this, stationTile, stationRotation, [0, 0], [RAIL_STATION_WIDTH-1, RAIL_STATION_LENGTH-2], true),
@@ -706,8 +715,9 @@ class ExtendCrossing extends Builder {
 		towns.AddList(AITownList());
 		
 		// filter out the tiny ones
-		towns.Valuate(AITown.GetPopulation);
-		towns.KeepAboveValue(MIN_TOWN_POPULATION);
+		// not needed since we now sort candidates by population
+		//towns.Valuate(AITown.GetPopulation);
+		//towns.KeepAboveValue(MIN_TOWN_POPULATION);
 		
 		local stations = AIStationList(AIStation.STATION_TRAIN);
 		for (local station = stations.Begin(); stations.HasNext(); station = stations.Next()) {
@@ -738,8 +748,10 @@ class ExtendCrossing extends Builder {
 			default: throw "invalid direction";
 		}
 		
-		towns.Valuate(AITown.GetDistanceManhattanToTile, crossing);
-		towns.Sort(AIList.SORT_BY_VALUE, true);
+		//towns.Valuate(AITown.GetDistanceManhattanToTile, fromStationTile);
+		//towns.Sort(AIList.SORT_BY_VALUE, true);
+		towns.Valuate(AITown.GetPopulation);
+		towns.Sort(AIList.SORT_BY_VALUE, false);
 		return towns;
 	}
 	
@@ -781,7 +793,7 @@ class ExtendCrossing extends Builder {
 		
 		// find a buildable area closest to ideal tile
 		local tiles = AITileList();
-		SafeAddRectangle(tiles, centerTile, Crossing.WIDTH);
+		SafeAddRectangle(tiles, centerTile, 2*Crossing.WIDTH);
 		tiles.Valuate(IsBuildableRectangle, Rotation.ROT_0, [-2, -2], [Crossing.WIDTH + 2, Crossing.WIDTH + 2], false);
 		tiles.KeepValue(1);
 		tiles.Valuate(AIMap.DistanceManhattan, centerTile);

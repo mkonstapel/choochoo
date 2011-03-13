@@ -20,8 +20,9 @@ class BuildTrack extends Task {
 	style = null;
 	path = null;
 	lastDepot = null;
+	follow = null;
 	
-	constructor(parentTask, from, to, ignored, signalMode, network, style = null) {
+	constructor(parentTask, from, to, ignored, signalMode, network, style = null, follow = null) {
 		Task.constructor(parentTask); 
 		this.a = from[0];
 		this.b = from[1];
@@ -31,6 +32,7 @@ class BuildTrack extends Task {
 		this.signalMode = signalMode;
 		this.network = network;
 		this.style = style ? style : STRAIGHT;
+		this.follow = follow;
 		
 		//this.lastDepot = -DEPOT_INTERVAL;	// build one as soon as possible
 		this.lastDepot = 0;
@@ -67,6 +69,8 @@ class BuildTrack extends Task {
 		local bridgeLength = GetMaxBridgeLength();
 		pathfinder.cost.max_bridge_length = bridgeLength;
 		pathfinder.cost.max_tunnel_length = 5;
+		if (follow) pathfinder.follow = PathToList(follow.GetPath());
+		
 		switch (AIController.GetSetting("PathfinderMultiplier")) {
 			case 1:  pathfinder.estimate_multiplier = 1.1; break;
 			case 2:  pathfinder.estimate_multiplier = 1.4; break;
@@ -76,19 +80,22 @@ class BuildTrack extends Task {
 		
 		local u = pathfinder.cost.tile;
 		pathfinder.cost.max_cost = u * 4 * AIMap.DistanceManhattan(a, d);
+		pathfinder.cost.slope = 0.1*u;
+		pathfinder.cost.coast = 0.1*u;
+		pathfinder.cost.diagonal_tile = u;
 		
 		if (style == STRAIGHT) {
 			// straight, avoiding obstacles
-			pathfinder.cost.diagonal_tile = u;
 			pathfinder.cost.turn = 2*u;
 			pathfinder.cost.adj_obstacle = 4*u;
 		} else if (style == FOLLOW) {
-			// cheaper turns, bonus for nearby track
-			pathfinder.cost.diagonal_tile = u;
-			pathfinder.cost.turn = u/2;
-			pathfinder.cost.slope = u/2;
+			// more exact search? doesn't seem to provide much benefit and takes much longer
+			// pathfinder.estimate_multiplier = 1.05;
+			// cheaper turns, penalty for no nearby track
+			pathfinder.cost.turn = 0.2*u;
 			pathfinder.cost.adj_obstacle = 0;
-			pathfinder.cost.adj_rail = -u;
+			pathfinder.cost.no_adj_rail = 2*u;
+			pathfinder.cost.max_cost = u * 8 * AIMap.DistanceManhattan(a, d);
 		} else if (style == LOOSE) {
 			pathfinder.cost.diagonal_tile = 40;
 			pathfinder.cost.turn = 25;
@@ -111,7 +118,19 @@ class BuildTrack extends Task {
 		
 		SetSecondarySign("Pathfinding...");
 		pathfinder.InitializePath([[b, a]], [[c, d]], ignored);
-		return pathfinder.FindPath(AIMap.DistanceManhattan(a, d) * 3 * TICKS_PER_DAY);
+		//return pathfinder.FindPath(AIMap.DistanceManhattan(a, d) * 3 * TICKS_PER_DAY);
+		return pathfinder.FindPath(-1);
+	}
+	
+	function PathToList(path) {
+		local list = AIList();
+		local node = path;
+		while (node != null) {
+			list.AddItem(node.GetTile(), 1);
+			node = node.GetParent();
+		}
+		
+		return list;
 	}
 	
 	function BuildPath(path) {

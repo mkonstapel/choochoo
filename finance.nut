@@ -66,7 +66,10 @@ function GetMinimumSafeMoney() {
 	vehicles.Valuate(AIVehicle.GetRunningCost);
 	local runningCosts = Sum(vehicles) / 12;
 	local maintenance = AIStationList(AIStation.STATION_ANY).Count() * MONTHLY_STATION_MAINTENANCE;
-	return 3*(runningCosts + maintenance);
+	local safety = 3*(runningCosts + maintenance);
+	
+	// at the start, just risk it
+	return safety < 10000 ? 0 : safety; 
 }
 
 /**

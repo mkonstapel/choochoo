@@ -21,7 +21,7 @@ class Rail
 	_cost_bridge_per_tile = null;  ///< The cost per tile of a new bridge, this is added to _cost_tile.
 	_cost_tunnel_per_tile = null;  ///< The cost per tile of a new tunnel, this is added to _cost_tile.
 	_cost_coast = null;            ///< The extra cost for a coast tile.
-	_cost_adj_rail = null;         ///< The extra cost for a rail in an adjacent tile.
+	_cost_no_adj_rail = null;      ///< The extra cost for no rail in an adjacent tile.
 	_cost_adj_obstacle = null;     ///< The extra cost for an obstacle in an adjacent tile.
 	_pathfinder = null;            ///< A reference to the used AyStar object.
 	_max_bridge_length = null;     ///< The maximum length of a bridge that will be build.
@@ -30,7 +30,9 @@ class Rail
 	cost = null;                   ///< Used to change the costs.
 	_running = null;
 	_goals = null;
-
+	
+	follow = null;
+	
 	constructor()
 	{
 		this._max_cost = 10000000;
@@ -41,7 +43,7 @@ class Rail
 		this._cost_bridge_per_tile = 150;
 		this._cost_tunnel_per_tile = 120;
 		this._cost_coast = 20;
-		this._cost_adj_rail = 0;
+		this._cost_no_adj_rail = 0;
 		this._cost_adj_obstacle = 0;
 		this._max_bridge_length = 6;
 		this._max_tunnel_length = 6;
@@ -49,6 +51,7 @@ class Rail
 
 		this.cost = this.Cost(this);
 		this._running = false;
+		this.follow = null;
 	}
 
 	/**
@@ -101,7 +104,7 @@ class Rail.Cost
 			case "bridge_per_tile":   this._main._cost_bridge_per_tile = val; break;
 			case "tunnel_per_tile":   this._main._cost_tunnel_per_tile = val; break;
 			case "coast":             this._main._cost_coast = val; break;
-			case "adj_rail":          this._main._cost_adj_rail = val; break;
+			case "no_adj_rail":       this._main._cost_no_adj_rail = val; break;
 			case "adj_obstacle":      this._main._cost_adj_obstacle = val; break;
 			case "max_bridge_length": this._main._max_bridge_length = val; break;
 			case "max_tunnel_length": this._main._max_tunnel_length = val; break;
@@ -122,7 +125,7 @@ class Rail.Cost
 			case "bridge_per_tile":   return this._main._cost_bridge_per_tile;
 			case "tunnel_per_tile":   return this._main._cost_tunnel_per_tile;
 			case "coast":             return this._main._cost_coast;
-			case "adj_rail":          return this._main._cost_adj_rail;
+			case "no_adj_rail":       return this._main._cost_no_adj_rail;
 			case "adj_obstacle":      return this._main._cost_adj_obstacle;
 			case "max_bridge_length": return this._main._max_bridge_length;
 			case "max_tunnel_length": return this._main._max_tunnel_length;
@@ -255,7 +258,8 @@ function Rail::_Cost(path, new_tile, new_direction, self)
 	local hasNeighbourRail = false;
 	foreach (offset in offsets) {
 		local neighbour = new_tile + offset;
-		if (AIRail.IsRailTile(neighbour)) {
+		//if (AIRail.IsRailTile(neighbour)) {
+		if (self.follow && self.follow.HasItem(neighbour)) {
 			hasNeighbourRail = true;
 			break;
 		}
@@ -273,9 +277,8 @@ function Rail::_Cost(path, new_tile, new_direction, self)
 		}
 	}
 	
-	if (hasNeighbourRail) {
-		// can be made a bonus
-		cost += self._cost_adj_rail;
+	if (!hasNeighbourRail) {
+		cost += self._cost_no_adj_rail;
 	}
 	
 	if (hasObstacle) {

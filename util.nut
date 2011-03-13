@@ -55,6 +55,10 @@ function Sqrt(i) {
 	return n;
 }
 
+function Min(a, b) {
+	return a < b ? a : b;
+}
+
 function Range(from, to) {
 	local range = [];
 	for (local i=from; i<to; i++) {
