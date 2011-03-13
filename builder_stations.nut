@@ -91,7 +91,12 @@ class BuildCargoStation extends Builder {
 		local distance = AIIndustry.GetDistanceManhattanToTile(atIndustry, AIIndustry.GetLocation(toIndustry));
 		AIRail.BuildNewGRFRailStation(platform, direction, 1, platformLength, AIStation.STATION_NEW,
 			cargo, atIndustry, toIndustry, distance, isSource);
-
+		
+		if (AIError.GetLastError() == AIError.ERR_PRECONDITION_FAILED) {
+			// assume kinky newgrfs and build a normal station
+			AIRail.BuildRailStation(platform, direction, 1, platformLength, AIStation.STATION_NEW);
+		}
+			
 		CheckError();
 		return AIStation.GetStationID(platform);
 	}
