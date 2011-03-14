@@ -218,7 +218,10 @@ class ConnectStation extends Task {
 				}
 			}
 			
-			local first = BuildTrack(this, station.GetExit(), crossing.GetEntrance(direction), reserved, SignalMode.FORWARD, network);
+			local first = BuildTrack(this,
+				station.GetExit(), crossing.GetEntrance(direction),
+				reserved, SignalMode.FORWARD, network);
+			
 			subtasks.append(first);
 			
 			// we don't have to reserve space for the path we just connected 
@@ -232,7 +235,10 @@ class ConnectStation extends Task {
 				}
 			}
 			
-			subtasks.append(BuildTrack(this, Swap(station.GetEntrance()), Swap(crossing.GetExit(direction)), reserved, SignalMode.BACKWARD, network, BuildTrack.FOLLOW, first));
+			subtasks.append(BuildTrack(this,
+				Swap(station.GetEntrance()), Swap(crossing.GetExit(direction)),
+				reserved, SignalMode.BACKWARD, network,
+				BuildTrack.FOLLOW, first));
 		}
 		
 		RunSubtasks();
@@ -306,7 +312,11 @@ class ConnectCrossing extends Task {
 				}
 			}
 			
-			subtasks.append(BuildTrack(this, toCrossing.GetExit(toDirection), fromCrossing.GetEntrance(fromDirection), reserved, SignalMode.FORWARD, network));
+			local first = BuildTrack(this,
+				toCrossing.GetExit(toDirection), fromCrossing.GetEntrance(fromDirection),
+				reserved, SignalMode.FORWARD, network);
+			
+			subtasks.append(first);
 		
 			//local reserved = toCrossing.GetReservedExitSpace(toDirection);
 			//reserved.extend(fromCrossing.GetReservedEntranceSpace(fromDirection));
@@ -323,7 +333,10 @@ class ConnectCrossing extends Task {
 				}
 			}
 			
-			subtasks.append(BuildTrack(this, Swap(toCrossing.GetEntrance(toDirection)), Swap(fromCrossing.GetExit(fromDirection)), reserved, SignalMode.BACKWARD, network, BuildTrack.FOLLOW));
+			subtasks.append(BuildTrack(this,
+				Swap(toCrossing.GetEntrance(toDirection)), Swap(fromCrossing.GetExit(fromDirection)),
+				reserved, SignalMode.BACKWARD, network,
+				BuildTrack.FOLLOW, first));
 		}
 		
 		RunSubtasks();
@@ -360,218 +373,6 @@ class ConnectCrossing extends Task {
 	}
 }
 
-class ExtendStation extends Task {
-
-	// TODO raise
-	static MIN_TOWN_POPULATION = 0;
-	
-	fromStationTile = null;
-	direction = null;
-	toStationTile = null;
-	network = null;
-	town = null;
-	
-	constructor(parentTask, fromStationTile, direction, network) {
-		Task.constructor(parentTask);
-		this.fromStationTile = fromStationTile;
-		this.direction = direction;
-		this.network = network;
-		this.toStationTile = null;
-		this.town = null;
-	}
-	
-	function _tostring() {
-		return "ExtendStation" + TerminusStation.AtLocation(fromStationTile, RAIL_STATION_PLATFORM_LENGTH);
-	}
-	
-	function Run() {
-		// see if we've not already built this direction
-		// if we have subtasks but we do find rails, assume we're still building
-		local fromStation = TerminusStation.AtLocation(fromStationTile, network.trainLength);
-		local exit = fromStation.GetRearExit();
-		if (!subtasks && AIRail.IsRailTile(exit[1])) {
-			return;
-		}
-		
-		if (!subtasks) {
-			SetConstructionSign(fromStationTile, this);
-			local towns = FindTowns();
-			local stationRotation = BuildTerminusStation.StationRotationForDirection(direction);
-			
-			town = null;
-			toStationTile = null;
-			for (town = towns.Begin(); towns.HasNext(); town = towns.Next()) {
-				toStationTile = FindStationSite(town, stationRotation, fromStationTile);
-				if (toStationTile) break;
-			}
-			
-			if (!toStationTile) {
-				throw TaskFailedException("no towns " + DirectionName(direction) + " of " + TerminusStation.AtLocation(fromStationTile, RAIL_STATION_PLATFORM_LENGTH) + " where we can build a station");
-			}
-			
-			local toStation = TerminusStation(toStationTile, stationRotation, RAIL_STATION_PLATFORM_LENGTH);
-			//local crossingTile = FindCrossingSite(toStationTile);
-			local crossingTile = null; // TODO
-			if (crossingTile) {
-				local crossingEntranceDirection = InverseDirection(direction);
-				local crossingExitDirection = CrossingExitDirection(crossingTile, toStationTile);
-				
-				subtasks = [
-					LevelTerrain(toStationTile, stationRotation, [0, 0], [RAIL_STATION_WIDTH-1, RAIL_STATION_LENGTH-2], true),
-					AppeaseLocalAuthority(town),
-					BuildTerminusStation(toStationTile, direction, network, town),
-					AppeaseLocalAuthority(town),
-					BuildBusStations(toStationTile, town),
-					LevelTerrain(crossingTile, Rotation.ROT_0, [1, 1], [Crossing.WIDTH-2, Crossing.WIDTH-2]),
-					BuildCrossing(crossingTile, network),
-					ConnectCrossing(crossing, direction, crossingTile, crossingEntranceDirection, network),
-					ConnectStation(crossingTile, crossingExitDirection, toStationTile, network),
-					BuildTrains(toStationTile, network, PAX),
-				];
-			} else {
-				subtasks = [
-					LevelTerrain(toStationTile, stationRotation, [0, 0], [RAIL_STATION_WIDTH-1, RAIL_STATION_LENGTH-2], true),
-					AppeaseLocalAuthority(town),
-					BuildTerminusStation(toStationTile, direction, network, town),
-					AppeaseLocalAuthority(town),
-					BuildBusStations(toStationTile, town),
-					BuildTrack(fromStation.GetRearExit(), toStation.GetEntrance(), Concat(fromStation.GetReservedRearEntranceSpace(), toStation.GetReservedExitSpace()), SignalMode.FORWARD, network),
-					BuildTrack(Swap(fromStation.GetRearEntrance()), Swap(toStation.GetExit()), [], SignalMode.BACKWARD, network, BuildTrack.FOLLOW),
-					BuildTrains(toStationTile, network, PAX),
-				];
-			}
-			
-			// build an extra train for the second station in a network
-			// at this point, that means we only have one station in the network
-			if (network.stations.len() == 1) {
-				local firstStation = AIStation.GetLocation(network.stations[0]);
-				subtasks.append(BuildTrains(firstStation, network, PAX));
-			}
-		}
-		
-		RunSubtasks();
-		
-		// TODO: append instead? before or after bus?
-		tasks.insert(1, ExtendStation(fromStationTile, direction, network));
-		
-		local towns = AITownList();
-		towns.Valuate(AITown.GetDistanceManhattanToTile, fromStationTile);
-		towns.KeepBelowValue(MAX_BUS_ROUTE_DISTANCE);
-		
-		// sort descending, then append back-to-front so the closest actually goes first
-		towns.Sort(AIList.SORT_BY_VALUE, false);
-		for (local town = towns.Begin(); towns.HasNext(); town = towns.Next()) {
-			tasks.insert(1, BuildBusService(fromStationTile, town));
-		}
-	}
-	
-	function CrossingExitDirection(crossingTile, stationTile) {
-		local dx = AIMap.GetTileX(stationTile) - AIMap.GetTileX(crossingTile);
-		local dy = AIMap.GetTileY(stationTile) - AIMap.GetTileY(crossingTile);
-		
-		// leave the new crossing in a direction perpendicular to the one we came in through
-		switch (direction) {
-			case Direction.NE: return dy > 0 ? Direction.SE : Direction.NW;
-			case Direction.SE: return dx > 0 ? Direction.SW : Direction.NE;
-			case Direction.SW: return dy > 0 ? Direction.SE : Direction.NW;
-			case Direction.NW: return dx > 0 ? Direction.SW : Direction.NE;
-			default: throw "invalid direction";
-		}
-	}
-	
-	/*
-	 * Find towns in the expansion direction that don't already have a station.
-	 */
-	function FindTowns() {
-		local towns = AIList();
-		towns.AddList(AITownList());
-		
-		// filter out the tiny ones
-		towns.Valuate(AITown.GetPopulation);
-		towns.KeepAboveValue(MIN_TOWN_POPULATION);
-		
-		local stations = AIStationList(AIStation.STATION_TRAIN);
-		for (local station = stations.Begin(); stations.HasNext(); station = stations.Next()) {
-			towns.RemoveItem(AIStation.GetNearestTown(station));
-		}
-		
-		switch (direction) {
-			case Direction.NE:
-				// negative X
-				FilterTowns(towns, fromStationTile, GetXDistance, false, GetYDistance);
-				break;
-				
-			case Direction.SE:
-				// positive Y
-				FilterTowns(towns, fromStationTile, GetYDistance, true, GetXDistance);
-				break;
-				
-			case Direction.SW:
-				// positive X
-				FilterTowns(towns, fromStationTile, GetXDistance, true, GetYDistance);
-				break;
-				
-			case Direction.NW:
-				// negative Y
-				FilterTowns(towns, fromStationTile, GetYDistance, false, GetXDistance);
-				break;
-			
-			default: throw "invalid direction";
-		}
-		
-		//towns.Valuate(AITown.GetDistanceManhattanToTile, fromStationTile);
-		//towns.Sort(AIList.SORT_BY_VALUE, true);
-		towns.Valuate(AITown.GetPopulation);
-		towns.Sort(AIList.SORT_BY_VALUE, false);
-		return towns;
-	}
-	
-	function FilterTowns(towns, location, lengthValuator, positive, widthValuator) {
-		// remove that are too close or too far
-		towns.Valuate(lengthValuator, location);
-		if (positive) {
-			towns.RemoveBelowValue(network.minDistance);
-			towns.RemoveAboveValue(network.maxDistance);
-		} else {
-			towns.RemoveAboveValue(-network.minDistance);
-			towns.RemoveBelowValue(-network.maxDistance);
-		}
-		
-		// remove towns too far off to the side
-		towns.Valuate(widthValuator, location);
-		towns.KeepBetweenValue(-network.maxDistance/2, network.maxDistance/2);
-	}
-	
-	function GetXDistance(town, tile) {
-		return AIMap.GetTileX(AITown.GetLocation(town)) - AIMap.GetTileX(tile);
-	}
-	
-	function GetYDistance(town, tile) {
-		return AIMap.GetTileY(AITown.GetLocation(town)) - AIMap.GetTileY(tile);
-	}
-	
-	function FindCrossingSite(stationTile) {
-		local dx = AIMap.GetTileX(stationTile) - AIMap.GetTileX(crossing);
-		local dy = AIMap.GetTileY(stationTile) - AIMap.GetTileY(crossing);
-		if (abs(dx) < 2*Crossing.WIDTH || abs(dy) < 2*Crossing.WIDTH) return null;
-		
-		local centerTile = crossing;
-		if (direction == Direction.NE || direction == Direction.SW) {
-			centerTile += AIMap.GetTileIndex(dx - Sign(dx) * (RAIL_STATION_LENGTH + 1), 0);
-		} else {
-			centerTile += AIMap.GetTileIndex(0, dy - Sign(dy) * (RAIL_STATION_LENGTH + 1));
-		}
-		
-		// find a buildable area closest to ideal tile
-		local tiles = AITileList();
-		SafeAddRectangle(tiles, centerTile, Crossing.WIDTH);
-		tiles.Valuate(IsBuildableRectangle, Rotation.ROT_0, [-2, -2], [Crossing.WIDTH + 2, Crossing.WIDTH + 2], false);
-		tiles.KeepValue(1);
-		tiles.Valuate(AIMap.DistanceManhattan, centerTile);
-		tiles.KeepBottom(1);
-		return tiles.IsEmpty() ? null : tiles.Begin();
-	}
-}
 
 class ExtendCrossing extends Builder {
 
@@ -631,7 +432,7 @@ class ExtendCrossing extends Builder {
 			
 			// TODO: proper cost estimate
 			// building stations is fairly cheap, but it's no use to start
-			// building stations if we don't have the money for pathfinding, tracks and trains 
+			// construction if we don't have the money for pathfinding, tracks and trains 
 			local costEstimate = 80000;
 			
 			local crossingTile = FindCrossingSite(stationTile);
@@ -791,12 +592,13 @@ class ExtendCrossing extends Builder {
 			centerTile += AIMap.GetTileIndex(0, dy - Sign(dy) * (RAIL_STATION_LENGTH + 1));
 		}
 		
-		// find a buildable area closest to ideal tile
+		// find a buildable area closest to ideal tile, or crossing (testing)
 		local tiles = AITileList();
-		SafeAddRectangle(tiles, centerTile, 2*Crossing.WIDTH);
+		SafeAddRectangle(tiles, centerTile, Crossing.WIDTH + 2);
 		tiles.Valuate(IsBuildableRectangle, Rotation.ROT_0, [-2, -2], [Crossing.WIDTH + 2, Crossing.WIDTH + 2], false);
 		tiles.KeepValue(1);
-		tiles.Valuate(AIMap.DistanceManhattan, centerTile);
+		//tiles.Valuate(AIMap.DistanceManhattan, centerTile);
+		tiles.Valuate(AIMap.DistanceManhattan, crossing);
 		tiles.KeepBottom(1);
 		return tiles.IsEmpty() ? null : tiles.Begin();
 	}

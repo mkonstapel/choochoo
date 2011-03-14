@@ -68,7 +68,7 @@ class BuildTrack extends Task {
 		
 		local bridgeLength = GetMaxBridgeLength();
 		pathfinder.cost.max_bridge_length = bridgeLength;
-		pathfinder.cost.max_tunnel_length = 5;
+		pathfinder.cost.max_tunnel_length = 8;
 		if (follow) pathfinder.follow = PathToList(follow.GetPath());
 		
 		switch (AIController.GetSetting("PathfinderMultiplier")) {
@@ -79,7 +79,7 @@ class BuildTrack extends Task {
 		}
 		
 		local u = pathfinder.cost.tile;
-		pathfinder.cost.max_cost = u * 4 * AIMap.DistanceManhattan(a, d);
+		//pathfinder.cost.max_cost = u * 4 * AIMap.DistanceManhattan(a, d);
 		pathfinder.cost.slope = 0.1*u;
 		pathfinder.cost.coast = 0.1*u;
 		pathfinder.cost.diagonal_tile = u;
@@ -87,15 +87,14 @@ class BuildTrack extends Task {
 		if (style == STRAIGHT) {
 			// straight, avoiding obstacles
 			pathfinder.cost.turn = 2*u;
+			pathfinder.cost.diagonal_tile = u;
 			pathfinder.cost.adj_obstacle = 4*u;
 		} else if (style == FOLLOW) {
-			// more exact search? doesn't seem to provide much benefit and takes much longer
-			// pathfinder.estimate_multiplier = 1.05;
 			// cheaper turns, penalty for no nearby track
+			pathfinder.cost.no_adj_rail = 2*u;
 			pathfinder.cost.turn = 0.2*u;
 			pathfinder.cost.adj_obstacle = 0;
-			pathfinder.cost.no_adj_rail = 2*u;
-			pathfinder.cost.max_cost = u * 8 * AIMap.DistanceManhattan(a, d);
+			//pathfinder.cost.max_cost = u * 8 * AIMap.DistanceManhattan(a, d);
 		} else if (style == LOOSE) {
 			pathfinder.cost.diagonal_tile = 40;
 			pathfinder.cost.turn = 25;
