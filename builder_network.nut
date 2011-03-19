@@ -5,7 +5,8 @@ class BuildNewNetwork extends Task {
 	
 	constructor(parentTask, minDistance = MIN_DISTANCE, maxDistance = MAX_DISTANCE) {
 		Task.constructor(parentTask);
-		this.network = Network(AIRailTypeList().Begin(), RAIL_STATION_PLATFORM_LENGTH, minDistance, maxDistance);
+		//this.network = Network(AIRailTypeList().Begin(), RAIL_STATION_PLATFORM_LENGTH, minDistance, maxDistance);
+		this.network = Network(AIRailTypeList().Begin(), 3, minDistance, maxDistance);
 	}
 	
 	function Run() {
@@ -376,7 +377,7 @@ class ConnectCrossing extends Task {
 
 class ExtendCrossing extends Builder {
 
-	static MIN_TOWN_POPULATION = 200;
+	static MIN_TOWN_POPULATION = 300;
 	
 	crossing = null;
 	direction = null;
@@ -516,9 +517,8 @@ class ExtendCrossing extends Builder {
 		towns.AddList(AITownList());
 		
 		// filter out the tiny ones
-		// not needed since we now sort candidates by population
-		//towns.Valuate(AITown.GetPopulation);
-		//towns.KeepAboveValue(MIN_TOWN_POPULATION);
+		towns.Valuate(AITown.GetPopulation);
+		towns.KeepAboveValue(MIN_TOWN_POPULATION);
 		
 		local stations = AIStationList(AIStation.STATION_TRAIN);
 		for (local station = stations.Begin(); stations.HasNext(); station = stations.Next()) {

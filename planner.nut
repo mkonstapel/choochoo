@@ -88,8 +88,9 @@ function CompareRouteValue(a, b) {
 
 function CalculateRoutes() {
 	local routes = GenerateRoutes();
+	local top = min(10, routes.len());
 	routes.sort(CompareRouteValue);
-	foreach (route in routes.slice(0, 10)) {
+	foreach (route in routes.slice(0, top)) {
 		Debug(route);
 	}
 	

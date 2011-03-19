@@ -158,12 +158,15 @@ class AppeaseLocalAuthority extends Task {
 				countdown = min(countdown, 20);
 			}
 			
+			// we may not plant a tree at all, in which case we'd be looking at the wrong AIError!
+			local planted = false;
 			while (AITile.PlantTree(tile) && countdown > 0) {
+				planted = true;
 				countdown--;
 			}
 			
-			if (AIError.GetLastError() == AIError.ERR_UNKNOWN || AIError.GetLastError() == AIError.ERR_SITE_UNSUITABLE) {
-				// too many trees or building on tile, continue
+			if (!planted || AIError.GetLastError() == AIError.ERR_UNKNOWN || AIError.GetLastError() == AIError.ERR_SITE_UNSUITABLE) {
+				// no trees planted, too many trees or building on tile, continue
 			} else {
 				CheckError();
 			}

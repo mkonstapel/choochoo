@@ -45,6 +45,11 @@ class BuildCargoLine extends Task {
 			local maxDistance = min(CARGO_MAX_DISTANCE, MaxDistance(cargo, CARGO_STATION_LENGTH));
 			local railType = SelectRailType(cargo);
 			AIRail.SetCurrentRailType(railType);
+			
+			if (AIIndustry.GetAmountOfStationsAround(a) > 0) {
+				Debug(AIIndustry.GetName(a), "is already being served");
+				throw TaskRetryException();
+			}
 						
 			Debug("Selected:", AICargo.GetCargoLabel(cargo), "from", AIIndustry.GetName(a), "to", AIIndustry.GetName(b));
 			
@@ -199,12 +204,14 @@ class BuildCargoLine extends Task {
 		local nameA = AIIndustry.GetName(a);
 		local dirA = StationDirection(locA, locB);
 		local rotA = BuildTerminusStation.StationRotationForDirection(dirA);
-		local siteA = FindIndustryStationSite(a, true, rotA, locB, CARGO_STATION_LENGTH + 3, 2);
+		//local siteA = FindIndustryStationSite(a, true, rotA, locB, CARGO_STATION_LENGTH + 3, 2);
+		local siteA = FindIndustryStationSite(a, true, rotA, locB);
 
 		local nameB = AIIndustry.GetName(b);
 		local dirB = StationDirection(locB, locA);
 		local rotB = BuildTerminusStation.StationRotationForDirection(dirB);
-		local siteB = FindIndustryStationSite(b, false, rotB, locA, CARGO_STATION_LENGTH + 3, 2);
+		//local siteB = FindIndustryStationSite(b, false, rotB, locA, CARGO_STATION_LENGTH + 3, 2);
+		local siteB = FindIndustryStationSite(b, false, rotB, locA);
 		
 		if (siteA && siteB) {
 			return [siteA, rotA, dirA, siteB, rotB, dirB];
@@ -217,12 +224,12 @@ class BuildCargoLine extends Task {
 	/**
 	 * Find a site for a station at the given industry.
 	 */
-	function FindIndustryStationSite(industry, producing, stationRotation, destination, length, width) {
+	function FindIndustryStationSite(industry, producing, stationRotation, destination) {
 		local location = AIIndustry.GetLocation(industry);
 		local area = producing ? AITileList_IndustryProducing(industry, RAIL_STATION_RADIUS) : AITileList_IndustryAccepting(industry, RAIL_STATION_RADIUS);
 		
 		// room for a station
-		area.Valuate(IsBuildableRectangle, stationRotation, [0, 0], [width, length], true);
+		area.Valuate(IsBuildableRectangle, stationRotation, [0, -1], [1, CARGO_STATION_LENGTH + 1], true);
 		area.KeepValue(1);
 		
 		// pick the tile farthest from the destination for increased profit

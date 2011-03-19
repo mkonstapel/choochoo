@@ -9,6 +9,7 @@ class BuildCargoStation extends Builder {
 	cargo = null;
 	isSource = null;
 	platformLength = null;
+	platform = null;
 	
 	constructor(parentTask, location, direction, network, atIndustry, toIndustry, cargo, isSource, platformLength) {
 		Builder.constructor(parentTask, location, StationRotationForDirection(direction));
@@ -23,13 +24,13 @@ class BuildCargoStation extends Builder {
 	function Run() {
 		SetConstructionSign(location, this);
 		
-		BuildPlatform();
+		platform = BuildPlatform();
 		local p = platformLength;
 		BuildSegment([0, p], [0, p+1]);
-		BuildDepot([1,p], [0,p]);
-		BuildRail([1, p], [0, p], [0, p-1]);
-		BuildRail([1, p], [0, p], [0, p+1]);
-		network.depots.append(GetTile([1,p]));
+		BuildDepot([0,-1], [0,0]);
+		//BuildRail([1, p], [0, p], [0, p-1]);
+		//BuildRail([1, p], [0, p], [0, p+1]);
+		network.depots.append(GetTile([0,-1]));
 		network.stations.append(AIStation.GetStationID(location));
 	}
 	
@@ -58,7 +59,7 @@ class BuildCargoStation extends Builder {
 			Demolish([0,y]);
 		}
 		
-		Demolish([1, platformLength]);	// depot
+		//Demolish([1, platformLength]);	// depot
 	}
 	
 	/**
@@ -87,6 +88,10 @@ class BuildCargoStation extends Builder {
 			throw "invalid rotation";
 		}
 		
+		// don't try to build twice
+		local stationID = AIStation.GetStationID(platform);
+		if (AIStation.IsValidStation(stationID)) return stationID;
+		
 		// AIRail.BuildRailStation(platform, direction, 1, platformLength, AIStation.STATION_NEW);
 		local distance = AIIndustry.GetDistanceManhattanToTile(atIndustry, AIIndustry.GetLocation(toIndustry));
 		AIRail.BuildNewGRFRailStation(platform, direction, 1, platformLength, AIStation.STATION_NEW,
@@ -94,6 +99,7 @@ class BuildCargoStation extends Builder {
 		
 		if (AIError.GetLastError() == AIError.ERR_PRECONDITION_FAILED) {
 			// assume kinky newgrfs and build a normal station
+			Warning("Could not build a newgrf station:", AIError.GetLastErrorString());
 			AIRail.BuildRailStation(platform, direction, 1, platformLength, AIStation.STATION_NEW);
 		}
 			
