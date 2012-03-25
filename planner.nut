@@ -83,7 +83,7 @@ class CargoRoute {
 }
 
 function CompareRouteValue(a, b) {
-	return a.payback > b.payback ? 1 : -1;
+	return a.payback - b.payback;
 }
 
 function CalculateRoutes() {
