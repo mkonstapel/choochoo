@@ -97,7 +97,7 @@ function CalculateRoutes() {
 		list.AddItem(i, routes[i].payback.tointeger());
 	}
 	
-	list.KeepTop(50);
+	list.KeepBottom(50);
 	list.Sort(AIList.SORT_BY_VALUE, true);
 	
 	local best = []
@@ -110,7 +110,7 @@ function CalculateRoutes() {
 		Debug(route);
 	}
 	
-	return routes;
+	return best;
 }
 
 function GenerateRoutes() {
@@ -142,7 +142,6 @@ function GenerateRoutes() {
 				if (distance < MAX_CARGO_DISTANCE) {
 					local route = CargoRoute(producer, consumer, cargo)
 					if (route.payback > 0) {
-						//Debug(route)
 						routes.append(route)
 					}
 				}
