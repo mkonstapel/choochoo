@@ -88,9 +88,25 @@ function CompareRouteValue(a, b) {
 
 function CalculateRoutes() {
 	local routes = GenerateRoutes();
-	local top = min(10, routes.len());
-	routes.sort(CompareRouteValue);
-	foreach (route in routes.slice(0, top)) {
+	
+	Debug("Found " + routes.len() + " possible cargo routes");
+	
+	// convert to an AIList for efficiently finding the best N
+	local list = AIList();
+	for (local i = 0; i < routes.len(); i++) {
+		list.AddItem(i, routes[i].payback.tointeger());
+	}
+	
+	list.KeepTop(50);
+	list.Sort(AIList.SORT_BY_VALUE, true);
+	
+	local best = []
+	foreach (index, _ in list) {
+		best.append(routes[index]);
+	}
+	
+	Debug("Best:");
+	foreach (route in best) {
 		Debug(route);
 	}
 	
@@ -107,16 +123,18 @@ function GenerateRoutes() {
 	}
 	
 	if (cargoList.IsEmpty()) {
-		throw "No suitable cargo";
+		return []
 	}
 	
 	local routes = [];
 	foreach (cargo, _ in cargoList) {
-		Debug(AICargo.GetCargoLabel(cargo));
 		local consumers = AIIndustryList_CargoAccepting(cargo);
 		local producers = AIIndustryList_CargoProducing(cargo);
+		
 		producers.Valuate(AIIndustry.GetLastMonthProduction, cargo);
 		producers.KeepAboveValue(0);
+		
+		Debug(AICargo.GetCargoLabel(cargo) + ": " + producers.Count() + " producers x " + consumers.Count() + " consumers");
 		
 		foreach (producer, _ in producers) {
 			foreach (consumer, _ in consumers) {

@@ -88,8 +88,10 @@ class Task {
 	
 	function Failed() {
 		// fail all completed subtasks, and the current one
-		foreach (task in completed) {
-			task.Failed();
+		if (completed != null) {
+			foreach (task in completed) {
+				task.Failed();
+			}
 		}
 		
 		if (currentTask) {

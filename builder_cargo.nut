@@ -7,6 +7,7 @@ class BuildCargoLine extends Task {
 	
 	static bannedCargo = [];
 	static routes = [];
+	static routesCalculated = Flag();
 	
 	constructor(parentTask=null) {
 		Task.constructor(parentTask, null);
@@ -17,24 +18,27 @@ class BuildCargoLine extends Task {
 	}
 	
 	function Run() {
-		if (routes.len() == 0) {
+		if (routes.len() == 0 && !routesCalculated.Get()) {
 			Debug("Calculating best cargo routes...");
+			SetConstructionSign(AIMap.GetTileIndex(1, COMPANY), this);
+			SetSecondarySign("Evaluating routes...");
+			
+			routesCalculated.Set(true);
 			routes.extend(CalculateRoutes());
+			
+			ClearSecondarySign();
 		}
 		
 		if (!subtasks) {
-			/*
-			local cargo = SelectCargo();
-			local railType = SelectRailType(cargo);
-			AIRail.SetCurrentRailType(railType);
-			local maxDistance = min(CARGO_MAX_DISTANCE, MaxDistance(cargo, CARGO_STATION_LENGTH));
-			// Debug("Max distance for " + AICargo.GetCargoLabel(cargo) + ": " + maxDistance);
+			if (routes.len() == 0) {
+				throw TaskFailedException("no cargo routes");
+			}
 			
-			local between = SelectIndustries(cargo, maxDistance);
-			local a = between[0];
-			local b = between[1];
-			*/
-
+			// delay for a random time, so different ChooChoos run out of sync
+			// that way, they each get their choice from the best cargo routes
+			// after that, the main building routine is random anyway
+			AIController.Sleep(1 + abs(AIBase.Rand() % TICKS_PER_DAY));
+			
 			local route = routes[0];
 			routes.remove(0);
 			

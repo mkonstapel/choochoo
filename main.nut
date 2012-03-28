@@ -205,9 +205,6 @@ class Bootstrap extends Task {
 		for (local i = 0; i < AIController.GetSetting("CargoLines"); i++) {
 			tasks.push(BuildCargoLine());
 		}
-		
-		// too ugly
-		//tasks.push(BuildCargoLines());
 	}
 	
 }
