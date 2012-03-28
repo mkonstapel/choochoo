@@ -62,7 +62,7 @@ class BuildTrains extends Task {
 	 * and the transport capacity of currently assigned trains.
 	 */
 	function StationCapacityDeficit(station) {
-		local production = AITown.GetMaxProduction(AIStation.GetNearestTown(station), PAX);
+		local production = AITown.GetLastMonthProduction(AIStation.GetNearestTown(station), PAX);
 		local trains = AIVehicleList_Station(station);
 		trains.Valuate(BuildTrains.TrainCapacity);
 		local capacity = Sum(trains);

@@ -420,6 +420,9 @@ class ExtendCrossing extends Builder {
 			local towns = FindTowns();
 			local stationRotation = BuildTerminusStation.StationRotationForDirection(direction);
 			
+			// TODO: try more than station site per town, and more than one town per direction
+			// NOTE: give up on a town if pathfinding fails or you might try to pathfound around the sea over and over and over...
+			
 			town = null;
 			stationTile = null;
 			for (town = towns.Begin(); towns.HasNext(); town = towns.Next()) {

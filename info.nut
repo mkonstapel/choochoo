@@ -3,9 +3,10 @@ class ChooChoo extends AIInfo {
 	function GetName()        { return "ChooChoo"; }
 	function GetDescription() { return "Muck about with trains"; }
 	function GetVersion()     { return 406; }
-	function GetDate()        { return "2011-03-19"; }
+	function GetDate()        { return "2012-03-28"; }
 	function CreateInstance() { return "ChooChoo"; }
 	function GetShortName()	  { return "CHOO"; }
+	function GetAPIVersion()  { return "1.0"; }
 	
 	function GetSettings() {
 	    AddSetting({name = "CargoLines", description = "Number of single track cargo lines to start with", min_value = 0, max_value = 20, easy_value = 5, medium_value = 10, hard_value = 20, custom_value = 10, flags = AICONFIG_INGAME});

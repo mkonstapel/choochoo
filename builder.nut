@@ -78,12 +78,12 @@ function IsBuildableRectangle(location, rotation, from, to, mustBeFlat) {
 	// check if the area is clear and flat
 	// TODO: don't require it to be flat, check if it can be leveled
 	local coords = RelativeCoordinates(location, rotation);
-	local height = AITile.GetHeight(location);
+	local height = AITile.GetMaxHeight(location);
 	
 	for (local x = from[0]; x < to[0]; x++) {
 		for (local y = from[1]; y < to[1]; y++) {
 			local tile = coords.GetTile([x, y]);
-			local flat = AITile.GetHeight(tile) == height && AITile.GetMinHeight(tile) == height && AITile.GetMaxHeight(tile) == height;
+			local flat = AITile.GetMaxHeight(tile) == height && AITile.GetMinHeight(tile) == height && AITile.GetMaxHeight(tile) == height;
 			if (!AITile.IsBuildable(tile) || (mustBeFlat && !flat)) {
 				return false;
 			}
@@ -99,7 +99,6 @@ function IsBuildableRectangle(location, rotation, from, to, mustBeFlat) {
 			
 			local flattenable = (
 				area.Count() == 9 &&
-				abs(AITile.GetHeight(tile) - height) <= 1 &&
 				abs(AITile.GetMinHeight(tile) - height) <= 1 &&
 				abs(AITile.GetMaxHeight(tile) - height) <= 1);
 			
