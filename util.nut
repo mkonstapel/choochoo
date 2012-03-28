@@ -328,7 +328,8 @@ function GetWagon(cargo, railType) {
 	engineList.Valuate(AIEngine.GetCapacity)
 	engineList.KeepTop(1);
 	
-	return engineList.IsEmpty() ? null : engineList.Begin();
+	if (engineList.IsEmpty()) throw TaskFailedException("no suitable wagon");
+	return engineList.Begin();
 }
 
 function MaxDistance(cargo, trainLength) {
@@ -360,5 +361,25 @@ class Counter {
 	
 	function Inc() {
 		count++;
+	}
+}
+
+/**
+ * A boolean flag, usable as a static field.
+ */
+class Flag {
+	
+	value = null;
+	
+	constructor() {
+		value = false;
+	}
+	
+	function Set(value) {
+		this.value = value;
+	}
+	
+	function Get() {
+		return value;
 	}
 }
