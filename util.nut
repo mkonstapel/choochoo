@@ -174,8 +174,8 @@ function Concat(a, b) {
  * tiles from the center tile, taking the edges of the map into account.
  */  
 function SafeAddRectangle(list, tile, radius) {
-	local x1 = max(0, AIMap.GetTileX(tile) - radius);
-	local y1 = max(0, AIMap.GetTileY(tile) - radius);
+	local x1 = max(1, AIMap.GetTileX(tile) - radius);
+	local y1 = max(1, AIMap.GetTileY(tile) - radius);
 	
 	local x2 = min(AIMap.GetMapSizeX() - 2, AIMap.GetTileX(tile) + radius);
 	local y2 = min(AIMap.GetMapSizeY() - 2, AIMap.GetTileY(tile) + radius);
