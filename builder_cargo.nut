@@ -30,6 +30,35 @@ class BuildCargoLine extends Task {
 		}
 		
 		if (!subtasks) {
+			// START TODO FIXME added by Otto to allow choochoo to survive in ECS environments
+			if (routes.len() == 0) {
+				Warning("No cargo routes; might be due to ECS; please hold! Your cargo is important to us...");
+				local curdate = AIDate.GetCurrentDate();
+				local currentMonth = AIDate.GetMonth(curdate);
+
+				// delay for two reasons: don't pick what other ai is picking as a first start
+				// starting up is already tough enough :P
+				// reason 2: When using ECS grf's; cargo acceptance starts 256 ticks after start
+				while (currentMonth < 2) {
+					curdate = AIDate.GetCurrentDate();
+					currentMonth = AIDate.GetMonth(curdate);
+					AIController.Sleep(1);
+				}
+				Debug("Retry time");
+				local allCargoes = AICargoList();
+				allCargoes.Valuate(AICargo.IsFreight);
+				allCargoes.KeepValue(1);
+				allCargoes.Valuate(AICargo.HasCargoClass, AICargo.CC_BULK);
+				allCargoes.KeepValue(1);
+				local selectedCargo = allCargoes.Begin();
+				Debug("Finding rail with example cargo: " + AICargo.GetCargoLabel(selectedCargo));
+				local railType = SelectRailType(selectedCargo);
+				Debug("Selected cargo rail type: " + AIRail.GetName(railType));
+				AIRail.SetCurrentRailType(railType);
+				routes.extend(CalculateRoutes());
+			}
+			// END TODO FIXME added by Otto to allow choochoo to survive in ECS environments
+			
 			if (routes.len() == 0) {
 				throw TaskFailedException("no cargo routes");
 			}
@@ -48,6 +77,7 @@ class BuildCargoLine extends Task {
 			
 			local maxDistance = min(CARGO_MAX_DISTANCE, MaxDistance(cargo, CARGO_STATION_LENGTH));
 			local railType = SelectRailType(cargo);
+			Debug("Selected cargo rail type: " + AIRail.GetName(railType));
 			AIRail.SetCurrentRailType(railType);
 			
 			if (AIIndustry.GetAmountOfStationsAround(a) > 0) {
