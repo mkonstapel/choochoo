@@ -598,7 +598,12 @@ class ExtendCrossing extends Builder {
 		// find a buildable area closest to ideal tile, or crossing (testing)
 		local tiles = AITileList();
 		SafeAddRectangle(tiles, centerTile, Crossing.WIDTH + 2);
-		tiles.Valuate(IsBuildableRectangle, Rotation.ROT_0, [-2, -2], [Crossing.WIDTH + 2, Crossing.WIDTH + 2], false);
+		// this times out
+		// tiles.Valuate(IsBuildableRectangle, Rotation.ROT_0, [-2, -2], [Crossing.WIDTH + 2, Crossing.WIDTH + 2], false);
+		for (local tile = tiles.Begin(); tiles.HasNext(); tile = tiles.Next()) {
+			tiles.SetValue(tile, IsBuildableRectangle(tile, Rotation.ROT_0, [-2, -2], [Crossing.WIDTH + 2, Crossing.WIDTH + 2], false) ? 1 : 0);
+		}
+		
 		tiles.KeepValue(1);
 		//tiles.Valuate(AIMap.DistanceManhattan, centerTile);
 		tiles.Valuate(AIMap.DistanceManhattan, crossing);
