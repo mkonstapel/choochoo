@@ -204,6 +204,8 @@ class BuildTrain extends Builder {
 		AIOrder.AppendOrder(train, AIStation.GetLocation(to), toFlags);
 		AIOrder.AppendOrder(train, toDepot, AIOrder.AIOF_SERVICE_IF_NEEDED);
 		AIVehicle.StartStopVehicle(train);
+		
+		GenerateName(train, fromDepot);
 	}
 	
 	function CheckFunds(engineType) {

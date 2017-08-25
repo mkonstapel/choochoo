@@ -6,6 +6,8 @@ require("task.nut");
 require("finance.nut");
 require("builder.nut");
 require("planner.nut");
+require("manager.nut");
+require("vehicles.nut");
 
 const MIN_DISTANCE =  30;
 const MAX_DISTANCE = 100;
@@ -55,8 +57,14 @@ class ChooChoo extends AIController {
 		}
 		
 		local minMoney = 0;
+		local year = 0;
 		while (true) {
 			HandleEvents();
+			
+			if (year != AIDate.GetYear(AIDate.GetCurrentDate())) {
+				CullTrains();
+				year = AIDate.GetYear(AIDate.GetCurrentDate());
+			}
 			
 			if (tasks.len() == 0) {
 				tasks.push(BuildNewNetwork(null));
@@ -135,14 +143,7 @@ class ChooChoo extends AIController {
   				case AIEvent.AI_ET_VEHICLE_UNPROFITABLE:
   					converted = AIEventVehicleUnprofitable.Convert(e);
   					vehicle = converted.GetVehicleID();
-  					// see if it's not already going to a depot
-  					if (AIOrder.IsGotoDepotOrder(vehicle, AIOrder.ORDER_CURRENT)) {
-  						Warning("Vehicle already going to depot");
-  					} else {
-  						Warning("Vehicle unprofitable: " + AIVehicle.GetName(vehicle));
-  						AIVehicle.SendVehicleToDepot(vehicle);
-  					}
-  					
+  					Cull(vehicle);
   					break;
   					
 				case AIEvent.AI_ET_VEHICLE_WAITING_IN_DEPOT:
