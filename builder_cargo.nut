@@ -263,7 +263,11 @@ class BuildCargoLine extends Task {
 		local area = producing ? AITileList_IndustryProducing(industry, RAIL_STATION_RADIUS) : AITileList_IndustryAccepting(industry, RAIL_STATION_RADIUS);
 		
 		// room for a station
-		area.Valuate(IsBuildableRectangle, stationRotation, [0, -1], [1, CARGO_STATION_LENGTH + 1], true);
+		// area.Valuate(IsBuildableRectangle, stationRotation, [0, -1], [1, CARGO_STATION_LENGTH + 1], true);
+		for (local tile = area.Begin(); area.HasNext(); tile = area.Next()) {
+			area.SetValue(tile, IsBuildableRectangle(tile, stationRotation, [0, -1], [1, CARGO_STATION_LENGTH + 1], true) ? 1 : 0);
+		}
+		
 		area.KeepValue(1);
 		
 		// pick the tile farthest from the destination for increased profit

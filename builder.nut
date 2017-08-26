@@ -52,14 +52,21 @@ function FindStationSite(town, stationRotation, destination) {
 	// room for a station - try to find a flat area first
 	local flat = AIList();
 	flat.AddList(area);
-	flat.Valuate(IsBuildableRectangle, stationRotation, [0, 0], [RAIL_STATION_WIDTH, RAIL_STATION_LENGTH], true);
+	// flat.Valuate(IsBuildableRectangle, stationRotation, [0, 0], [RAIL_STATION_WIDTH, RAIL_STATION_LENGTH], true);
+	for (local tile = flat.Begin(); flat.HasNext(); tile = flat.Next()) {
+		flat.SetValue(tile, IsBuildableRectangle(tile, stationRotation, [0, 0], [RAIL_STATION_WIDTH, RAIL_STATION_LENGTH], true) ? 1 : 0);
+	}
+	
 	flat.KeepValue(1);
 	
 	if (flat.Count() > 0) {
 		area = flat;
 	} else {
 		// try again, with terraforming
-		area.Valuate(IsBuildableRectangle, stationRotation, [0, 0], [RAIL_STATION_WIDTH, RAIL_STATION_LENGTH], false);
+		// area.Valuate(IsBuildableRectangle, stationRotation, [0, 0], [RAIL_STATION_WIDTH, RAIL_STATION_LENGTH], false);
+		for (local tile = area.Begin(); area.HasNext(); tile = area.Next()) {
+			area.SetValue(tile, IsBuildableRectangle(tile, stationRotation, [0, 0], [RAIL_STATION_WIDTH, RAIL_STATION_LENGTH], false) ? 1 : 0);
+		}
 		area.KeepValue(1);
 	}
 	
