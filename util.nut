@@ -25,6 +25,24 @@ function Error(...) {
 	AILog.Error(GetDate() + ":" + s);
 }
 
+/**
+ * Print a stack trace.
+ *
+ * Unfortunately, getstackinfos() does not appear to be available
+ */
+// function PrintStack() {
+// 	local i = 2; // 0 is getstackinfos, 1 is PrintStack()
+// 	while (true) {
+// 		local stack = getstackinfos(i);
+// 		if (stack == null) break;
+// 		AILog.Error("*FUNCTION [" + stack.func + "()] " + stack.src + " [" + stack.line + "]");
+// 		foreach(idx, val in stack.locals) {
+// 			AILog.Error("[" + idx + "] " + val);
+// 		}
+// 		i = i + 1;
+// 	}
+// }
+
 function GetDate() {
 	local date = AIDate.GetCurrentDate();
 	return "" + AIDate.GetYear(date) + "-" + ZeroPad(AIDate.GetMonth(date)) + "-" + ZeroPad(AIDate.GetDayOfMonth(date));

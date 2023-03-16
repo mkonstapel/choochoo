@@ -48,7 +48,7 @@ function CullTrains() {
 
 function Cull(vehicle) {
 	local name = AIVehicle.GetName(vehicle);
-	if (name.find("X") == null) {
+	if (name != null && name.find("X") == null) {
 		AIVehicle.SendVehicleToDepot(vehicle);
 		AIVehicle.SetName(vehicle, "X" + name);
 	}

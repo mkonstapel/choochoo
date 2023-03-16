@@ -29,6 +29,9 @@ enum SignalMode {
 
 class ChooChoo extends AIController {
 	
+	minMoney = 0;
+	year = 0;
+
 	function Start() {
 		AICompany.SetName("ChooChoo");
 		AICompany.SetAutoRenewStatus(true);
@@ -56,49 +59,68 @@ class ChooChoo extends AIController {
 			tasks.push(Bootstrap());
 		}
 		
-		local minMoney = 0;
-		local year = 0;
 		while (true) {
-			HandleEvents();
-			
-			if (year != AIDate.GetYear(AIDate.GetCurrentDate())) {
-				CullTrains();
-				year = AIDate.GetYear(AIDate.GetCurrentDate());
-			}
-			
-			if (tasks.len() == 0) {
-				tasks.push(BuildNewNetwork(null));
-			}
-			
-			Debug("Tasks: " + ArrayToString(tasks));
-			
-			local task;
-			try {
-				if (minMoney > 0) WaitForMoney(minMoney);
-				minMoney = 0;
-				
-				// run the next task in the queue
-				task = tasks[0];
-				Debug("Running: " + task);
-				task.Run();
-				tasks.remove(0);
-			} catch (e) {
-				if (typeof(e) == "instance") {
-					if (e instanceof TaskRetryException) {
-						Sleep(e.sleep);
-						Debug("Retrying...");
-					} else if (e instanceof TaskFailedException) {
-						Warning(task + " failed: " + e);
-						tasks.remove(0);
-						task.Failed();
-					} else if (e instanceof NeedMoneyException) {
-						Debug(task + " needs £" + e.amount);
-						minMoney = e.amount;
-					}
-				} else {
-					Error("Unexpected error");
-					return;
+			// unfortunately, we can't re-throw an exception and get a stack trace
+			// if we've caught it, so we run the main loop either inside a try/catch,
+			// or not, based on the CarryOn setting
+
+			if (AIController.GetSetting("CarryOn") == 0) {
+				// safety off, debugging on
+				MainLoop();
+			} else {
+				try {
+					MainLoop();
+				} catch (e) {
+					Error("Unexpected error: " + e);
+					Warning("To capture a stack trace, disable \"Keep running on unexpected errors\" in the AI settings (this will kill the AI company)");
+					// sleep on it and hope it goes away
+					Sleep(TICKS_PER_DAY);
 				}
+			}
+		}
+	}
+
+	function MainLoop() {
+		HandleEvents();
+		
+		if (year != AIDate.GetYear(AIDate.GetCurrentDate())) {
+			CullTrains();
+			year = AIDate.GetYear(AIDate.GetCurrentDate());
+		}
+
+		if (tasks.len() == 0) {
+			tasks.push(BuildNewNetwork(null));
+		}
+		
+		Debug("Tasks: " + ArrayToString(tasks));
+		
+		local task;
+		try {
+			if (minMoney > 0) WaitForMoney(minMoney);
+			minMoney = 0;
+			
+			// run the next task in the queue
+			task = tasks[0];
+			Debug("Running: " + task);
+			task.Run();
+			tasks.remove(0);
+		} catch (e) {
+			if (typeof(e) == "instance") {
+				if (e instanceof TaskRetryException) {
+					Sleep(e.sleep);
+					Debug("Retrying...");
+				} else if (e instanceof TaskFailedException) {
+					Warning(task + " failed: " + e);
+					tasks.remove(0);
+					task.Failed();
+				} else if (e instanceof NeedMoneyException) {
+					Debug(task + " needs £" + e.amount);
+					minMoney = e.amount;
+				} else {
+					throw e;
+				}
+			} else {
+				throw e;
 			}
 		}
 	}
