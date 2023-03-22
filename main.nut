@@ -84,8 +84,12 @@ class ChooChoo extends AIController {
 		HandleEvents();
 		
 		if (year != AIDate.GetYear(AIDate.GetCurrentDate())) {
-			CullTrains();
 			year = AIDate.GetYear(AIDate.GetCurrentDate());
+			try {
+				CullTrains();
+			} catch (e) {
+				Error("Error culling trains: " + e);
+			}
 		}
 
 		if (tasks.len() == 0) {

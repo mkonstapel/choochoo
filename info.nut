@@ -2,7 +2,7 @@ class ChooChoo extends AIInfo {
 	function GetAuthor()      { return "Michiel Konstapel"; }
 	function GetName()        { return "ChooChoo"; }
 	function GetDescription() { return "Muck about with trains"; }
-	function GetVersion()     { return 413; }
+	function GetVersion()     { return 414; }
 	function GetDate()        { return "2023-03-16"; }
 	function CreateInstance() { return "ChooChoo"; }
 	function GetShortName()	  { return "CHOO"; }
