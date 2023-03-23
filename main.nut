@@ -169,7 +169,7 @@ class ChooChoo extends AIController {
   				case AIEvent.AI_ET_VEHICLE_UNPROFITABLE:
   					converted = AIEventVehicleUnprofitable.Convert(e);
   					vehicle = converted.GetVehicleID();
-  					Cull(vehicle);
+  					if (AIVehicle.GetVehicleType(vehicle) == AIVehicle.VT_RAIL) Cull(vehicle);
   					break;
   					
 				case AIEvent.AI_ET_VEHICLE_WAITING_IN_DEPOT:

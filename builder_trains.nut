@@ -79,8 +79,8 @@ class BuildTrains extends Task {
 	function TrainCapacity(train) {
 		local capacity = AIVehicle.GetCapacity(train, PAX);
 		
-		local a = AIOrder.GetOrderDestination(train, 0);
-		local b = AIOrder.GetOrderDestination(train, 1);
+		local a = AIOrder.GetOrderDestination(train, 1);
+		local b = AIOrder.GetOrderDestination(train, 3);
 		local distance = AIMap.DistanceManhattan(a, b);
 		
 		local speedKph = AIEngine.GetMaxSpeed(AIVehicle.GetEngineType(train)) / 2;
@@ -199,10 +199,10 @@ class BuildTrain extends Builder {
 		//fromFlags = first ? fromFlags | AIOrder.AIOF_FULL_LOAD_ANY : fromFlags;
 		
 		network.trains.append(train);
+		AIOrder.AppendOrder(train, fromDepot, AIOrder.AIOF_NONE);
 		AIOrder.AppendOrder(train, AIStation.GetLocation(from), fromFlags);
-		AIOrder.AppendOrder(train, fromDepot, AIOrder.AIOF_SERVICE_IF_NEEDED);
+		AIOrder.AppendOrder(train, toDepot, AIOrder.AIOF_NONE);
 		AIOrder.AppendOrder(train, AIStation.GetLocation(to), toFlags);
-		AIOrder.AppendOrder(train, toDepot, AIOrder.AIOF_SERVICE_IF_NEEDED);
 		AIVehicle.StartStopVehicle(train);
 		
 		GenerateName(train, fromDepot);

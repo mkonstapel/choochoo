@@ -151,8 +151,8 @@ class BuildTerminusStation extends Builder {
 		if (doubleTrack) BuildRail([2, p], [1, p], [1, p+1]);
 		network.depots.append(GetTile([2,p]));
 		
-		BuildSignal([0, p+1], [0, p+2], AIRail.SIGNALTYPE_PBS);
-		BuildSignal([1, p+1], [1, p],   AIRail.SIGNALTYPE_PBS);
+		BuildSignal([0, p+1], [0, p+2], AIRail.SIGNALTYPE_PBS_ONEWAY);
+		BuildSignal([1, p+1], [1, p],   AIRail.SIGNALTYPE_PBS_ONEWAY);
 		
 		BuildRoadDepot([2,p-1], [2,p-2]);
 		BuildRoadDriveThrough([2,p-2], [2,p-3], true, stationID);
@@ -464,9 +464,9 @@ class BuildBus extends Task {
 		local bus = AIVehicle.BuildVehicle(depot, engineType);
 		CheckError();
 		
-		AIOrder.AppendOrder(bus, trainStationTile, AIOrder.AIOF_NONE);
-		AIOrder.AppendOrder(bus, busStationTile, AIOrder.AIOF_NONE);
-		AIOrder.AppendOrder(bus, depot, AIOrder.AIOF_NONE);
+		AIOrder.AppendOrder(bus, trainStationTile, AIOrder.AIOF_TRANSFER | AIOrder.OF_NON_STOP_INTERMEDIATE | AIOrder.OF_NO_LOAD);
+		AIOrder.AppendOrder(bus, busStationTile, AIOrder.OF_FULL_LOAD_ANY | AIOrder.OF_NON_STOP_INTERMEDIATE);
+		AIOrder.AppendOrder(bus, depot, AIOrder.AIOF_NONE | AIOrder.OF_NON_STOP_INTERMEDIATE);
 		AIVehicle.StartStopVehicle(bus);
 	}
 	

@@ -48,6 +48,7 @@ class Rail
 		this._max_bridge_length = 6;
 		this._max_tunnel_length = 6;
 		this._pathfinder = this._aystar_class(this._Cost, this._Estimate, this._Neighbours, this._CheckDirection, this, this, this, this);
+		this._pathfinder._queue_class = AIPriorityQueue;
 
 		this.cost = this.Cost(this);
 		this._running = false;

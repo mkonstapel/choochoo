@@ -37,8 +37,7 @@ function CullTrains() {
 	
 	foreach (train, profit in worst) {
 		Debug("Culling " + AIVehicle.GetName(train) + ", made " + profit + " last year");
-		Cull(train);
-		clones--;
+		clones -= Cull(train);
 		if (clones <= 0)
 			break;
 	}
@@ -51,5 +50,7 @@ function Cull(vehicle) {
 	if (name != null && name.find("X") == null) {
 		AIVehicle.SendVehicleToDepot(vehicle);
 		AIVehicle.SetName(vehicle, "X" + name);
+		return 1;
 	}
+	return 0;
 }
