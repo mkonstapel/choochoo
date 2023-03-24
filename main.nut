@@ -1,4 +1,5 @@
 require("util.nut");
+require("aystar.nut");
 require("pathfinder.nut");
 require("world.nut");
 require("signs.nut");
@@ -50,7 +51,7 @@ class ChooChoo extends AIController {
 		::tasks <- [];
 		
 		CheckGameSettings();
-		
+
 		AIRail.SetCurrentRailType(AIRailTypeList().Begin());
 		//CalculateRoutes();
 		

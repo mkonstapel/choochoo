@@ -82,30 +82,37 @@ class BuildTrack extends Task {
 		//pathfinder.cost.max_cost = u * 4 * AIMap.DistanceManhattan(a, d);
 		pathfinder.cost.slope = 0.1*u;
 		pathfinder.cost.coast = 0.1*u;
-		pathfinder.cost.diagonal_tile = u;
+
+		// High multiplier settings make it very bridge happy, because bridges
+		// and tunnels jump towards the goal, making all intermediate tiles
+		// seem bad options because they are being overestimated. We have to
+		// increase the cost to make it prefer short bridges.
+		pathfinder.cost.bridge_per_tile = 2*u + (5*u * pathfinder.estimate_multiplier);
+		// The terrain is rarely suitable for tunnels, so when it is, might as
+		// well use it. Tunnels are limited in length, and they aren't
+		// eyesores like big cantilever bridges.
+		pathfinder.cost.tunnel_per_tile = 0.5*u;
 		
 		if (style == STRAIGHT) {
 			// straight, avoiding obstacles
 			pathfinder.cost.turn = 2*u;
 			pathfinder.cost.diagonal_tile = u;
-			pathfinder.cost.adj_obstacle = 4*u;
+			pathfinder.cost.adj_obstacle = 5*u;
 		} else if (style == FOLLOW) {
 			// cheaper turns, penalty for no nearby track
 			pathfinder.cost.no_adj_rail = 2*u;
+			pathfinder.cost.diagonal_tile = (0.8*u).tointeger();
 			pathfinder.cost.turn = 0.2*u;
 			pathfinder.cost.adj_obstacle = 0;
 			//pathfinder.cost.max_cost = u * 8 * AIMap.DistanceManhattan(a, d);
 		} else if (style == LOOSE) {
-			pathfinder.cost.diagonal_tile = 40;
-			pathfinder.cost.turn = 25;
-			pathfinder.cost.slope = 300;
+			pathfinder.cost.diagonal_tile = (0.4*u).tointeger();
+			pathfinder.cost.turn = 0.25*u;
+			pathfinder.cost.slope = 3*u;
 		} else {
-			pathfinder.cost.diagonal_tile = 70;
+			pathfinder.cost.diagonal_tile = (0.7*u).tointeger();
 		}
 		
-		// high multiplier settings make it very bridge happy, so increase the cost
-		pathfinder.cost.bridge_per_tile = 200 + (200 * pathfinder.estimate_multiplier);
-		pathfinder.cost.tunnel_per_tile = 100;
 		
 		// Pathfinding needs money since it attempts to build in test mode.
 		// We can't get the price of a tunnel, but we can get it for a bridge
@@ -117,8 +124,10 @@ class BuildTrack extends Task {
 		
 		SetSecondarySign("Pathfinding...");
 		pathfinder.InitializePath([[b, a]], [[c, d]], ignored);
-		return pathfinder.FindPath(AIMap.DistanceManhattan(a, d) * 5 * TICKS_PER_DAY);
-		//return pathfinder.FindPath(-1);
+		local res = pathfinder.FindPath(AIMap.DistanceManhattan(a, d) * 5 * TICKS_PER_DAY);
+		// local res = pathfinder.FindPath(-1);
+		Debug("Pathfinder called Cost", pathfinder.costCalls, "times, Neighbours", pathfinder.neighbourCalls, "times, Estimate", pathfinder.estimateCalls, "times");
+		return res;
 	}
 	
 	function PathToList(path) {

@@ -12,7 +12,8 @@ class Rail
 {
 	estimate_multiplier = 1;
 	
-	_aystar_class = import("graph.aystar", "", 4);
+	// _aystar_class = import("graph.aystar", "", 4);
+	_aystar_class = AyStar;
 	_max_cost = null;              ///< The maximum cost for a route.
 	_cost_tile = null;             ///< The cost for a single tile.
 	_cost_diagonal_tile = null;    ///< The cost for a diagonal tile.
@@ -32,9 +33,22 @@ class Rail
 	_goals = null;
 	
 	follow = null;
+
+	costCalls = null;
+	estimateCalls = null;
+	neighbourCalls = null;
 	
+
 	constructor()
 	{
+		::ORTHO_NEIGHBOUR_OFFSETS <- [
+			AIMap.GetTileIndex(0, 1), AIMap.GetTileIndex(0, -1), AIMap.GetTileIndex(1, 0), AIMap.GetTileIndex(-1, 0)
+		];
+		::ORTHO_NEIGHBOUR_OFFSETS2 <- [
+			AIMap.GetTileIndex(0, 1), AIMap.GetTileIndex(0, -1), AIMap.GetTileIndex(1, 0), AIMap.GetTileIndex(-1, 0),
+			AIMap.GetTileIndex(0, 2), AIMap.GetTileIndex(0, -2), AIMap.GetTileIndex(2, 0), AIMap.GetTileIndex(-2, 0)
+		];
+
 		this._max_cost = 10000000;
 		this._cost_tile = 100;
 		this._cost_diagonal_tile = 70;
@@ -52,6 +66,10 @@ class Rail
 		this.cost = this.Cost(this);
 		this._running = false;
 		this.follow = null;
+
+		this.costCalls = 0;
+		this.neighbourCalls = 0;
+		this.estimateCalls = 0;
 	}
 
 	/**
@@ -182,98 +200,46 @@ function Rail::_nonzero(a, b)
 
 function Rail::_Cost(path, new_tile, new_direction, self)
 {
+	self.costCalls++;
+
 	/* path == null means this is the first node of a path, so the cost is 0. */
 	if (path == null) return 0;
 
 	local prev_tile = path.GetTile();
+	local p = path.GetParent();
+	local pt = p && p.GetTile();
+	local pp = p && p.GetParent();
+	local ppt = pp && pp.GetTile();
+	local ppp = pp && pp.GetParent();
+	local pppt = ppp && ppp.GetTile();
 
-	/* If the new tile is a bridge / tunnel tile, check whether we came from the other
-	 *  end of the bridge / tunnel or if we just entered the bridge / tunnel. */
-	if (AIBridge.IsBridgeTile(new_tile)) {
-		if (AIBridge.GetOtherBridgeEnd(new_tile) != prev_tile) {
-			local cost = path.GetCost() + self._cost_tile;
-			if (path.GetParent() != null && path.GetParent().GetTile() - prev_tile != prev_tile - new_tile) cost += self._cost_turn;
-			return cost;
-		}
-		
-		return path.GetCost() + AIMap.DistanceManhattan(new_tile, prev_tile) * self._cost_tile + self._GetBridgeNumSlopes(new_tile, prev_tile) * self._cost_slope;
-	}
-	if (AITunnel.IsTunnelTile(new_tile)) {
-		if (AITunnel.GetOtherTunnelEnd(new_tile) != prev_tile) {
-			local cost = path.GetCost() + self._cost_tile;
-			if (path.GetParent() != null && path.GetParent().GetTile() - prev_tile != prev_tile - new_tile) cost += self._cost_turn;
-			return cost;
-		}
-		
-		return path.GetCost() + AIMap.DistanceManhattan(new_tile, prev_tile) * self._cost_tile;
-	}
+	local diagonal = pt && AIMap.DistanceManhattan(pt, prev_tile) == 1 && pt - prev_tile != prev_tile - new_tile;
+	local cost = diagonal ? self._cost_diagonal_tile : self._cost_tile;
 
-	/* If the two tiles are more then 1 tile apart, the pathfinder wants a bridge or tunnel
-	 *  to be build. It isn't an existing bridge / tunnel, as that case is already handled. */
-	if (AIMap.DistanceManhattan(new_tile, prev_tile) > 1) {
-		/* Check if we should build a bridge or a tunnel. */
-		local cost = path.GetCost();
-		if (AITunnel.GetOtherTunnelEnd(new_tile) == prev_tile) {
-			cost += AIMap.DistanceManhattan(new_tile, prev_tile) * (self._cost_tile + self._cost_tunnel_per_tile);
-		} else {
-			cost += AIMap.DistanceManhattan(new_tile, prev_tile) * (self._cost_tile + self._cost_bridge_per_tile) + self._GetBridgeNumSlopes(new_tile, prev_tile) * self._cost_slope;
-		}
-		if (path.GetParent() != null && path.GetParent().GetParent() != null &&
-				path.GetParent().GetParent().GetTile() - path.GetParent().GetTile() != max(AIMap.GetTileX(prev_tile) - AIMap.GetTileX(new_tile), AIMap.GetTileY(prev_tile) - AIMap.GetTileY(new_tile)) / AIMap.DistanceManhattan(new_tile, prev_tile)) {
-			cost += self._cost_turn;
-		}
-		
-		return cost;
-	}
-
-	local cost = self._cost_tile;
-	local diagonal = path.GetParent() != null && AIMap.DistanceManhattan(path.GetParent().GetTile(), prev_tile) == 1 && path.GetParent().GetTile() - prev_tile != prev_tile - new_tile;
-	if (diagonal) cost = self._cost_diagonal_tile;
-	
-	/* Check for a turn. We do this by substracting the TileID of the current
-	 *  node from the TileID of the previous node and comparing that to the
-	 *  difference between the tile before the previous node and the node before
-	 *  that. */
-	 
-	// if we don't have enough parents to determine a turn, assume diagonal is bad
-	// because we want to exit straight from stations and crossings
-	local long = path.GetParent() != null && path.GetParent().GetParent() != null;
-	if ((long && self._IsTurn(path.GetParent().GetParent().GetTile(), path.GetParent().GetTile(), prev_tile, new_tile)) ||
-		(!long && diagonal)) {
-			//AIMap.DistanceManhattan(new_tile, path.GetParent().GetParent().GetTile()) == 3 &&
-			//path.GetParent().GetParent().GetTile() - path.GetParent().GetTile() != prev_tile - new_tile) {
-		cost += self._cost_turn;
-	}
-	
-	/* Check for a double turn. */
-	if (path.GetParent() != null && path.GetParent().GetParent() != null && path.GetParent().GetParent().GetParent() != null &&
-			self._IsTurn(path.GetParent().GetParent().GetParent().GetTile(), path.GetParent().GetParent().GetTile(), path.GetParent().GetTile(), prev_tile)) {
-		cost += 2*self._cost_turn;
-	}
-	
 	/* Check for track and obstacles in neighbour tiles. */
-	local offsets = [
-		AIMap.GetTileIndex(0, 1), AIMap.GetTileIndex(0, -1),
-		AIMap.GetTileIndex(1, 0), AIMap.GetTileIndex(-1, 0)];
 	local hasNeighbourRail = false;
-	foreach (offset in offsets) {
-		local neighbour = new_tile + offset;
-		//if (AIRail.IsRailTile(neighbour)) {
-		if (self.follow && self.follow.HasItem(neighbour)) {
-			hasNeighbourRail = true;
-			break;
+	local hasObstacle = false;
+	
+	// only check if we have to;
+	// for the first track we don't care about adjacent rail and for the follower we don't care about obstacles
+	if (self._cost_no_adj_rail > 0) {
+		foreach (offset in ORTHO_NEIGHBOUR_OFFSETS) {
+			local neighbour = new_tile + offset;
+			//if (AIRail.IsRailTile(neighbour)) {
+			if (self.follow && self.follow.HasItem(neighbour)) {
+				hasNeighbourRail = true;
+				break;
+			}
 		}
 	}
-	
-	offsets.extend([
-		AIMap.GetTileIndex(0, 2), AIMap.GetTileIndex(0, -2),
-		AIMap.GetTileIndex(2, 0), AIMap.GetTileIndex(-2, 0)]);
-	local hasObstacle = false;
-	foreach (offset in offsets) {
-		local neighbour = new_tile + offset;
-		if (!AITile.IsBuildable(neighbour)) {
-			hasObstacle = true;
-			break;
+
+	if (self._cost_adj_obstacle > 0) {
+		foreach (offset in ORTHO_NEIGHBOUR_OFFSETS2) {
+			local neighbour = new_tile + offset;
+			if (!AITile.IsBuildable(neighbour)) {
+				hasObstacle = true;
+				break;
+			}
 		}
 	}
 	
@@ -291,8 +257,8 @@ function Rail::_Cost(path, new_tile, new_direction, self)
 	}
 
 	/* Check if the last tile was sloped. */
-	if (path.GetParent() != null && !AIBridge.IsBridgeTile(prev_tile) && !AITunnel.IsTunnelTile(prev_tile) &&
-			self._IsSlopedRail(path.GetParent().GetTile(), prev_tile, new_tile)) {
+	if (pt && !AIBridge.IsBridgeTile(prev_tile) && !AITunnel.IsTunnelTile(prev_tile) &&
+			self._IsSlopedRail(pt, prev_tile, new_tile)) {
 		cost += self._cost_slope;
 	}
 
@@ -303,12 +269,54 @@ function Rail::_Cost(path, new_tile, new_direction, self)
 		cost += self._cost_no_existing_rail;
 	}
 	*/
+
+	/* If the new tile is a bridge / tunnel tile, check whether we came from the other
+	 *  end of the bridge / tunnel or if we just entered the bridge / tunnel. */
+	if (AIBridge.IsBridgeTile(new_tile) &&  AIBridge.GetOtherBridgeEnd(new_tile) == prev_tile) {
+		cost += AIMap.DistanceManhattan(new_tile, prev_tile) * self._cost_tile + self._GetBridgeNumSlopes(new_tile, prev_tile) * self._cost_slope;
+	}
+
+	if (AITunnel.IsTunnelTile(new_tile) && AITunnel.GetOtherTunnelEnd(new_tile) == prev_tile) {
+		cost += AIMap.DistanceManhattan(new_tile, prev_tile) * self._cost_tile;
+	}
+
+	/* If the two tiles are more then 1 tile apart, the pathfinder wants a bridge or tunnel
+	 *  to be build. It isn't an existing bridge / tunnel, as that case is already handled. */
+	if (AIMap.DistanceManhattan(new_tile, prev_tile) > 1) {
+		/* Check if we should build a bridge or a tunnel. */
+		if (AITunnel.GetOtherTunnelEnd(new_tile) == prev_tile) {
+			cost += AIMap.DistanceManhattan(new_tile, prev_tile) * (self._cost_tile + self._cost_tunnel_per_tile);
+		} else {
+			cost += AIMap.DistanceManhattan(new_tile, prev_tile) * (self._cost_tile + self._cost_bridge_per_tile) + self._GetBridgeNumSlopes(new_tile, prev_tile) * self._cost_slope;
+		}
+	}
+	
+	/* Check for a turn. We do this by substracting the TileID of the current
+	 *  node from the TileID of the previous node and comparing that to the
+	 *  difference between the tile before the previous node and the node before
+	 *  that. */
+	 
+	// if we don't have enough parents to determine a turn, assume diagonal is bad
+	// because we want to exit straight from stations and crossings
+	local long = pp;
+	if ((long && self._IsTurn(ppt, pt, prev_tile, new_tile)) ||
+		(!long && diagonal)) {
+			//AIMap.DistanceManhattan(new_tile, path.GetParent().GetParent().GetTile()) == 3 &&
+			//path.GetParent().GetParent().GetTile() - path.GetParent().GetTile() != prev_tile - new_tile) {
+		cost += self._cost_turn;
+	}
+	
+	/* Check for a double turn. */
+	if (pppt && self._IsTurn(pppt, ppt, pt, prev_tile)) {
+		cost += 2*self._cost_turn;
+	}
 	
 	return path.GetCost() + cost;
 }
 
 function Rail::_Estimate(cur_tile, cur_direction, goal_tiles, self)
 {
+	self.estimateCalls++;
 	local min_cost = self._max_cost;
 	/* As estimate we multiply the lowest possible cost for a single tile with
 	 *  with the minimum number of tiles we need to traverse. */
@@ -323,45 +331,48 @@ function Rail::_Estimate(cur_tile, cur_direction, goal_tiles, self)
 
 function Rail::_Neighbours(path, cur_node, self)
 {
+	self.neighbourCalls++;
+
+	// TODO: if self.follow, allow non-conflicting rail pieces: NW-NE + SW-SE or NW-SW+NE+SE
+	// if (self.follow == null && AITile.HasTransportType(cur_node, AITile.TRANSPORT_RAIL)) return [];
 	if (AITile.HasTransportType(cur_node, AITile.TRANSPORT_RAIL)) return [];
 	/* self._max_cost is the maximum path cost, if we go over it, the path isn't valid. */
 	if (path.GetCost() >= self._max_cost) return [];
 	local tiles = [];
-	local offsets = [AIMap.GetTileIndex(0, 1), AIMap.GetTileIndex(0, -1),
-	                 AIMap.GetTileIndex(1, 0), AIMap.GetTileIndex(-1, 0)];
-
+	local par = path.GetParent();
+	local par_tile = par && par.GetTile();
 	/* Check if the current tile is part of a bridge or tunnel. */
 	if (AIBridge.IsBridgeTile(cur_node) || AITunnel.IsTunnelTile(cur_node)) {
 		/* We don't use existing rails, so neither existing bridges / tunnels. */
-	} else if (path.GetParent() != null && AIMap.DistanceManhattan(cur_node, path.GetParent().GetTile()) > 1) {
-		local other_end = path.GetParent().GetTile();
+	} else if (par != null && AIMap.DistanceManhattan(cur_node, par_tile) > 1) {
+		local other_end = par_tile;
 		local next_tile = cur_node + (cur_node - other_end) / AIMap.DistanceManhattan(cur_node, other_end);
-		foreach (offset in offsets) {
+		foreach (offset in ORTHO_NEIGHBOUR_OFFSETS) {
 			if (AIRail.BuildRail(cur_node, next_tile, next_tile + offset)) {
 				tiles.push([next_tile, self._GetDirection(other_end, cur_node, next_tile, true)]);
 			}
 		}
 	} else {
 		/* Check all tiles adjacent to the current tile. */
-		foreach (offset in offsets) {
+		foreach (offset in ORTHO_NEIGHBOUR_OFFSETS) {
 			local next_tile = cur_node + offset;
 			/* Don't turn back */
-			if (path.GetParent() != null && next_tile == path.GetParent().GetTile()) continue;
+			if (par != null && next_tile == par_tile) continue;
 			/* Disallow 90 degree turns */
-			if (path.GetParent() != null && path.GetParent().GetParent() != null &&
-				next_tile - cur_node == path.GetParent().GetParent().GetTile() - path.GetParent().GetTile()) continue;
+			if (par != null && par.GetParent() != null &&
+				next_tile - cur_node == par.GetParent().GetTile() - par_tile) continue;
 			/* We add them to the to the neighbours-list if we can build a rail to
 			 *  them and no rail exists there. */
-			if ((path.GetParent() == null || AIRail.BuildRail(path.GetParent().GetTile(), cur_node, next_tile))) {
-				if (path.GetParent() != null) {
-					tiles.push([next_tile, self._GetDirection(path.GetParent().GetTile(), cur_node, next_tile, false)]);
+			if ((par == null || AIRail.BuildRail(par_tile, cur_node, next_tile))) {
+				if (par != null) {
+					tiles.push([next_tile, self._GetDirection(par_tile, cur_node, next_tile, false)]);
 				} else {
 					tiles.push([next_tile, self._GetDirection(null, cur_node, next_tile, false)]);
 				}
 			}
 		}
-		if (path.GetParent() != null && path.GetParent().GetParent() != null) {
-			local bridges = self._GetTunnelsBridges(path.GetParent().GetTile(), cur_node, self._GetDirection(path.GetParent().GetParent().GetTile(), path.GetParent().GetTile(), cur_node, true));
+		if (par != null && par.GetParent() != null) {
+			local bridges = self._GetTunnelsBridges(par_tile, cur_node, self._GetDirection(par.GetParent().GetTile(), par_tile, cur_node, true));
 			foreach (tile in bridges) {
 				tiles.push(tile);
 			}
@@ -411,7 +422,32 @@ function Rail::_GetTunnelsBridges(last_node, cur_node, bridge_dir)
 		local bridge_list = AIBridgeList_Length(i + 1);
 		local target = cur_node + i * (cur_node - last_node);
 		if (!bridge_list.IsEmpty() && AIBridge.BuildBridge(AIVehicle.VT_RAIL, bridge_list.Begin(), cur_node, target)) {
-			tiles.push([target, bridge_dir]);
+			// don't allow the following track to jump over its peer, because it looks ugly
+			local ugly = false;
+			if (follow) {
+				local span = AITileList();
+				span.AddRectangle(cur_node, target);
+				for (local tile = span.Begin(); span.HasNext(); tile = span.Next()) {
+					if (follow.HasItem(tile)) {
+						ugly = true;
+						break;
+					}
+				}
+			}
+
+			if (!ugly) {
+				// only allow bridges if they actually go over unbuildable stuff (like water and rail)
+				local span = AITileList();
+				span.AddRectangle(cur_node, target);
+				span.Valuate(AITile.IsBuildable);
+				span.KeepValue(0);
+				if (span.Count() > 0 && span.Count() > AIMap.DistanceManhattan(cur_node, target) - 4) {
+					tiles.push([target, bridge_dir]);
+					// break here to only return the shortest possible bridge
+					// but with the raised costs, it should be OK to also consider longer bridges
+					// break;
+				}
+			}
 		}
 	}
 
