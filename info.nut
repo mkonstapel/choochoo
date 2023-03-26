@@ -2,11 +2,12 @@ class ChooChoo extends AIInfo {
 	function GetAuthor()      { return "Michiel Konstapel"; }
 	function GetName()        { return "ChooChoo"; }
 	function GetDescription() { return "Muck about with trains"; }
-	function GetVersion()     { return 414; }
+	function GetVersion()     { return 415; }
 	function GetDate()        { return "2023-03-16"; }
 	function CreateInstance() { return "ChooChoo"; }
 	function GetShortName()	  { return "CHOO"; }
 	function GetAPIVersion()  { return "1.0"; }
+	function GetURL()         { return "https://www.tt-forums.net/viewtopic.php?t=44225"; }
 	
 	function GetSettings() {
 	    AddSetting({name = "CargoLines", description = "Number of single track cargo lines to start with", min_value = 0, max_value = 20, easy_value = 5, medium_value = 10, hard_value = 20, custom_value = 10, flags = AICONFIG_INGAME});
@@ -16,6 +17,7 @@ class ChooChoo extends AIInfo {
 	    AddSetting({name = "PathfinderMultiplier", description = "Pathfinder speed: higher values are faster, but less accurate", min_value = 1, max_value = 4, easy_value = 1, medium_value = 2, hard_value = 3, custom_value = 3, flags = AICONFIG_INGAME});
 	    AddLabels("PathfinderMultiplier", {_1 = "Slow", _2 = "Medium", _3 = "Fast", _4 = "Very fast"});
 	    AddSetting({name = "CarryOn", description = "Keep running on unexpected errors (rather than aborting with a stack trace)", easy_value = 1, medium_value = 1, hard_value = 1, custom_value = 1, flags = AICONFIG_BOOLEAN|AICONFIG_INGAME});
+	    AddSetting({name = "PrettyBridges", description = "Prefer looks over speed when selecting bridge types (for example, no cantilever bridges)", easy_value = 1, medium_value = 1, hard_value = 1, custom_value = 1, flags = AICONFIG_BOOLEAN|AICONFIG_INGAME});
 	}
 }
 

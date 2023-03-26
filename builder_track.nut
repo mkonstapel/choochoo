@@ -140,6 +140,34 @@ class BuildTrack extends Task {
 		
 		return list;
 	}
+
+	function SelectBridge(length) {
+		local bridge_list = AIBridgeList_Length(length);
+		bridge_list.Valuate(AIBridge.GetMaxSpeed);
+		bridge_list.Sort(AIAbstractList.SORT_BY_VALUE, false);
+
+		// Prefer not to use cantilever bridges because I think they're ugly
+		// and (even more IMHO) I think the subtle coppery suspension bridges
+		// look better than the faster yellow ones. Of course, this does not
+		// take NewGRFs into account, just the base game but that's OK, it'll
+		// still pick a "working" bridge.
+		local bridge = bridge_list.Begin();
+		if (AIController.GetSetting("PrettyBridges") != 0) {
+			while (bridge_list.HasNext()) {
+				local name = AIBridge.GetName(bridge).tolower();
+				local isCantilever = name.find("cantilever") != null;
+				local isSuspension = name.find("suspension") != null;
+				local isYellowSuspension = isSuspension && AIBridge.GetMaxSpeed(bridge) == 112;
+				if (!isCantilever && !isYellowSuspension) {
+					break;
+				}
+
+				bridge = bridge_list.Next();
+			}
+		}
+
+		return bridge;
+	}
 	
 	function BuildPath(path) {
 		local node = path;
@@ -159,10 +187,7 @@ class BuildTrack extends Task {
 							CheckError();
 						}
 					} else {
-						local bridge_list = AIBridgeList_Length(length);
-						bridge_list.Valuate(AIBridge.GetMaxSpeed);
-						bridge_list.Sort(AIAbstractList.SORT_BY_VALUE, false);
-						AIBridge.BuildBridge(AIVehicle.VT_RAIL, bridge_list.Begin(), prev, node.GetTile());
+						AIBridge.BuildBridge(AIVehicle.VT_RAIL, SelectBridge(length), prev, node.GetTile());
 						//costEstimate = GetMaxBridgeCost(length);
 						CheckError();
 					}
