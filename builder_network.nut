@@ -110,10 +110,10 @@ class BuildCrossing extends Builder {
 		BuildRail([2,0], [2,1], [3,1]);
 		
 		// long inner diagonals
-		//BuildRail([0,1], [1,1], [2,3]);
-		//BuildRail([0,2], [1,2], [2,0]);
-		//BuildRail([1,3], [1,2], [3,1]);
-		//BuildRail([3,2], [2,2], [1,0]);
+		BuildRail([0,1], [1,1], [2,3]);
+		BuildRail([0,2], [1,2], [2,0]);
+		BuildRail([1,3], [1,2], [3,1]);
+		BuildRail([3,2], [2,2], [1,0]);
 		
 		// inner diagonals (clockwise)
 		BuildRail([2,1], [1,1], [1,2]);
@@ -172,10 +172,10 @@ class BuildCrossing extends Builder {
 		RemoveRail([2,0], [2,1], [3,1]);
 		
 		// long inner diagonals
-		//RemoveRail([0,1], [1,1], [2,3]);
-		//RemoveRail([0,2], [1,2], [2,0]);
-		//RemoveRail([1,3], [1,2], [3,1]);
-		//RemoveRail([3,2], [2,2], [1,0]);
+		RemoveRail([0,1], [1,1], [2,3]);
+		RemoveRail([0,2], [1,2], [2,0]);
+		RemoveRail([1,3], [1,2], [3,1]);
+		RemoveRail([3,2], [2,2], [1,0]);
 		
 		// inner diagonals (clockwise)
 		RemoveRail([2,1], [1,1], [1,2]);
@@ -221,7 +221,7 @@ class ConnectStation extends Task {
 			
 			local first = BuildTrack(this,
 				station.GetExit(), crossing.GetEntrance(direction),
-				reserved, SignalMode.FORWARD, network);
+				reserved, SignalMode.FORWARD, network, BuildTrack.FAST);
 			
 			subtasks.append(first);
 			
@@ -239,7 +239,7 @@ class ConnectStation extends Task {
 			subtasks.append(BuildTrack(this,
 				Swap(station.GetEntrance()), Swap(crossing.GetExit(direction)),
 				reserved, SignalMode.BACKWARD, network,
-				BuildTrack.FOLLOW, first));
+				BuildTrack.FAST, first));
 		}
 		
 		RunSubtasks();
@@ -315,7 +315,7 @@ class ConnectCrossing extends Task {
 			
 			local first = BuildTrack(this,
 				toCrossing.GetExit(toDirection), fromCrossing.GetEntrance(fromDirection),
-				reserved, SignalMode.FORWARD, network);
+				reserved, SignalMode.FORWARD, network, BuildTrack.FAST);
 			
 			subtasks.append(first);
 		
@@ -337,7 +337,7 @@ class ConnectCrossing extends Task {
 			subtasks.append(BuildTrack(this,
 				Swap(toCrossing.GetEntrance(toDirection)), Swap(fromCrossing.GetExit(fromDirection)),
 				reserved, SignalMode.BACKWARD, network,
-				BuildTrack.FOLLOW, first));
+				BuildTrack.FAST, first));
 		}
 		
 		RunSubtasks();
@@ -656,12 +656,18 @@ class ExtendCrossing extends Builder {
 		
 		RemoveRail([0,1], [1,1], [1,0]);
 		RemoveRail([0,1], [1,1], [2,1]);
+		RemoveRail([0,1], [1,1], [1,2]);
+		RemoveRail([2,1], [1,1], [1,2]);
 		
+		RemoveRail([0,2], [1,2], [1,1]);
 		RemoveRail([0,2], [1,2], [2,2]);
 		RemoveRail([0,2], [1,2], [1,3]);
+		RemoveRail([1,1], [1,2], [2,2]);
 		
-		RemoveRail([2,2], [2,1], [1,1]);
-		RemoveRail([2,1], [2,2], [1,2]);
+		RemoveRail([1,1], [2,1], [3,1]);
+		RemoveRail([2,0], [2,1], [1,1]);
+		RemoveRail([1,2], [2,2], [3,2]);
+		RemoveRail([2,3], [2,2], [1,2]);
 		
 		// we can remove more bits if another direction is already gone
 		if (!HasRail([1,3])) {

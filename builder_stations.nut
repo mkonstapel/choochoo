@@ -464,9 +464,9 @@ class BuildBus extends Task {
 		local bus = AIVehicle.BuildVehicle(depot, engineType);
 		CheckError();
 		
-		AIOrder.AppendOrder(bus, trainStationTile, AIOrder.AIOF_NONE);
-		AIOrder.AppendOrder(bus, busStationTile, AIOrder.AIOF_NONE);
-		AIOrder.AppendOrder(bus, depot, AIOrder.AIOF_NONE);
+		AIOrder.AppendOrder(bus, trainStationTile, AIOrder.AIOF_TRANSFER | AIOrder.OF_NON_STOP_INTERMEDIATE | AIOrder.OF_NO_LOAD);
+		AIOrder.AppendOrder(bus, busStationTile, AIOrder.OF_FULL_LOAD_ANY | AIOrder.OF_NON_STOP_INTERMEDIATE);
+		AIOrder.AppendOrder(bus, depot, AIOrder.AIOF_NONE | AIOrder.OF_NON_STOP_INTERMEDIATE);
 		AIVehicle.StartStopVehicle(bus);
 	}
 	

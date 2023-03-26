@@ -33,6 +33,7 @@ class BuildRoad extends Task {
 	
 	function FindPath(a, b) {
 		local pathfinder = Road();
+		pathfinder._pathfinder._queue_class = AIPriorityQueue;
 		pathfinder.cost.max_bridge_length = 4;
 		pathfinder.cost.max_tunnel_length = 4;
 		pathfinder.cost.max_cost = pathfinder.cost.tile * 4 * AIMap.DistanceManhattan(a, b);
