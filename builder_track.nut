@@ -55,7 +55,8 @@ class BuildTrack extends Task {
 		
 		if (!path) path = FindPath();
 		ClearSecondarySign();
-		if (!path) throw TaskFailedException("no path");
+		if (path == null) throw TaskFailedException("no path");
+		if (path == false) throw TaskFailedException("gave up");
 		BuildPath(path);
 	}
 	
@@ -124,7 +125,7 @@ class BuildTrack extends Task {
 		
 		SetSecondarySign("Pathfinding...");
 		pathfinder.InitializePath([[b, a]], [[c, d]], ignored);
-		local res = pathfinder.FindPath(AIMap.DistanceManhattan(a, d) * 5 * TICKS_PER_DAY);
+		local res = pathfinder.FindPath((50 + AIMap.DistanceManhattan(a, d)) * 5 * TICKS_PER_DAY);
 		// local res = pathfinder.FindPath(-1);
 		Debug("Pathfinder called Cost", pathfinder.costCalls, "times, Neighbours", pathfinder.neighbourCalls, "times, Estimate", pathfinder.estimateCalls, "times");
 		return res;

@@ -50,11 +50,6 @@ class ChooChoo extends AIController {
 		
 		::tasks <- [];
 
-		local bridges = AIBridgeList();
-		for (local bridge = bridges.Begin(); bridges.HasNext(); bridge = bridges.Next()) {
-			Debug("Bridge", bridge, "maxlen", AIBridge.GetMaxLength(bridge), "speed", AIBridge.GetMaxSpeed(bridge), "name", AIBridge.GetName(bridge));
-		}
-		
 		CheckGameSettings();
 
 		AIRail.SetCurrentRailType(AIRailTypeList().Begin());

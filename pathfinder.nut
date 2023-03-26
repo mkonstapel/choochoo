@@ -216,24 +216,25 @@ function Rail::_Cost(path, new_tile, new_direction, self)
 	local diagonal = pt && AIMap.DistanceManhattan(pt, prev_tile) == 1 && pt - prev_tile != prev_tile - new_tile;
 	local cost = diagonal ? self._cost_diagonal_tile : self._cost_tile;
 
-	/* Check for track and obstacles in neighbour tiles. */
-	local hasNeighbourRail = false;
-	local hasObstacle = false;
-	
-	// only check if we have to;
+	// only check adjacent rail and obstacles if we have to;
 	// for the first track we don't care about adjacent rail and for the follower we don't care about obstacles
 	if (self._cost_no_adj_rail > 0) {
+		local hasNeighbourRail = self.follow.HasItem(new_tile);
 		foreach (offset in ORTHO_NEIGHBOUR_OFFSETS) {
 			local neighbour = new_tile + offset;
-			//if (AIRail.IsRailTile(neighbour)) {
 			if (self.follow && self.follow.HasItem(neighbour)) {
 				hasNeighbourRail = true;
 				break;
 			}
 		}
+
+		if (!hasNeighbourRail) {
+			cost += self._cost_no_adj_rail;
+		}
 	}
 
 	if (self._cost_adj_obstacle > 0) {
+		local hasObstacle = false;
 		foreach (offset in ORTHO_NEIGHBOUR_OFFSETS2) {
 			local neighbour = new_tile + offset;
 			if (!AITile.IsBuildable(neighbour)) {
@@ -241,14 +242,10 @@ function Rail::_Cost(path, new_tile, new_direction, self)
 				break;
 			}
 		}
-	}
-	
-	if (!hasNeighbourRail) {
-		cost += self._cost_no_adj_rail;
-	}
-	
-	if (hasObstacle) {
-		cost += self._cost_adj_obstacle;
+
+		if (hasObstacle) {
+			cost += self._cost_adj_obstacle;
+		}
 	}
 	
 	/* Check if the new tile is a coast tile. */
@@ -333,11 +330,13 @@ function Rail::_Neighbours(path, cur_node, self)
 {
 	self.neighbourCalls++;
 
-	// TODO: if self.follow, allow non-conflicting rail pieces: NW-NE + SW-SE or NW-SW+NE+SE
-	// if (self.follow == null && AITile.HasTransportType(cur_node, AITile.TRANSPORT_RAIL)) return [];
-	if (AITile.HasTransportType(cur_node, AITile.TRANSPORT_RAIL)) return [];
+	// when creating the second rail of a double track, allow non-conflicting
+	// rail pieces: NW-NE + SW-SE or NW-SW+NE+SE
+	if (self.follow == null && AITile.HasTransportType(cur_node, AITile.TRANSPORT_RAIL)) return [];
+
 	/* self._max_cost is the maximum path cost, if we go over it, the path isn't valid. */
 	if (path.GetCost() >= self._max_cost) return [];
+	
 	local tiles = [];
 	local par = path.GetParent();
 	local par_tile = par && par.GetTile();
@@ -361,14 +360,28 @@ function Rail::_Neighbours(path, cur_node, self)
 			/* Disallow 90 degree turns */
 			if (par != null && par.GetParent() != null &&
 				next_tile - cur_node == par.GetParent().GetTile() - par_tile) continue;
-			/* We add them to the to the neighbours-list if we can build a rail to
-			 *  them and no rail exists there. */
-			if ((par == null || AIRail.BuildRail(par_tile, cur_node, next_tile))) {
-				if (par != null) {
-					tiles.push([next_tile, self._GetDirection(par_tile, cur_node, next_tile, false)]);
-				} else {
-					tiles.push([next_tile, self._GetDirection(null, cur_node, next_tile, false)]);
-				}
+			/* We add them to the to the neighbours-list if we can build a rail to them
+			without crossing another rail. */
+			local buildable = AIRail.BuildRail(par_tile, cur_node, next_tile);
+			local tracks = AIRail.GetRailTracks(cur_node);
+			if (buildable && tracks != AIRail.RAILTRACK_INVALID) {
+				// check if we can build here without creating a crossing
+				// using direction logic from _IsSlopedRail
+				local NW = cur_node - AIMap.GetMapSizeX() == par_tile || cur_node - AIMap.GetMapSizeX() == next_tile;
+				local NE = cur_node - 1 == par_tile || cur_node - 1 == next_tile;
+				local SE = cur_node + AIMap.GetMapSizeX() == par_tile || cur_node + AIMap.GetMapSizeX() == next_tile;
+				local SW = cur_node + 1 == par_tile || cur_node + 1 == next_tile;
+				
+				buildable = (
+					   NW && NE && tracks == AIRail.RAILTRACK_SW_SE
+					|| SW && SE && tracks == AIRail.RAILTRACK_NW_NE
+					|| NW && SW && tracks == AIRail.RAILTRACK_NE_SE
+					|| NE && SE && tracks == AIRail.RAILTRACK_NW_SW
+				);
+			}
+
+			if (par == null || buildable) {
+				tiles.push([next_tile, self._GetDirection(par_tile, cur_node, next_tile, false)]);
 			}
 		}
 		if (par != null && par.GetParent() != null) {
@@ -436,17 +449,20 @@ function Rail::_GetTunnelsBridges(last_node, cur_node, bridge_dir)
 			}
 
 			if (!ugly) {
-				// only allow bridges if they actually go over unbuildable stuff (like water and rail)
-				local span = AITileList();
-				span.AddRectangle(cur_node, target);
-				span.Valuate(AITile.IsBuildable);
-				span.KeepValue(0);
-				if (span.Count() > 0 && span.Count() > AIMap.DistanceManhattan(cur_node, target) - 4) {
-					tiles.push([target, bridge_dir]);
-					// break here to only return the shortest possible bridge
-					// but with the raised costs, it should be OK to also consider longer bridges
-					// break;
-				}
+				// only allow bridges if they actually go over unbuildable stuff (like water and rail)?
+				// I don't think we need to, now that it builds smaller, less conspicuous bridges
+				// local span = AITileList();
+				// span.AddRectangle(cur_node, target);
+				// span.Valuate(AITile.IsBuildable);
+				// span.KeepValue(0);
+				// if (span.Count() > 0 && span.Count() > AIMap.DistanceManhattan(cur_node, target) - 4) {
+				// 	tiles.push([target, bridge_dir]);
+				// 	// break here to only return the shortest possible bridge
+				// 	// but with the raised costs, it should be OK to also consider longer bridges
+				// 	// break;
+				// }
+
+				tiles.push([target, bridge_dir]);
 			}
 		}
 	}

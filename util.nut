@@ -144,6 +144,14 @@ function StringN(s, n) {
 	return r;
 }
 
+function Join(...) {
+	local s = "";
+	for(local i = 0; i< vargc; i++) {
+		s = s + " " + vargv[i];
+	}
+	return s;
+}
+
 function ZeroPad(i) {
 	return i < 10 ? "0" + i : "" + i;
 }
