@@ -137,19 +137,38 @@ function AyStar::FindPath(iterations)
             if ((this._closed.GetValue(cur_tile) & path.GetDirection()) != 0) continue;
 
             /* Scan the path for a possible collision */
-            local scan_path = path.GetParent();
 
-            local mismatch = false;
-            while (scan_path != null) {
-                if (scan_path.GetTile() == cur_tile) {
-                    if (!this._check_direction_callback(cur_tile, scan_path.GetDirection(), path.GetDirection(), this._check_direction_callback_param)) {
-                        mismatch = true;
-                        break;
-                    }
-                }
-                scan_path = scan_path.GetParent();
-            }
-            if (mismatch) continue;
+            /*
+            MK: this is very expensive for long paths, and can it ever even
+            happen? I think it can; say you exit a narrow pass and need to
+            turn left, but the only way to do so is to go forward, loop to
+            the right and cross over yourself. See picture below, going from
+            A to B where X marks impassable terrain:
+
+            XXX/--\
+            XXX|  |
+            B--+--/
+            XXX|XXX
+               |
+               A
+
+            Is it bad if it happens? Not sure. For ChooChoo, worst case the
+            route might jam and we sell the trains. I'd rather have the
+            (very significant!) speed boost to pathfinding.
+            */
+            
+            // local scan_path = path.GetParent();
+            // local mismatch = false;
+            // while (scan_path != null) {
+            //     if (scan_path.GetTile() == cur_tile) {
+            //         if (!this._check_direction_callback(cur_tile, scan_path.GetDirection(), path.GetDirection(), this._check_direction_callback_param)) {
+            //             mismatch = true;
+            //             break;
+            //         }
+            //     }
+            //     scan_path = scan_path.GetParent();
+            // }
+            // if (mismatch) continue;
 
             /* Add the new direction */
             this._closed.SetValue(cur_tile, this._closed.GetValue(cur_tile) | path.GetDirection());
