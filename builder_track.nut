@@ -96,24 +96,37 @@ class BuildTrack extends Task {
 		
 		if (style == STRAIGHT) {
 			// straight, avoiding obstacles
+			
+			// Do we care about turns? If not, pathfinding may be a little faster
+			// since we don't need to calculate turn costs. The windy snaky paths
+			// may be a feature, but for rail lines I like the straighter paths,
+			// so some cost for turns it is.
 			pathfinder.cost.turn = 2*u;
+			// pathfinder.cost.turn = 0;
+
+			// we don't really care about slopes, and that speeds up pathfinding
+			pathfinder.cost.slope = 0;
 			pathfinder.cost.diagonal_tile = u;
 			pathfinder.cost.adj_obstacle = 5*u;
 		} else if (style == FOLLOW) {
 			// cheaper turns, penalty for no nearby track
 			pathfinder.cost.no_adj_rail = 2*u;
-			pathfinder.cost.diagonal_tile = (0.8*u).tointeger();
-			pathfinder.cost.turn = 0.2*u;
+			pathfinder.cost.diagonal_tile = (0.8*u);
+			pathfinder.cost.turn = 0.1*u;
+			// pathfinder.cost.turn = 0;
+			pathfinder.cost.slope = 0;
 			pathfinder.cost.adj_obstacle = 0;
-			//pathfinder.cost.max_cost = u * 8 * AIMap.DistanceManhattan(a, d);
 		} else if (style == LOOSE) {
-			pathfinder.cost.diagonal_tile = (0.4*u).tointeger();
+			pathfinder.cost.diagonal_tile = (0.4*u);
 			pathfinder.cost.turn = 0.25*u;
 			pathfinder.cost.slope = 3*u;
 		} else {
-			pathfinder.cost.diagonal_tile = (0.7*u).tointeger();
+			pathfinder.cost.diagonal_tile = (0.7*u);
+
+			// fastest pathfinding disregards both turns and slopes
+			pathfinder.cost.turn = 0;
+			pathfinder.cost.slope = 0;
 		}
-		
 		
 		// Pathfinding needs money since it attempts to build in test mode.
 		// We can't get the price of a tunnel, but we can get it for a bridge

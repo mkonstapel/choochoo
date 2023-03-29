@@ -238,7 +238,7 @@ class AyStar.Path
         this._prev = old_path;
         this._tile = new_tile;
         this._direction = new_direction;
-        this._cost = cost_callback(old_path, new_tile, new_direction, cost_callback_param);
+        this._cost = old_path ? cost_callback(old_path, new_tile, new_direction, cost_callback_param) : 0;
     };
 
     /**

@@ -41,10 +41,12 @@ class ChooChoo extends AIController {
 		
 		AIRoad.SetCurrentRoadType(AIRoad.ROADTYPE_ROAD);
 		
+		::MAP_SIZE_X <- AIMap.GetMapSizeX();
+		::MAP_SIZE_Y <- AIMap.GetMapSizeY();
 		::COMPANY <- AICompany.ResolveCompanyID(AICompany.COMPANY_SELF);
 		::PAX <- GetPassengerCargoID();
 		::MAIL <- GetMailCargoID();
-		::TICKS_PER_DAY <- 37;
+		::TICKS_PER_DAY <- 74;
 		::SIGN1 <- -1;
 		::SIGN2 <- -1;
 		
