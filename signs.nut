@@ -1,4 +1,5 @@
 function SetConstructionSign(tile, task) {
+	local mode = AIExecMode();
 	AISign.RemoveSign(SIGN1);
 	
 	if (!AIController.GetSetting("ActivitySigns")) return;
@@ -19,6 +20,7 @@ function SetConstructionSign(tile, task) {
 }
 
 function SetSecondarySign(text) {
+	local mode = AIExecMode();
 	if (!AIController.GetSetting("ActivitySigns")) {
 		AISign.RemoveSign(SIGN2);
 		return;
@@ -38,5 +40,6 @@ function SetSecondarySign(text) {
 }
 
 function ClearSecondarySign() {
+	local mode = AIExecMode();
 	AISign.RemoveSign(SIGN2);
 }
