@@ -37,8 +37,11 @@ class Rail
 	tileEstimates = null;
 
 	costCalls = null;
+	costOps = null;
 	estimateCalls = null;
+	estimateOps = null;
 	neighbourCalls = null;
+	neighbourOps = null;
 
 	constructor()
 	{
@@ -71,8 +74,11 @@ class Rail
 		this.tileEstimates = AIList();
 
 		this.costCalls = 0;
+		this.costOps = 0;
 		this.neighbourCalls = 0;
+		this.neighbourOps = 0;
 		this.estimateCalls = 0;
+		this.estimateOps = 0;
 	}
 
 	/**

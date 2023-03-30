@@ -162,7 +162,7 @@ class BuildTrack extends Task {
 				}
 
 				// not sure if I like the "progress bar"
-				
+
 				/*
 				local best = pathfinder._pathfinder._open.Peek();
 				local tile = best.GetTile();
