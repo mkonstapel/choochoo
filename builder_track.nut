@@ -65,8 +65,8 @@ class BuildTrack extends Task {
 	}
 	
 	function FindPath() {
+		local startDate = AIDate.GetCurrentDate()
 		local pathfinder = Rail();
-		
 		local bridgeLength = GetMaxBridgeLength();
 		pathfinder.cost.max_bridge_length = bridgeLength;
 		pathfinder.cost.max_tunnel_length = 8;
@@ -138,9 +138,104 @@ class BuildTrack extends Task {
 		
 		SetSecondarySign("Pathfinding...");
 		pathfinder.InitializePath([[b, a]], [[c, d]], ignored);
-		local res = pathfinder.FindPath((50 + AIMap.DistanceManhattan(a, d)) * 5 * TICKS_PER_DAY);
-		// local res = pathfinder.FindPath(-1);
-		Debug("Pathfinder called Cost", pathfinder.costCalls, "times, Neighbours", pathfinder.neighbourCalls, "times, Estimate", pathfinder.estimateCalls, "times");
+
+		// how long should we search?
+		// do we want to search longer on longer routes?
+		// do we want to search "harder" if we really need this track?
+		local startDate = AIDate.GetCurrentDate();
+		local endDate = startDate + 2*365; 
+		local res = null;
+		local distance = Sqrt(AIMap.DistanceSquare(a, d));
+
+		// track our best and worst considered options, in terms of remaining distance
+		// to show how far the pathfinder is in terms of homing in on the destination
+		local upperBound = 0;
+		local lowerBound = 0;
+		local alpha = 0.05;
+		while (true) {
+			res = pathfinder.FindPath(1000);
+			if (res == false) {
+				// see if we want to continue
+				local date = AIDate.GetCurrentDate();
+				if (date > endDate) {
+					break;
+				}
+
+				// not sure if I like the "progress bar"
+				
+				/*
+				local best = pathfinder._pathfinder._open.Peek();
+				local tile = best.GetTile();
+				local remaining = Sqrt(AIMap.DistanceSquare(tile, d));
+
+				if (remaining > upperBound) {
+					upperBound = remaining;
+				} else {
+					upperBound = alpha * remaining + (1-alpha) * upperBound;
+				}
+
+				if (remaining < lowerBound) {
+					lowerBound = remaining;
+				} else {
+					lowerBound = alpha * remaining + (1-alpha) * lowerBound;
+				}
+
+				local current = 100 * (distance - remaining) / distance;
+				local worst = 100 * (distance - upperBound) / distance;
+				local best = 100 * (distance - lowerBound) / distance;
+				local bar = "";
+				local didCurrent = false;
+				local didWorst = false;
+				local didBest = false;
+				for (local i = -100; i < 110; i += 10) {
+					if (i == 0) {
+						bar += " ";
+					} else if (!didWorst && i >= worst) {
+						bar += "[";
+						didWorst = true;
+					} else if (!didCurrent && i >= current) {
+						bar += i < 0 ? "<" : ">";
+						didCurrent = true;
+					} else if (!didBest && i >= best) {
+						bar += "]";
+						didBest = true;
+					} else {
+						bar += "-";
+					}
+				}
+				SetSecondarySign(bar);
+				*/
+			} else {
+				// we either found a path, or concluded there isn't one
+				break;
+			}
+		}
+
+		// pathfinder performance report
+		/*
+		try {
+			local outcome;
+			if (res == null) {
+				outcome = "no path exists";
+			} else if (res == false) {
+				outcome = "timed out";
+			} else {
+				outcome = "path of " + PathToList(res).Count() + " tiles";
+			}
+			local opsPerDay = 10000 * TICKS_PER_DAY;
+			Debug("Pathfinder took", AIDate.GetCurrentDate() - startDate, "days:", outcome);
+			Debug("Callback costs:");
+			Debug("- Cost:", pathfinder.costOps / opsPerDay, "days", pathfinder.costCalls, "calls ", pathfinder.costOps, "ops,",  pathfinder.costOps / pathfinder.costCalls, "ops per call");
+			Debug("- Neighbours:", pathfinder.neighbourOps / opsPerDay, "days", pathfinder.neighbourCalls, "calls", pathfinder.neighbourOps, "ops,",  pathfinder.neighbourOps / pathfinder.neighbourCalls, "ops per call");
+			Debug("- Estimate:", pathfinder.estimateOps / opsPerDay, "days", pathfinder.estimateCalls, "calls", pathfinder.estimateOps, "ops",  pathfinder.estimateOps / pathfinder.estimateCalls, "ops per call");
+			Debug("- A* pop:", pathfinder._pathfinder.popOps);
+			Debug("- A* goal:", pathfinder._pathfinder.goalOps);
+			Debug("- A* neighbour:", pathfinder._pathfinder.neighbourOps);
+		} catch (e) {
+			Error("Error creating pathfinder report", e);
+		}
+		*/
+
 		return res;
 	}
 	

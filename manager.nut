@@ -24,6 +24,8 @@ function CullTrains() {
 	
 	best.KeepTop(n/10);
 	worst.KeepBottom(n/10);
+
+	// TODO: always keep one or two trains per stations, so we don't get empty branch lines
 	
 	local clones = 0;
 	foreach (train, profit in best) {
