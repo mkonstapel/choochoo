@@ -350,7 +350,7 @@ function Rail::_Cost(path, new_tile, new_direction, self)
 	return path.GetCost() + cost;
 }
 
-function Rail::_Estimate(cur_tile, cur_direction, goal_tiles, self)
+function Rail::_Estimate(cur_tile, cur_direction, goal_tile, self)
 {
 	self.estimateCalls++;
 	// local ops = AIController.GetOpsTillSuspend();
@@ -361,12 +361,9 @@ function Rail::_Estimate(cur_tile, cur_direction, goal_tiles, self)
 		local min_cost = self._max_cost;
 		/* As estimate we multiply the lowest possible cost for a single tile with
 		 *  with the minimum number of tiles we need to traverse. */
-		foreach (tile in goal_tiles) {
-			local dx = abs(AIMap.GetTileX(cur_tile) - AIMap.GetTileX(tile[0]));
-			local dy = abs(AIMap.GetTileY(cur_tile) - AIMap.GetTileY(tile[0]));
-			min_cost = min(min_cost, min(dx, dy) * self._cost_diagonal_tile * 2 + (max(dx, dy) - min(dx, dy)) * self._cost_tile);
-		}
-
+		local dx = abs(AIMap.GetTileX(cur_tile) - AIMap.GetTileX(goal_tile));
+		local dy = abs(AIMap.GetTileY(cur_tile) - AIMap.GetTileY(goal_tile));
+		min_cost = min(min_cost, min(dx, dy) * self._cost_diagonal_tile * 2 + (max(dx, dy) - min(dx, dy)) * self._cost_tile);
 		est = (min_cost*self.estimate_multiplier).tointeger();
 		self.tileEstimates.AddItem(cur_tile, est);
 	}

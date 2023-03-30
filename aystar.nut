@@ -23,7 +23,9 @@ class AyStar
     _check_direction_callback_param = null;
     _open = null;
     _closed = null;
-    _goals = null;
+    // _goals = null;
+    _goal0 = null;
+    _goal1 = null;
 
     /**
      * @param cost_callback A function that returns the cost of a path. It
@@ -102,6 +104,8 @@ function AyStar::InitializePath(sources, goals, ignored_tiles = [])
     if (typeof(sources) != "array" || sources.len() == 0) throw("sources has be a non-empty array.");
     if (typeof(goals) != "array" || goals.len() == 0) throw("goals has be a non-empty array.");
 
+    if (goals.len() != 1) throw("optimized for single goal");
+
     this._open = _queue_class();
     this._closed = AIList();
 
@@ -116,7 +120,9 @@ function AyStar::InitializePath(sources, goals, ignored_tiles = [])
         }
     }
 
-    this._goals = goals;
+    // this._goals = goals;
+    this._goal0 = goals[0][0]
+    this._goal1 = goals[0][1]
 
     foreach (tile in ignored_tiles) {
         this._closed.AddItem(tile, ~0);
@@ -140,10 +146,10 @@ function AyStar::FindPath(iterations)
 
             /*
             MK: this is very expensive for long paths, and can it ever even
-            happen? I think it can; say you exit a narrow pass and need to
-            turn left, but the only way to do so is to go forward, loop to
-            the right and cross over yourself. See picture below, going from
-            A to B where X marks impassable terrain:
+            happen? Yes, it can; say you exit a narrow pass and need to turn
+            left, but the only way to do so is to go forward, loop to the
+            right and cross over yourself. See picture below, going from A to
+            B where X marks impassable terrain:
 
             XXX/--\
             XXX|  |
@@ -176,26 +182,40 @@ function AyStar::FindPath(iterations)
             /* New entry, make sure we don't check it again */
             this._closed.AddItem(cur_tile, path.GetDirection());
         }
+
         /* Check if we found the end */
-        foreach (goal in this._goals) {
-            if (typeof(goal) == "array") {
-                if (cur_tile == goal[0]) {
-                    local neighbours = this._neighbours_callback(path, cur_tile, this._neighbours_callback_param);
-                    foreach (node in neighbours) {
-                        if (node[0] == goal[1]) {
-                            this._CleanPath();
-                            return path;
-                        }
-                    }
-                    continue;
-                }
-            } else {
-                if (cur_tile == goal) {
+        
+        // foreach (goal in this._goals) {
+        //     if (typeof(goal) == "array") {
+        //         if (cur_tile == goal[0]) {
+        //             local neighbours = this._neighbours_callback(path, cur_tile, this._neighbours_callback_param);
+        //             foreach (node in neighbours) {
+        //                 if (node[0] == goal[1]) {
+        //                     this._CleanPath();
+        //                     return path;
+        //                 }
+        //             }
+        //             continue;
+        //         }
+        //     } else {
+        //         if (cur_tile == goal) {
+        //             this._CleanPath();
+        //             return path;
+        //         }
+        //     }
+        // }
+
+        // optimize for our single goal
+        if (cur_tile == this._goal0) {
+            local neighbours = this._neighbours_callback(path, cur_tile, this._neighbours_callback_param);
+            foreach (node in neighbours) {
+                if (node[0] == this._goal1) {
                     this._CleanPath();
                     return path;
                 }
             }
         }
+
         /* Scan all neighbours */
         local neighbours = this._neighbours_callback(path, cur_tile, this._neighbours_callback_param);
         foreach (node in neighbours) {
@@ -204,7 +224,7 @@ function AyStar::FindPath(iterations)
             if ((this._closed.GetValue(node[0]) & node[1]) != 0) continue;
             /* Calculate the new paths and add them to the open list */
             local new_path = this.Path(path, node[0], node[1], this._cost_callback, this._cost_callback_param);
-            this._open.Insert(new_path, new_path.GetCost() + this._estimate_callback(node[0], node[1], this._goals, this._estimate_callback_param));
+            this._open.Insert(new_path, new_path.GetCost() + this._estimate_callback(node[0], node[1], this._goal0, this._estimate_callback_param));
         }
     }
 
@@ -217,7 +237,7 @@ function AyStar::_CleanPath()
 {
     this._closed = null;
     this._open = null;
-    this._goals = null;
+    // this._goals = null;
 }
 
 /**
