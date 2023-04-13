@@ -34,7 +34,7 @@ class BuildNewNetwork extends Task {
 			
 			AIRail.SetCurrentRailType(network.railType);
 			subtasks = [
-				LevelTerrain(this, tile, Rotation.ROT_0, [1, 1], [Crossing.WIDTH-2, Crossing.WIDTH-2]),
+				LevelTerrain(this, tile, Rotation.ROT_0, [1, 1], [Crossing.WIDTH-2, Crossing.WIDTH-2], false, false),
 				BuildCrossing(this, tile, network)
 			];
 		}
@@ -434,6 +434,11 @@ class ExtendCrossing extends Builder {
 				throw TaskFailedException("no towns " + DirectionName(direction) + " of " + Crossing(crossing) + " where we can build a station");
 			}
 			
+			// so we don't reforest tiles we're about to build on again
+			local stationCoordinates = RelativeCoordinates(stationTile, stationRotation);
+			local stationTiles = AITileList();
+			stationTiles.AddRectangle(stationCoordinates.GetTile([0, 0]), stationCoordinates.GetTile([RAIL_STATION_WIDTH, RAIL_STATION_LENGTH]));
+
 			// TODO: proper cost estimate
 			// building stations is fairly cheap, but it's no use to start
 			// construction if we don't have the money for pathfinding, tracks and trains 
@@ -443,17 +448,16 @@ class ExtendCrossing extends Builder {
 			if (crossingTile) {
 				local crossingEntranceDirection = InverseDirection(direction);
 				local crossingExitDirection = CrossingExitDirection(crossingTile, stationTile);
-				
 				subtasks = [
 					WaitForMoney(this, costEstimate),
 					AppeaseLocalAuthority(this, town),
 					BuildTownBusStation(this, town),
 					LevelTerrain(this, stationTile, stationRotation, [0, 0], [RAIL_STATION_WIDTH-1, RAIL_STATION_LENGTH-2], true),
-					AppeaseLocalAuthority(this, town),
+					AppeaseLocalAuthority(this, town, stationTiles),
 					BuildTerminusStation(this, stationTile, direction, network, town),
 					AppeaseLocalAuthority(this, town),
 					BuildBusStations(this, stationTile, town),
-					LevelTerrain(this, crossingTile, Rotation.ROT_0, [1, 1], [Crossing.WIDTH-2, Crossing.WIDTH-2]),
+					LevelTerrain(this, crossingTile, Rotation.ROT_0, [1, 1], [Crossing.WIDTH-2, Crossing.WIDTH-2], true, false),
 					BuildCrossing(this, crossingTile, network),
 					ConnectCrossing(this, crossing, direction, crossingTile, crossingEntranceDirection, network),
 					ConnectStation(this, crossingTile, crossingExitDirection, stationTile, network),
@@ -465,7 +469,7 @@ class ExtendCrossing extends Builder {
 					AppeaseLocalAuthority(this, town),
 					BuildTownBusStation(this, town),
 					LevelTerrain(this, stationTile, stationRotation, [0, 0], [RAIL_STATION_WIDTH-1, RAIL_STATION_LENGTH-2], true),
-					AppeaseLocalAuthority(this, town),
+					AppeaseLocalAuthority(this, town, stationTiles),
 					BuildTerminusStation(this, stationTile, direction, network, town),
 					AppeaseLocalAuthority(this, town),
 					BuildBusStations(this, stationTile, town),
