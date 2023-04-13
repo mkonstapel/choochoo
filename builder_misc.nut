@@ -155,7 +155,7 @@ class AppeaseLocalAuthority extends Task {
 			if (rating >= AITown.TOWN_RATING_POOR) {
 				// once we reach poor, the minimum to build a station, try to add some more
 				// for slack, in case we "accidentally" hit a tree later...
-				countdown = min(countdown, 20);
+				countdown = max(countdown, 40);
 			}
 			
 			// we may not plant a tree at all, in which case we'd be looking at the wrong AIError!
