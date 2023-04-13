@@ -175,13 +175,11 @@ class AppeaseLocalAuthority extends Task {
 	
 	function GetInfluenceArea(town) {
 		local location = AITown.GetLocation(town);
-		local distance = GetGameSetting("economy.dist_local_authority", 10);
+		local distance = GetGameSetting("economy.dist_local_authority", 20);
 		local area = AITileList();
-		SafeAddRectangle(area, location, distance);
-		area.Valuate(AITile.GetDistanceManhattanToTile, location);
-		area.KeepBelowValue(distance);
-		area.Valuate(AITile.GetClosestTown);
-		area.KeepValue(town);
+		SafeAddRectangle(area, location, distance + 1);
+		area.Valuate(AITile.IsWithinTownInfluence, town);
+		area.KeepValue(1);
 		return area;
 	}
 }
