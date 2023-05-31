@@ -122,7 +122,7 @@ class BuildCargoLine extends Task {
 				BuildTrains(this, siteA, network, cargo, AIOrder.AIOF_FULL_LOAD_ANY),
 				//BuildTrains(this, siteA, network, cargo, AIOrder.AIOF_FULL_LOAD_ANY),
 				//BuildTrack(this, Swap(stationA.GetEntrance()), Swap(stationB.GetExit()), [], SignalMode.BACKWARD, network),
-				//BuildSignals(this, firstTrack, SignalMode.FORWARD),
+				//BuildSignals(this, firstTrack, SignalMode.FORWARD, network.trainLength + 2),
 			];
 		}
 		

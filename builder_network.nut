@@ -219,9 +219,15 @@ class ConnectStation extends Task {
 				}
 			}
 			
+			// because the pathfinder returns a path as a linked list from the
+			// goal back to the start, we build "in reverse", and because we
+			// want the first signal block (from the station or junction
+			// exit) to be large enough, we always want to start building
+			// from that end so we actually pathfind in reverse (entrance to
+			// exit) and therefore, build forward (exit to entrance)
 			local first = BuildTrack(this,
-				station.GetExit(), crossing.GetEntrance(direction),
-				reserved, SignalMode.FORWARD, network);
+				Swap(crossing.GetEntrance(direction)), Swap(station.GetExit()),
+				reserved, SignalMode.BACKWARD, network);
 			
 			subtasks.append(first);
 			
@@ -314,8 +320,8 @@ class ConnectCrossing extends Task {
 			}
 			
 			local first = BuildTrack(this,
-				toCrossing.GetExit(toDirection), fromCrossing.GetEntrance(fromDirection),
-				reserved, SignalMode.FORWARD, network);
+				Swap(fromCrossing.GetEntrance(fromDirection)), Swap(toCrossing.GetExit(toDirection)),
+				reserved, SignalMode.BACKWARD, network);
 			
 			subtasks.append(first);
 		

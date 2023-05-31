@@ -6,7 +6,6 @@ class BuildTrack extends Task {
 	static FAST = 2;
 	static FOLLOW = 3;
 	
-	static SIGNAL_INTERVAL = 3;
 	//static DEPOT_INTERVAL = 30;
 	static DEPOT_INTERVAL = 0;
 	
@@ -16,6 +15,7 @@ class BuildTrack extends Task {
 	d = null;
 	ignored = null;
 	signalMode = null;
+	signalInterval = null;
 	network = null;
 	style = null;
 	path = null;
@@ -30,6 +30,7 @@ class BuildTrack extends Task {
 		this.d = to[1];
 		this.ignored = ignored;
 		this.signalMode = signalMode;
+		this.signalInterval = network.trainLength + 1;
 		this.network = network;
 		this.style = style ? style : STRAIGHT;
 		this.follow = follow;
@@ -283,7 +284,11 @@ class BuildTrack extends Task {
 		local prev = null;
 		local prevprev = null;
 		local prevprevprev = null;
-		local count = 1;	// don't start with signals right away
+
+		// trains take up more space on diagonals and we want to make sure
+		// they clear the exit of stations and junctions, so the first signal
+		// block should be two tiles longer
+		local count = -2;
 		while (node != null) {
 			if (prevprev != null) {
 				if (AIMap.DistanceManhattan(prev, node.GetTile()) > 1) {
@@ -316,7 +321,8 @@ class BuildTrack extends Task {
 					local forward = signalMode == SignalMode.FORWARD;
 					local front = forward ? node.GetTile() : prevprev;
 					if (signalMode != SignalMode.NONE &&
-					    count % SIGNAL_INTERVAL == 0 &&
+						count > 0 &&
+					    count % signalInterval == 0 &&
 					    AIRail.GetSignalType(prev, front) == AIRail.SIGNALTYPE_NONE)
 					{
 						AIRail.BuildSignal(prev, front, AIRail.SIGNALTYPE_NORMAL);
@@ -324,7 +330,7 @@ class BuildTrack extends Task {
 					
 					local possibleDepot = DEPOT_INTERVAL > 0 && prevprevprev && node.GetParent();
 					local depotSite = possibleDepot ? GetDepotSite(prevprevprev, prevprev, prev, node.GetTile(), node.GetParent().GetTile(), forward, true) : null;
-					if (count % SIGNAL_INTERVAL == 1 && count - lastDepot > DEPOT_INTERVAL && depotSite) {
+					if (count % signalInterval == 1 && count - lastDepot > DEPOT_INTERVAL && depotSite) {
 						if (AIRail.BuildRailDepot(depotSite, prev) &&
 							AIRail.BuildRail(depotSite, prev, prevprev) &&
 							AIRail.BuildRail(depotSite, prev, node.GetTile())) {
@@ -456,9 +462,10 @@ class BuildSignals extends Builder {
 	trackBuilder = null;
 	signalMode = null;
 	
-	constructor(trackBuilder, signalMode) {
+	constructor(trackBuilder, signalMode, signalInterval) {
 		this.trackBuilder = trackBuilder;
 		this.signalMode = signalMode;
+		this.signalInterval = signalInterval;
 	}
 	
 	function Run() {
@@ -468,7 +475,7 @@ class BuildSignals extends Builder {
 		local prev = null;
 		local prevprev = null;
 		local prevprevprev = null;
-		local count = 1;	// don't start with signals right away
+		local count = -2;	// don't start with signals right away
 		while (node != null) {
 			if (prevprev != null) {
 				if (AIMap.DistanceManhattan(prev, node.GetTile()) > 1) {
@@ -482,7 +489,8 @@ class BuildSignals extends Builder {
 					local forward = signalMode == SignalMode.FORWARD;
 					local front = forward ? node.GetTile() : prevprev;
 					if (signalMode != SignalMode.NONE &&
-					    count % BuildTrack.SIGNAL_INTERVAL == 0 &&
+						count > 0 &&
+					    count % this.signalInterval == 0 &&
 					    AIRail.GetSignalType(prev, front) == AIRail.SIGNALTYPE_NONE)
 					{
 						AIRail.BuildSignal(prev, front, AIRail.SIGNALTYPE_NORMAL);

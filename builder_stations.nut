@@ -152,7 +152,9 @@ class BuildTerminusStation extends Builder {
 		network.depots.append(GetTile([2,p]));
 		
 		BuildSignal([0, p+1], [0, p+2], AIRail.SIGNALTYPE_PBS_ONEWAY);
-		BuildSignal([1, p+1], [1, p],   AIRail.SIGNALTYPE_PBS_ONEWAY);
+
+		// don't do this, a train might block the station entrance/exit
+		// BuildSignal([1, p+1], [1, p],   AIRail.SIGNALTYPE_PBS_ONEWAY);
 		
 		BuildRoadDepot([2,p-1], [2,p-2]);
 		BuildRoadDriveThrough([2,p-2], [2,p-3], true, stationID);
