@@ -119,12 +119,17 @@ class AppeaseLocalAuthority extends Task {
 	excludeArea = null;
 	minTownRating = null;
 	
-	constructor(parentTask, town, excludeArea = null, minTownRating = AITown.TOWN_RATING_POOR) {
-		// POOR is the minimum for building a station
+	constructor(parentTask, town, excludeArea = null, minTownRating = AITown.TOWN_RATING_MEDIOCRE) {
+		// POOR is the minimum for building a station, but a little margin is probably nice
+		// and it only takes an extra 29 trees
 		Task.constructor(parentTask);
 		this.town = town;
 		this.excludeArea = excludeArea;
 		this.minTownRating = minTownRating;
+
+		if (minTownRating > AITown.TOWN_RATING_MEDIOCRE) {
+			throw TaskFailedException("building trees can only get you up to TOWN_RATING_MEDIOCRE");
+		}
 	}
 	
 	function _tostring() {
@@ -141,7 +146,6 @@ class AppeaseLocalAuthority extends Task {
 			currentTownRating = AITown.TOWN_RATING_GOOD
 		};
 
-		Debug("Our current rating is", currentTownRating + "/" + minTownRating);
 		if (currentTownRating >= minTownRating) {
 			// already good
 			return;
@@ -179,21 +183,11 @@ class AppeaseLocalAuthority extends Task {
 		// https://github.com/OpenTTD/OpenTTD/blob/master/src/tree_cmd.cpp#L433
 		local treesNeeded = Ceiling((minRating - numericRating) / 7.0);
 
-		Debug("Need to plant", treesNeeded, "trees to go from", numericRating, "to", minRating);
+		Debug("Need to plant up to", treesNeeded, "trees to go from", numericRating, "to", minRating);
 		local deforestFirst = false;
 
 		local area = GetTreeArea(town);
-		area.Valuate(AITile.IsBuildable);
-		area.KeepValue(1);
-		// as mentioned, only the first tree counts
-		area.Valuate(AITile.HasTreeOnTile);
-		area.KeepValue(0);
-		// road tiles are "buildable", but not for trees
-		area.Valuate(AIRoad.IsRoadTile);
-		area.KeepValue(0);
-		// diagonal cost tiles (half land, half water) cannot have trees, so just exclude all coast tiles
-		area.Valuate(AITile.IsCoastTile);
-		area.KeepValue(0);
+		KeepValidTreeTiles(area);
 
 		local freeTiles = area.Count();
 		Debug("Looks like we can plant", freeTiles, "trees");
@@ -201,13 +195,19 @@ class AppeaseLocalAuthority extends Task {
 		local treeTiles = 0;
 		
 		// if our rating is already really bad, see if we could get away with nuking a bunch of trees so we can replant them
-		if (freeTiles < treesNeeded && AITown.GetRating(town, COMPANY) == AITown.TOWN_RATING_APPALLING) {
+		if (freeTiles < treesNeeded) {
 			local area = GetTreeArea(town);
 			area.Valuate(AITile.HasTreeOnTile);
 			area.KeepValue(1);
 			treeTiles = area.Count();
 			deforestFirst = true;
-			Debug("And we can 'reforest' another", treeTiles, "tiles");
+
+			// this will tank our rating, so recalculate
+			currentTownRating = AITown.TOWN_RATING_APPALLING;
+			numericRating = ratings[currentTownRating];
+			treesNeeded = Ceiling((minRating - numericRating) / 7.0);
+
+			Debug("And we can 'reforest' another", treeTiles, "tiles but then we need to plant", treesNeeded);
 		}
 
 		if (freeTiles + treeTiles < treesNeeded) {
@@ -215,7 +215,7 @@ class AppeaseLocalAuthority extends Task {
 		}
 
 		if (deforestFirst) {
-			Warning("Applying forced reforestation!");
+			SetSecondarySign("\"Reforesting\"")
 			local trees = GetTreeArea(town);
 			trees.Valuate(AITile.HasTreeOnTile);
 			trees.KeepValue(1);
@@ -228,22 +228,19 @@ class AppeaseLocalAuthority extends Task {
 		}
 
 		area = GetTreeArea(town);
-		area.Valuate(AITile.IsBuildable);
-		area.KeepValue(1);
-		area.Valuate(AITile.HasTreeOnTile);
-		area.KeepValue(0);
-		area.Valuate(AIRoad.IsRoadTile);
-		area.KeepValue(0);
-		area.Valuate(AITile.IsCoastTile);
-		area.KeepValue(0);
+		KeepValidTreeTiles(area);
 
 		// build from the inside out
 		area.Valuate(AITile.GetDistanceSquareToTile, location);
 		area.Sort(AIList.SORT_BY_VALUE, true);
 
 		local treesPlanted = 0;
+		SetSecondarySign("Planting trees")
 		for (local tile = area.Begin(); area.HasNext(); tile = area.Next()) {
-			if (AITile.PlantTree(tile)) {
+			if (AITile.HasTreeOnTile(tile)) {
+				// trees may regrow while we're planting
+				continue;
+			} else if (AITile.PlantTree(tile) && AITile.HasTreeOnTile(tile)) {
 				treesPlanted++;
 			} else {
 				local error = AIError.GetLastError();
@@ -252,7 +249,7 @@ class AppeaseLocalAuthority extends Task {
 					CheckError();
 				} else {
 					// just continue to the next tile
-					Warning("Error planting trees:", AIError.GetLastErrorString());
+					Warning(treesPlanted + " Error planting trees:", AIError.GetLastErrorString());
 				}
 			}
 
@@ -260,9 +257,32 @@ class AppeaseLocalAuthority extends Task {
 			local townRating = AITown.GetRating(town, COMPANY);
 			if (townRating >= minTownRating) {
 				Debug("Stopping tree planting at rating", townRating, "after planting", treesPlanted, "/", treesNeeded, "trees");
-				break;
+				ClearSecondarySign();
+				return;
 			}
 		}
+
+		Warning("Stopping tree planting after loop, planted", treesPlanted, "/", treesNeeded, "trees, rating", AITown.GetRating(town, COMPANY));
+		ClearSecondarySign();
+	}
+
+	function KeepValidTreeTiles(area) {
+		area.Valuate(AITile.IsBuildable);
+		area.KeepValue(1);
+		// as mentioned, only the first tree counts
+		area.Valuate(AITile.HasTreeOnTile);
+		area.KeepValue(0);
+		// water, road and rail tiles are "buildable", but not for trees
+		// this should also filter out bridges as you cannot build trees underneath a bridge
+		area.Valuate(AITile.IsWaterTile);
+		area.KeepValue(0);
+		area.Valuate(AIRoad.IsRoadTile);
+		area.KeepValue(0);
+		area.Valuate(AIRail.IsRailTile);
+		area.KeepValue(0);
+		// diagonal cost tiles (half land, half water) cannot have trees, so just exclude all coast tiles
+		area.Valuate(AITile.IsCoastTile);
+		area.KeepValue(0);
 	}
 	
 	function GetTreeArea(town) {
