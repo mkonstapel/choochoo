@@ -263,16 +263,13 @@ function GetMailCargoID() {
 
 function GetCargoID(cargoClass) {
 	local list = AICargoList();
-	local candidate = -1;
 	for (local i = list.Begin(); list.HasNext(); i = list.Next()) {
-		if (AICargo.HasCargoClass(i, cargoClass))
-		candidate = i;
+		if (AICargo.HasCargoClass(i, cargoClass)) {
+			return i;
+		}
 	}
-	
-	if(candidate != -1)
-		return candidate;
-	
-	throw "missing required cargo class";
+
+	return null;
 }
 
 function GetMaxBridgeLength() {

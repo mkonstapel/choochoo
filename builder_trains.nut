@@ -147,7 +147,7 @@ class BuildTrain extends Builder {
 			CheckError();
 		}
 		
-		if (cargo == PAX) {
+		if (cargo == PAX && MAIL != null) {
 			// include one mail wagon
 			if (!hasMail) {
 				local wagonType = GetWagon(MAIL, network.railType);

@@ -200,6 +200,10 @@ class ChooChoo extends AIController {
 		} else {
 			throw "ChooChoo is not compatible with current game settings.";
 		}
+
+		if (PAX == null) {
+			throw "ChooChoo cannot run without passengers as a cargo type.";
+		}
 	}
 	
 	function CheckSetting(name, value, description) {
