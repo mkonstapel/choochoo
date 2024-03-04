@@ -151,7 +151,11 @@ class BuildTerminusStation extends Builder {
 		if (doubleTrack) BuildRail([2, p], [1, p], [1, p+1]);
 		network.depots.append(GetTile([2,p]));
 		
-		BuildSignal([0, p+1], [0, p+2], AIRail.SIGNALTYPE_PBS_ONEWAY);
+		if (network.rightSide) {
+			BuildSignal([0, p+1], [0, p+2], AIRail.SIGNALTYPE_PBS_ONEWAY);
+		} else {
+			BuildSignal([1, p+1], [1, p+2], AIRail.SIGNALTYPE_PBS_ONEWAY);
+		}
 
 		// don't do this, a train might block the station entrance/exit
 		// BuildSignal([1, p+1], [1, p],   AIRail.SIGNALTYPE_PBS_ONEWAY);

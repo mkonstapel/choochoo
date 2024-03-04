@@ -159,7 +159,7 @@ class Crossing extends WorldObject {
 	}
 	
 	function GetName() {
-		local waypoints = [ [0,0], [0,2], [2,3], [3,1], [1,0] ];
+		local waypoints = [ [3,2], [0,2], [2,3], [3,1], [1,0], [0,1], [1,3], [3,2], [2,0] ];
 		foreach (tile in waypoints) {
 			local waypoint = AIWaypoint.GetWaypointID(GetTile(tile));
 			if (AIWaypoint.IsValidWaypoint(waypoint)) {
@@ -256,6 +256,7 @@ class TerminusStation extends WorldObject {
 class Network {
 	
 	railType = null;
+	rightSide = null;
 	trainLength = null;
 	minDistance = null;
 	maxDistance = null;
@@ -263,8 +264,9 @@ class Network {
 	depots = null;
 	trains = null;
 	
-	constructor(railType, trainLength, minDistance, maxDistance) {
+	constructor(railType, rightSide, trainLength, minDistance, maxDistance) {
 		this.railType = railType;
+		this.rightSide = rightSide;
 		this.trainLength = trainLength;
 		this.minDistance = minDistance;
 		this.maxDistance = maxDistance;

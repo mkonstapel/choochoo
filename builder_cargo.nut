@@ -112,7 +112,7 @@ class BuildCargoLine extends Task {
 			//local exitB = TerminusStation(siteB, rotB, CARGO_STATION_LENGTH).GetEntrance();
 			//local firstTrack = BuildTrack(stationA.GetExit(), stationB.GetEntrance(), reserved, SignalMode.NONE, network);
 			
-			local network = Network(railType, CARGO_STATION_LENGTH, MIN_DISTANCE, maxDistance);
+			local network = Network(railType, IsRightHandTraffic(), CARGO_STATION_LENGTH, MIN_DISTANCE, maxDistance);
 			subtasks = [
 				// location, direction, network, atIndustry, toIndustry, cargo isSource, platformLength
 				BuildCargoStation(this, siteA, dirA, network, a, b, cargo, true, CARGO_STATION_LENGTH),

@@ -43,7 +43,7 @@ class BuildLine extends Task {
 			local exitA = Swap(TerminusStation(siteA, rotA, RAIL_STATION_PLATFORM_LENGTH).GetEntrance());
 			local exitB = TerminusStation(siteB, rotB, RAIL_STATION_PLATFORM_LENGTH).GetEntrance();
 			
-			local network = Network(AIRailTypeList().Begin(), RAIL_STATION_PLATFORM_LENGTH, MIN_TOWN_DISTANCE, MAX_TOWN_DISTANCE);
+			local network = Network(AIRailTypeList().Begin(), IsRightHandTraffic(), RAIL_STATION_PLATFORM_LENGTH, MIN_TOWN_DISTANCE, MAX_TOWN_DISTANCE);
 			subtasks = [
 				BuildTerminusStation(siteA, dirA, network, a, false),
 				BuildTerminusStation(siteB, dirB, network, b, false),

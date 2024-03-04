@@ -5,8 +5,8 @@ class BuildNewNetwork extends Task {
 	
 	constructor(parentTask, minDistance = MIN_DISTANCE, maxDistance = MAX_DISTANCE) {
 		Task.constructor(parentTask);
-		//this.network = Network(AIRailTypeList().Begin(), RAIL_STATION_PLATFORM_LENGTH, minDistance, maxDistance);
-		this.network = Network(AIRailTypeList().Begin(), 3, minDistance, maxDistance);
+		//this.network = Network(AIRailTypeList().Begin(), IsRightHandTraffic(), RAIL_STATION_PLATFORM_LENGTH, minDistance, maxDistance);
+		this.network = Network(AIRailTypeList().Begin(), IsRightHandTraffic(), 3, minDistance, maxDistance);
 	}
 	
 	function Run() {
@@ -48,7 +48,7 @@ class BuildNewNetwork extends Task {
 	
 	function EstimateNetworkStationCount(tile) {
 		local stationCount = 0;
-		local estimationNetwork = Network(network.railType, RAIL_STATION_PLATFORM_LENGTH, network.minDistance, network.maxDistance);
+		local estimationNetwork = Network(network.railType, network.rightSide, RAIL_STATION_PLATFORM_LENGTH, network.minDistance, network.maxDistance);
 		foreach (direction in [Direction.NE, Direction.SW, Direction.NW, Direction.SE]) {
 			stationCount += EstimateCrossing(tile, direction, estimationNetwork);
 		}
@@ -210,8 +210,8 @@ class ConnectStation extends Task {
 			subtasks = [];
 			local station = TerminusStation.AtLocation(stationTile, RAIL_STATION_PLATFORM_LENGTH);
 			
-			local reserved = station.GetReservedEntranceSpace();
-			reserved.extend(crossing.GetReservedExitSpace(direction));
+			local reserved = network.rightSide ? station.GetReservedEntranceSpace() : station.GetReservedExitSpace();
+			reserved.extend(network.rightSide ? crossing.GetReservedExitSpace(direction) : crossing.GetReservedEntranceSpace(direction));
 			foreach (d in [Direction.NE, Direction.SW, Direction.NW, Direction.SE]) {
 				if (d != direction) {
 					reserved.extend(crossing.GetReservedEntranceSpace(d));
@@ -225,8 +225,17 @@ class ConnectStation extends Task {
 			// exit) to be large enough, we always want to start building
 			// from that end so we actually pathfind in reverse (entrance to
 			// exit) and therefore, build forward (exit to entrance)
+			local from, to;
+			if (network.rightSide) {
+				from = Swap(crossing.GetEntrance(direction));
+				to = Swap(station.GetExit());
+			} else {
+				from = crossing.GetExit(direction);
+				to = station.GetEntrance();
+			}
+
 			local first = BuildTrack(this,
-				Swap(crossing.GetEntrance(direction)), Swap(station.GetExit()),
+				from, to,
 				reserved, SignalMode.BACKWARD, network);
 			
 			subtasks.append(first);
@@ -242,8 +251,15 @@ class ConnectStation extends Task {
 				}
 			}
 			
+			if (network.rightSide) {
+				from = Swap(station.GetEntrance());
+				to = Swap(crossing.GetExit(direction));
+			} else {
+				from = station.GetExit();
+				to = crossing.GetEntrance(direction);
+			}
 			subtasks.append(BuildTrack(this,
-				Swap(station.GetEntrance()), Swap(crossing.GetExit(direction)),
+				from, to,
 				reserved, SignalMode.BACKWARD, network,
 				BuildTrack.FOLLOW, first));
 		}
@@ -251,7 +267,7 @@ class ConnectStation extends Task {
 		RunSubtasks();
 			
 		// open up the exit by removing the signal
-		local exit = crossing.GetExit(direction);
+		local exit = network.rightSide ? crossing.GetExit(direction) : Swap(crossing.GetEntrance(direction));
 		AIRail.RemoveSignal(exit[0], exit[1]);
 		
 		if (StartsWith(crossing.GetName(), "unnamed") && AIController.GetSetting("JunctionNames")) {
@@ -305,8 +321,8 @@ class ConnectCrossing extends Task {
 		if (!subtasks) {
 			subtasks = [];
 		
-			local reserved = toCrossing.GetReservedEntranceSpace(toDirection);
-			reserved.extend(fromCrossing.GetReservedExitSpace(fromDirection));
+			local reserved = network.rightSide ? toCrossing.GetReservedEntranceSpace(toDirection) : toCrossing.GetReservedExitSpace(toDirection)
+			reserved.extend(network.rightSide ? fromCrossing.GetReservedExitSpace(fromDirection) : fromCrossing.GetReservedEntranceSpace(fromDirection));
 			foreach (d in [Direction.NE, Direction.SW, Direction.NW, Direction.SE]) {
 				if (d != fromDirection) {
 					reserved.extend(fromCrossing.GetReservedEntranceSpace(d));
@@ -319,10 +335,16 @@ class ConnectCrossing extends Task {
 				}
 			}
 			
-			local first = BuildTrack(this,
-				Swap(fromCrossing.GetEntrance(fromDirection)), Swap(toCrossing.GetExit(toDirection)),
-				reserved, SignalMode.BACKWARD, network);
-			
+			local from, to;
+			if (network.rightSide) {
+				from = Swap(fromCrossing.GetEntrance(fromDirection));
+				to = Swap(toCrossing.GetExit(toDirection));
+			} else {
+				from = fromCrossing.GetExit(fromDirection);
+				to = toCrossing.GetEntrance(toDirection);
+			}
+
+			local first = BuildTrack(this, from, to, reserved, SignalMode.BACKWARD, network);
 			subtasks.append(first);
 		
 			//local reserved = toCrossing.GetReservedExitSpace(toDirection);
@@ -340,22 +362,27 @@ class ConnectCrossing extends Task {
 				}
 			}
 			
-			subtasks.append(BuildTrack(this,
-				Swap(toCrossing.GetEntrance(toDirection)), Swap(fromCrossing.GetExit(fromDirection)),
-				reserved, SignalMode.BACKWARD, network,
-				BuildTrack.FOLLOW, first));
+			if (network.rightSide) {
+				from = Swap(toCrossing.GetEntrance(toDirection));
+				to = Swap(fromCrossing.GetExit(fromDirection));
+			} else {
+				from = toCrossing.GetExit(toDirection);
+				to = fromCrossing.GetEntrance(fromDirection);
+			}
+			
+			subtasks.append(BuildTrack(this, from, to, reserved, SignalMode.BACKWARD, network, BuildTrack.FOLLOW, first));
 		}
 		
 		RunSubtasks();
 		
 		// open up both crossings' exits
-		local exit = fromCrossing.GetExit(fromDirection);
+		local exit = network.rightSide ? fromCrossing.GetExit(fromDirection) : Swap(fromCrossing.GetEntrance(fromDirection));
 		AIRail.RemoveSignal(exit[0], exit[1]);
 		if (StartsWith(fromCrossing.GetName(), "unnamed") && AIController.GetSetting("JunctionNames")) {
 			BuildWaypoint(exit[0]);
 		}
 		
-		exit = toCrossing.GetExit(toDirection);
+		exit = network.rightSide ? toCrossing.GetExit(toDirection) : Swap(toCrossing.GetEntrance(toDirection));
 		AIRail.RemoveSignal(exit[0], exit[1]);
 		if (StartsWith(toCrossing.GetName(), "unnamed") && AIController.GetSetting("JunctionNames")) {
 			BuildWaypoint(exit[0]);

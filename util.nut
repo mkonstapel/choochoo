@@ -272,6 +272,15 @@ function GetCargoID(cargoClass) {
 	return null;
 }
 
+function IsRightHandTraffic() {
+	local roadVehicleSide = AIGameSettings.GetValue("vehicle.road_side");
+	switch (AIController.GetSetting("TrainTrafficSide")) {
+		case 1: return false;
+		case 2: return true;
+		default: return roadVehicleSide == 1;
+	}
+}
+
 function GetMaxBridgeLength() {
 	local length = AIController.GetSetting("MaxBridgeLength");
 	while (length > 0 && AIBridgeList_Length(length).IsEmpty()) {
