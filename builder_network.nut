@@ -154,10 +154,18 @@ class BuildCrossing extends Builder {
 		}
 
 		// one exit should have a waypoint which we need to demolish
-		Demolish([0,2])
-		Demolish([2,3])
-		Demolish([3,1])
-		Demolish([1,0])
+		if (network.rightSide) {
+			Demolish([0,2])
+			Demolish([2,3])
+			Demolish([3,1])
+			Demolish([1,0])
+		} else {
+			Demolish([0,1])
+			Demolish([1,3])
+			Demolish([3,2])
+			Demolish([2,0])
+		}
+
 		
 		// four segments of track
 		RemoveSegment([0,1], [3,1]);
@@ -686,7 +694,11 @@ class ExtendCrossing extends Builder {
 		SetLocalCoordinateSystem(GetTile(offset), rotation);
 		
 		// the exit might have a waypoint
-		Demolish([0,2]);
+		if (network.rightSide) {
+			Demolish([0,2]);
+		} else {
+			Demolish([0,1]);
+		}
 		
 		RemoveRail([-1,1], [0,1], [1,1]);
 		RemoveRail([-1,2], [0,2], [1,2]);
