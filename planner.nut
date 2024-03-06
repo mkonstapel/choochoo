@@ -34,7 +34,7 @@ class CargoRoute {
 	
 	function GetTrainCost() {
 		// TODO: calculate optimal train length
-		local numWagons = 7;
+		local numWagons = 5;
 		return AIEngine.GetPrice(engine) + numWagons * AIEngine.GetPrice(wagon);
 	}
 	
@@ -44,7 +44,7 @@ class CargoRoute {
 	
 	function GetDailyProfit() {
 		// TODO: calculate optimal train length
-		local numWagons = 7;
+		local numWagons = 5;
 		
 		local tripTime = GetTripTime();
 		//Debug("Trip time", tripTime);
