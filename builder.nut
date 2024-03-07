@@ -69,16 +69,80 @@ function FindStationSite(town, stationRotation, destination) {
 		}
 		area.KeepValue(1);
 	}
+
+	if (!area.IsEmpty()) {
+		area.Valuate(LakeDetector, destination);
+		area.KeepValue(0);
+
+		if (area.IsEmpty()) {
+			Warning("LakeDetector rejected " + AITown.GetName(town));
+		}
+	}
 	
 	// pick the tile closest to the crossing
 	//area.Valuate(AITile.GetDistanceManhattanToTile, destination);
 	//area.KeepBottom(1);
-	
+
 	// pick the tile closest to the city center
 	area.Valuate(AITile.GetDistanceManhattanToTile, location);
 	area.KeepBottom(1);
 	
 	return area.IsEmpty() ? null : area.Begin();
+}
+
+function LakeDetector(tile, destination) {
+	// check the edges of the rectangle defined by the tile and destination
+	// return true if two opposing edges are blocked by water
+	local x1 = AIMap.GetTileX(tile);
+	local y1 = AIMap.GetTileY(tile);
+	local x2 = AIMap.GetTileX(destination);
+	local y2 = AIMap.GetTileY(destination);
+	local xmin = min(x1, x2);
+	local xmax = max(x1, x2);
+	local ymin = min(y1, y2);
+	local ymax = max(y1, y2);
+
+	// at least allow some water, even if we are allowed no or only tiny bridges
+	// 4 tiles probably means there's a way around somewhere
+	// and otherwise we might never build anything
+	local waterLimit = max(GetMaxBridgeLength() - 2, 4);
+	local xminBlocked = _LakeDetectorEdge(xmin, ymin, xmin, ymax, waterLimit);
+	local xmaxBlocked = _LakeDetectorEdge(xmax, ymin, xmax, ymax, waterLimit);
+	if (xminBlocked && xmaxBlocked) {
+		return 1;
+	}
+
+	local yminBlocked = _LakeDetectorEdge(xmin, ymin, xmax, ymin, waterLimit);
+	local ymaxBlocked = _LakeDetectorEdge(xmin, ymax, xmax, ymax, waterLimit);
+	return yminBlocked && ymaxBlocked ? 1 : 0;
+}
+
+function _LakeDetectorEdge(xmin, ymin, xmax, ymax, waterLimit) {
+	if (!(xmin == xmax || ymin == ymax)) {
+		throw "LakeDetectorEdge: not an edge";
+	}
+
+	if (!(xmin <= xmax && ymin <= ymax)) {
+		throw  "LakeDetectorEdge: min > max";
+	}
+
+	local waterCount = 0;
+	for (local x = xmin; x <= xmax; x++) {
+		for (local y = ymin; y <= ymax; y++) {
+
+			local t = AIMap.GetTileIndex(x, y);
+			if (AITile.IsWaterTile(t)) {
+				waterCount++;
+			} else {
+				waterCount = 0;
+			}
+			if (waterCount > waterLimit) {
+				return true;
+			}
+		}
+	}
+
+	return false;
 }
 
 function IsBuildableRectangle(location, rotation, from, to, mustBeFlat) {

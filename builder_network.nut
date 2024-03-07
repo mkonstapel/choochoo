@@ -467,6 +467,7 @@ class ExtendCrossing extends Builder {
 			town = null;
 			stationTile = null;
 			for (town = towns.Begin(); towns.HasNext(); town = towns.Next()) {
+				SetSecondarySign("Considering " + AITown.GetName(town));
 				stationTile = FindStationSite(town, stationRotation, crossing);
 				if (stationTile) break;
 			}
@@ -485,7 +486,9 @@ class ExtendCrossing extends Builder {
 			// construction if we don't have the money for pathfinding, tracks and trains 
 			local costEstimate = 80000;
 			
+			SetSecondarySign("Looking for junction site");
 			local crossingTile = FindCrossingSite(stationTile);
+			ClearSecondarySign();
 			if (crossingTile) {
 				local crossingEntranceDirection = InverseDirection(direction);
 				local crossingExitDirection = CrossingExitDirection(crossingTile, stationTile);
@@ -650,6 +653,18 @@ class ExtendCrossing extends Builder {
 		}
 		
 		tiles.KeepValue(1);
+
+		if (!tiles.IsEmpty()) {
+			tiles.Valuate(LakeDetector, stationTile);
+			tiles.KeepValue(0);
+			tiles.Valuate(LakeDetector, crossing);
+			tiles.KeepValue(0);
+
+			if (tiles.IsEmpty()) {
+				Warning("LakeDetector rejected crossing");
+			}
+		}
+		
 		//tiles.Valuate(AIMap.DistanceManhattan, centerTile);
 		tiles.Valuate(AIMap.DistanceManhattan, crossing);
 		tiles.KeepBottom(1);

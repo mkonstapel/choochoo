@@ -270,14 +270,23 @@ class BuildCargoLine extends Task {
 		
 		area.KeepValue(1);
 		
-		// pick the tile farthest from the destination for increased profit
-		area.Valuate(AITile.GetDistanceManhattanToTile, destination);
-		area.KeepTop(1);
-		
+		if (!area.IsEmpty()) {
+			area.Valuate(LakeDetector, destination);
+			area.KeepValue(0);
+
+			if (area.IsEmpty()) {
+				Warning("LakeDetector rejected " + AIIndustry.GetName(industry));
+			}
+		}
+
 		// pick the tile closest to the industry for looks
 		//area.Valuate(AITile.GetDistanceManhattanToTile, location);
 		//area.KeepBottom(1);
-		
+
+		// pick the tile farthest from the destination for increased profit
+		area.Valuate(AITile.GetDistanceManhattanToTile, destination);
+		area.KeepTop(1);
+
 		return area.IsEmpty() ? null : area.Begin();
 	}
 }
