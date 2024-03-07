@@ -144,7 +144,7 @@ class BuildTrack extends Task {
 		// do we want to search longer on longer routes?
 		// do we want to search "harder" if we really need this track?
 		local startDate = AIDate.GetCurrentDate();
-		local endDate = startDate + 2*365; 
+		local endDate = startDate + 365; 
 		local res = null;
 		local distance = Sqrt(AIMap.DistanceSquare(a, d));
 
