@@ -54,10 +54,15 @@ class BuildTrack extends Task {
 		AISign.BuildSign(d, "d");
 		*/
 		
+		local startDate = AIDate.GetCurrentDate();
 		if (!path) path = FindPath();
+		local endDate = AIDate.GetCurrentDate();
+		local days = endDate - startDate;
+
 		ClearSecondarySign();
-		if (path == null) throw TaskFailedException("no path");
-		if (path == false) throw TaskFailedException("gave up");
+		if (path == null) throw TaskFailedException("no path after " + days + " days");
+		if (path == false) throw TaskFailedException("gave up after " + days + " days");
+		Debug("    Found path in " + days + " days");
 		BuildPath(path);
 	}
 	
