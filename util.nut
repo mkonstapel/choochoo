@@ -185,6 +185,13 @@ function ArrayToList(a) {
 	return l;
 }
 
+function ArrayContains(a, item) {
+	foreach (item in a) {
+		if (item == item) return true;
+	}
+	return false;
+}
+
 /**
  * Return an array that contains all elements of a and b.
  */
