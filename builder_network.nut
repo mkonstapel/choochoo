@@ -705,7 +705,7 @@ class ExtendCrossing extends Builder {
 			// try again in the future to see if we can expand elsewhere.
 			// Since we failed, we may have troublesome geography, so expand
 			// other crossings first.
-			Error("retrying, " + AITown.GetName(town) + " didn't work out");
+			Debug(AITown.GetName(town) + " didn't work out");
 			triedTowns.append(town);
 			tasks.append(ExtendCrossing(null, crossing, direction, network, triedTowns));
 			
@@ -713,7 +713,7 @@ class ExtendCrossing extends Builder {
 			return;
 		} else {
 			// continue to clean up the exit
-			Error("no towns left to try");
+			Debug("no towns left to try");
 		}
 		
 		// either we didn't find a town, or one of our subtasks failed
