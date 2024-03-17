@@ -159,6 +159,7 @@ class BuildTrack extends Task {
 		local lowerBound = 0;
 		local alpha = 0.05;
 		while (true) {
+			ManageLoan();
 			res = pathfinder.FindPath(1000);
 			if (res == false) {
 				// see if we want to continue
