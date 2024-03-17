@@ -1,3 +1,75 @@
+/*
+ * Find towns in the expansion direction that don't already have a station.
+ */
+function FindTowns(fromTile, direction, minPopulation, minDistance, maxDistance, maxWidth, ignoreBranchStations) {
+	local towns = AIList();
+	towns.AddList(AITownList());
+	
+	// filter out the tiny ones
+	towns.Valuate(AITown.GetPopulation);
+	towns.KeepAboveValue(minPopulation);
+	
+	local stations = AIStationList(AIStation.STATION_TRAIN);
+	for (local station = stations.Begin(); stations.HasNext(); station = stations.Next()) {
+		if (ignoreBranchStations && IsBranchLineStation(station)) {
+			// a town can still get a mainline station if it already has a branch station
+		} else {
+			// any station counts, towns don't get multiple branch stations
+			towns.RemoveItem(AIStation.GetNearestTown(station));
+		}
+	}
+	
+	switch (direction) {
+		case Direction.NE:
+			// negative X
+			FilterTowns(towns, fromTile, GetXDistance, false, GetYDistance, minDistance, maxDistance, maxWidth);
+			break;
+			
+		case Direction.SE:
+			// positive Y
+			FilterTowns(towns, fromTile, GetYDistance, true, GetXDistance, minDistance, maxDistance, maxWidth);
+			break;
+			
+		case Direction.SW:
+			// positive X
+			FilterTowns(towns, fromTile, GetXDistance, true, GetYDistance, minDistance, maxDistance, maxWidth);
+			break;
+			
+		case Direction.NW:
+			// negative Y
+			FilterTowns(towns, fromTile, GetYDistance, false, GetXDistance, minDistance, maxDistance, maxWidth);
+			break;
+		
+		default: throw "invalid direction";
+	}
+	
+	return towns;
+}
+
+function FilterTowns(towns, location, lengthValuator, positive, widthValuator, minDistance, maxDistance, maxWidth) {
+	// remove that are too close or too far
+	towns.Valuate(lengthValuator, location);
+	if (positive) {
+		towns.RemoveBelowValue(minDistance);
+		towns.RemoveAboveValue(maxDistance);
+	} else {
+		towns.RemoveAboveValue(-minDistance);
+		towns.RemoveBelowValue(-maxDistance);
+	}
+	
+	// remove towns too far off to the side
+	towns.Valuate(widthValuator, location);
+	towns.KeepBetweenValue(-maxWidth, maxWidth);
+}
+
+function GetXDistance(town, tile) {
+	return AIMap.GetTileX(AITown.GetLocation(town)) - AIMap.GetTileX(tile);
+}
+
+function GetYDistance(town, tile) {
+	return AIMap.GetTileY(AITown.GetLocation(town)) - AIMap.GetTileY(tile);
+}
+
 class BuildNewNetwork extends Task {
 	
 	static MAX_ATTEMPTS = 50;
@@ -66,12 +138,11 @@ class BuildNewNetwork extends Task {
 	
 	function EstimateCrossing(tile, direction, estimationNetwork) {
 		// for now, ignore potential gains from newly built crossings
-		local extender = ExtendCrossing(this, tile, direction, estimationNetwork);
-		local towns = extender.FindTowns();
+		local towns = FindTowns(tile, direction, ExtendCrossing.MIN_TOWN_POPULATION, estimationNetwork.minDistance, estimationNetwork.maxDistance, estimationNetwork.maxDistance/2, true);
 		local town = null;
 		local stationTile = null;
 		for (town = towns.Begin(); towns.HasNext(); town = towns.Next()) {
-			stationTile = FindStationSite(town, BuildTerminusStation.StationRotationForDirection(direction), tile);
+			stationTile = FindMainlineStationSite(town, StationRotationForDirection(direction), tile);
 			if (stationTile) {
 				return 1;
 			}
@@ -294,6 +365,71 @@ class ConnectStation extends Task {
 	}
 }
 
+class ConnectBranchStation extends Task {
+	
+	crossingTile = null;
+	direction = null;
+	stationTile = null;
+	network = null;
+	
+	constructor(parentTask, crossingTile, direction, stationTile, network) {
+		Task.constructor(parentTask);
+		this.crossingTile = crossingTile;
+		this.direction = direction;
+		this.stationTile = stationTile;
+		this.network = network;
+	}
+	
+	function Run() {
+		SetConstructionSign(crossingTile, this);
+		
+		local crossing = Crossing(crossingTile);
+		
+		if (!subtasks) {
+			subtasks = [];
+			local station = BranchStation.AtLocation(stationTile, BRANCH_STATION_PLATFORM_LENGTH);
+			
+			local reserved = station.GetReservedRearEntranceSpace();
+			foreach (d in [Direction.NE, Direction.SW, Direction.NW, Direction.SE]) {
+				if (d != direction) {
+					reserved.extend(crossing.GetReservedEntranceSpace(d));
+					reserved.extend(crossing.GetReservedExitSpace(d));
+				}
+			}
+			
+			// because the pathfinder returns a path as a linked list from the
+			// goal back to the start, we build "in reverse", and because we
+			// want the first signal block (from the station or junction
+			// exit) to be large enough, we always want to start building
+			// from that end so we actually pathfind in reverse (entrance to
+			// exit) and therefore, build forward (exit to entrance)
+			local from, to;
+			if (network.rightSide) {
+				from = Swap(crossing.GetEntrance(direction));
+			} else {
+				from = crossing.GetExit(direction);
+			}
+			
+			to = station.GetEntrance();
+
+			local buildTrack = BuildTrack(this,
+				from, to,
+				reserved, SignalMode.NONE, network, BuildTrack.BRANCH);
+			
+			subtasks.append(buildTrack);
+
+		}
+		
+		RunSubtasks();
+	}
+	
+	function _tostring() {
+		local station = AIStation.GetStationID(stationTile);
+		local name = AIStation.IsValidStation(station) ? AIStation.GetName(station) : "unnamed";
+		return "ConnectBranchStation " + name + " to " + Crossing(crossingTile) + " " + DirectionName(direction);
+	}
+}
+
 class ConnectCrossing extends Task {
 	
 	fromCrossingTile = null;
@@ -414,19 +550,19 @@ class ExtendCrossing extends Builder {
 	crossing = null;
 	direction = null;
 	network = null;
-	triedTowns = null;
+	failedTowns = null;
 	cancelled = null;
 	town = null;
 	candidateTowns = null;
 	stationTile = null;
 	crossingTile = null;
 	
-	constructor(parentTask, crossing, direction, network, triedTowns = null) {
+	constructor(parentTask, crossing, direction, network, failedTowns = null) {
 		Builder.constructor(parentTask, crossing);
 		this.crossing = crossing;
 		this.direction = direction;
 		this.network = network;
-		this.triedTowns = triedTowns == null ? [] : triedTowns;
+		this.failedTowns = failedTowns == null ? [] : failedTowns;
 		this.cancelled = false;
 		this.town = null;
 		this.candidateTowns = [];
@@ -455,23 +591,25 @@ class ExtendCrossing extends Builder {
 		
 		if (!subtasks) {
 			SetConstructionSign(crossing, this);
-			local towns = FindTowns();
-			local stationRotation = BuildTerminusStation.StationRotationForDirection(direction);
+			local towns = FindTowns(crossing, direction, MIN_TOWN_POPULATION, network.minDistance, network.maxDistance, network.maxDistance/2, true);
+			towns.Valuate(AITown.GetPopulation);
+			towns.Sort(AIList.SORT_BY_VALUE, false);
+			local stationRotation = StationRotationForDirection(direction);
 			
-			// TODO: try more than station site per town, and more than one town per direction
+			// TODO: try more than station site per town?
 			// NOTE: give up on a town if pathfinding fails or you might try to pathfound around the sea over and over and over...
 			
 			town = null;
 			stationTile = null;
 			for (local candidate = towns.Begin(); towns.HasNext(); candidate = towns.Next()) {
-				if (ArrayContains(triedTowns, candidate)) {
+				if (ArrayContains(failedTowns, candidate)) {
 					continue;
 				}
 
 				if (!town) {
 					SetSecondarySign("Considering " + AITown.GetName(candidate));
 					Debug("Considering " + AITown.GetName(candidate));
-					stationTile = FindStationSite(candidate, stationRotation, crossing);
+					stationTile = FindMainlineStationSite(candidate, stationRotation, crossing);
 					if (stationTile) {
 						town = candidate;
 					}
@@ -586,77 +724,6 @@ class ExtendCrossing extends Builder {
 		}
 	}
 	
-	/*
-	 * Find towns in the expansion direction that don't already have a station.
-	 */
-	function FindTowns() {
-		local towns = AIList();
-		towns.AddList(AITownList());
-		
-		// filter out the tiny ones
-		towns.Valuate(AITown.GetPopulation);
-		towns.KeepAboveValue(MIN_TOWN_POPULATION);
-		
-		local stations = AIStationList(AIStation.STATION_TRAIN);
-		for (local station = stations.Begin(); stations.HasNext(); station = stations.Next()) {
-			towns.RemoveItem(AIStation.GetNearestTown(station));
-		}
-		
-		switch (direction) {
-			case Direction.NE:
-				// negative X
-				FilterTowns(towns, crossing, GetXDistance, false, GetYDistance);
-				break;
-				
-			case Direction.SE:
-				// positive Y
-				FilterTowns(towns, crossing, GetYDistance, true, GetXDistance);
-				break;
-				
-			case Direction.SW:
-				// positive X
-				FilterTowns(towns, crossing, GetXDistance, true, GetYDistance);
-				break;
-				
-			case Direction.NW:
-				// negative Y
-				FilterTowns(towns, crossing, GetYDistance, false, GetXDistance);
-				break;
-			
-			default: throw "invalid direction";
-		}
-		
-		//towns.Valuate(AITown.GetDistanceManhattanToTile, fromStationTile);
-		//towns.Sort(AIList.SORT_BY_VALUE, true);
-		towns.Valuate(AITown.GetPopulation);
-		towns.Sort(AIList.SORT_BY_VALUE, false);
-		return towns;
-	}
-	
-	function FilterTowns(towns, location, lengthValuator, positive, widthValuator) {
-		// remove that are too close or too far
-		towns.Valuate(lengthValuator, location);
-		if (positive) {
-			towns.RemoveBelowValue(network.minDistance);
-			towns.RemoveAboveValue(network.maxDistance);
-		} else {
-			towns.RemoveAboveValue(-network.minDistance);
-			towns.RemoveBelowValue(-network.maxDistance);
-		}
-		
-		// remove towns too far off to the side
-		towns.Valuate(widthValuator, location);
-		towns.KeepBetweenValue(-network.maxDistance/2, network.maxDistance/2);
-	}
-	
-	function GetXDistance(town, tile) {
-		return AIMap.GetTileX(AITown.GetLocation(town)) - AIMap.GetTileX(tile);
-	}
-	
-	function GetYDistance(town, tile) {
-		return AIMap.GetTileY(AITown.GetLocation(town)) - AIMap.GetTileY(tile);
-	}
-	
 	function FindCrossingSite(stationTile) {
 		local dx = AIMap.GetTileX(stationTile) - AIMap.GetTileX(crossing);
 		local dy = AIMap.GetTileY(stationTile) - AIMap.GetTileY(crossing);
@@ -691,8 +758,10 @@ class ExtendCrossing extends Builder {
 			}
 		}
 		
-		//tiles.Valuate(AIMap.DistanceManhattan, centerTile);
-		tiles.Valuate(AIMap.DistanceManhattan, crossing);
+		// try for a more symmetrical layout by not prefering to stay close to the source crossing?
+		tiles.Valuate(AIMap.DistanceManhattan, centerTile);
+		// tiles.Valuate(AIMap.DistanceManhattan, crossing);
+
 		tiles.KeepBottom(1);
 		return tiles.IsEmpty() ? null : tiles.Begin();
 	}
@@ -706,14 +775,19 @@ class ExtendCrossing extends Builder {
 			// Since we failed, we may have troublesome geography, so expand
 			// other crossings first.
 			Debug(AITown.GetName(town) + " didn't work out");
-			triedTowns.append(town);
-			tasks.append(ExtendCrossing(null, crossing, direction, network, triedTowns));
+			failedTowns.append(town);
+			tasks.append(ExtendCrossing(null, crossing, direction, network, failedTowns));
 			
 			// leave the exit in place
 			return;
 		} else {
-			// continue to clean up the exit
 			Debug("no towns left to try");
+
+			// maybe we can still build a branch line
+			tasks.append(BuildBranchLine(null, crossing, direction, network));
+
+			// leave the exit in place
+			return;
 		}
 		
 		// either we didn't find a town, or one of our subtasks failed
@@ -748,7 +822,9 @@ class ExtendCrossing extends Builder {
 		}
 		
 		// move coordinate system
-		SetLocalCoordinateSystem(GetTile(offset), rotation);
+		if (location == crossing) {
+			SetLocalCoordinateSystem(GetTile(offset), rotation);
+		}
 		
 		// the exit might have a waypoint
 		if (network.rightSide) {
@@ -770,17 +846,19 @@ class ExtendCrossing extends Builder {
 		RemoveRail([2,1], [2,2], [1,2]);
 		
 		// we can remove more bits if another direction is already gone
-		if (!HasRail([1,3])) {
+		if (!HasRail([1,3]) && !HasRail([2,3])) {
 			RemoveRail([1,1], [2,1], [3,1]);
 			RemoveRail([2,0], [2,1], [2,2]);
 			RemoveRail([2,1], [2,2], [2,3]);
 		}
 		
-		if (!HasRail([1,0])) {
+		if (!HasRail([1,0]) && !HasRail([1,0])) {
 			RemoveRail([1,2], [2,2], [3,2]);
 			RemoveRail([2,0], [2,1], [2,2]);
 			RemoveRail([2,1], [2,2], [2,3]);
 		}
+
+		// TODO if only two directions remain, rename from "crossing"/"junction" to "waypoint"
 	}
 	
 	function HasRail(tileCoords) {

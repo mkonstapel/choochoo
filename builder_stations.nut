@@ -1,3 +1,13 @@
+function StationRotationForDirection(direction) {
+	switch (direction) {
+		case Direction.NE: return Rotation.ROT_270;
+		case Direction.SE: return Rotation.ROT_180;
+		case Direction.SW: return Rotation.ROT_90;
+		case Direction.NW: return Rotation.ROT_0;
+		default: throw "invalid direction";
+	}
+}
+
 /**
  * Single platform terminus station.
  */
@@ -9,7 +19,6 @@ class BuildCargoStation extends Builder {
 	cargo = null;
 	isSource = null;
 	platformLength = null;
-	platform = null;
 	
 	constructor(parentTask, location, direction, network, atIndustry, toIndustry, cargo, isSource, platformLength) {
 		Builder.constructor(parentTask, location, StationRotationForDirection(direction));
@@ -24,7 +33,7 @@ class BuildCargoStation extends Builder {
 	function Run() {
 		SetConstructionSign(location, this);
 		
-		platform = BuildPlatform();
+		BuildPlatform();
 		local p = platformLength;
 		BuildSegment([0, p], [0, p+1]);
 		BuildDepot([0,-1], [0,0]);
@@ -32,16 +41,6 @@ class BuildCargoStation extends Builder {
 		//BuildRail([1, p], [0, p], [0, p+1]);
 		network.depots.append(GetTile([0,-1]));
 		network.stations.append(AIStation.GetStationID(location));
-	}
-	
-	function StationRotationForDirection(direction) {
-		switch (direction) {
-			case Direction.NE: return Rotation.ROT_270;
-			case Direction.SE: return Rotation.ROT_180;
-			case Direction.SW: return Rotation.ROT_90;
-			case Direction.NW: return Rotation.ROT_0;
-			default: throw "invalid direction";
-		}
 	}
 	
 	function Failed() {
@@ -113,6 +112,98 @@ class BuildCargoStation extends Builder {
 }
 
 /**
+ * Single platform through station.
+ */
+class BuildBranchStation extends Builder {
+	
+	network = null;
+	town = null;
+	platformLength = null;
+	
+	constructor(parentTask, location, direction, network, town, platformLength = BRANCH_STATION_PLATFORM_LENGTH) {
+		Builder.constructor(parentTask, location, StationRotationForDirection(direction));
+		this.network = network;
+		this.town = town;
+		this.platformLength = platformLength;
+	}
+	
+	function Run() {
+		SetConstructionSign(location, this);
+		
+		local stationID = BuildPlatform();
+		local name = AIStation.GetName(stationID);
+		if (!EndsWith(name, " B")) {
+			AIStation.SetName(stationID, name + " B");
+		}
+
+		local p = platformLength;
+		// do we need this bit?
+		// BuildSegment([0, p], [0, p+1]);
+		
+		// probably don't want this, you can't send arbitrary trains here
+		// we could track branches and branch stations but I don't think we need to
+
+		// network.stations.append(AIStation.GetStationID(location));
+	}
+	
+	function Failed() {
+		Task.Failed();
+		
+		local station = AIStation.GetStationID(location);
+		foreach (index, entry in network.stations) {
+			if (entry == station) {
+				network.stations.remove(index);
+				break;
+			}
+		}
+		
+		foreach (y in Range(-1, platformLength+2)) {
+			Demolish([0,y]);
+		}
+	}
+	
+	/**
+	 * Build station platform. Returns stationID.
+	 */
+	function BuildPlatform() {
+		// template is oriented NW->SE
+		local direction;
+		if (this.rotation == Rotation.ROT_0 || this.rotation == Rotation.ROT_180) {
+			direction = AIRail.RAILTRACK_NW_SE;
+		} else {
+			direction = AIRail.RAILTRACK_NE_SW;
+		}
+		
+		// on the map, location of the station is the topmost tile
+		local platform;
+		if (this.rotation == Rotation.ROT_0) {
+			platform = GetTile([0, 0]);
+		} else if (this.rotation == Rotation.ROT_90) {
+			platform = GetTile([0, platformLength-1]);
+		} else if (this.rotation == Rotation.ROT_180) {
+			platform = GetTile([0, platformLength-1]);
+		} else if (this.rotation == Rotation.ROT_270) {
+			platform = GetTile([0,0]);
+		} else {
+			throw "invalid rotation";
+		}
+		
+		// don't try to build twice
+		local stationID = AIStation.GetStationID(platform);
+		if (AIStation.IsValidStation(stationID)) return stationID;
+		
+		// AIRail.BuildRailStation(platform, direction, 1, platformLength, AIStation.STATION_NEW);
+		AIRail.BuildRailStation(platform, direction, 1, platformLength, AIStation.STATION_NEW);
+		CheckError();
+		return AIStation.GetStationID(platform);
+	}
+	
+	function _tostring() {
+		return "BuildBranchStation at " + AITown.GetName(town);
+	}
+}
+
+/**
  * 2-platform terminus station.
  */
 class BuildTerminusStation extends Builder {
@@ -166,16 +257,6 @@ class BuildTerminusStation extends Builder {
 		BuildRoadDriveThrough([2,p-4], [2,p-5], true, stationID);
 		
 		network.stations.append(stationID);
-	}
-	
-	function StationRotationForDirection(direction) {
-		switch (direction) {
-			case Direction.NE: return Rotation.ROT_270;
-			case Direction.SE: return Rotation.ROT_180;
-			case Direction.SW: return Rotation.ROT_90;
-			case Direction.NW: return Rotation.ROT_0;
-			default: throw "invalid direction";
-		}
 	}
 	
 	function Failed() {

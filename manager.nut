@@ -20,6 +20,11 @@ function CullTrains() {
 	local best = AIList();
 	local worst = AIList();
 	best.AddList(trains);
+
+	// don't clone trains on branch lines, that'll deadlock
+	best.Valuate(IsBranchLineTrain);
+	best.KeepValue(0);
+
 	worst.AddList(trains);
 	
 	best.KeepTop(n/10);

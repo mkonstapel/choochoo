@@ -24,13 +24,13 @@ class BuildLine extends Task {
 			
 			local nameA = AITown.GetName(a);
 			local dirA = StationDirection(AITown.GetLocation(a), AITown.GetLocation(B));
-			local rotA = BuildTerminusStation.StationRotationForDirection(dirA);
+			local rotA = StationRotationForDirection(dirA);
 			local siteA = FindStationSite(a, rotA, AITown.GetLocation(b));
 	
 			local nameB = AITown.GetName(b);
 			local locB = AITown.GetLocation(b);
 			local dirB = StationDirection(AITown.GetLocation(b), AITown.GetLocation(a));
-			local rotB = BuildTerminusStation.StationRotationForDirection(dirB);
+			local rotB = StationRotationForDirection(dirB);
 			local siteB = FindStationSite(b, rotB, AITown.GetLocation(a));
 			
 			if (siteA && siteB) {

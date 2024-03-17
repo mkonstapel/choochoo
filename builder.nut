@@ -3,10 +3,15 @@ const RAIL_STATION_WIDTH = 3;
 const RAIL_STATION_PLATFORM_LENGTH = 4;
 const RAIL_STATION_LENGTH = 7; // actual building and rails plus room for entrance/exit
 
+const BRANCH_STATION_WIDTH = 1;
+const BRANCH_STATION_PLATFORM_LENGTH = 3;
+const BRANCH_STATION_LENGTH = 3;
+
 require("builder_main.nut");
 require("builder_misc.nut");
 require("builder_cargo.nut");
 require("builder_network.nut");
+require("builder_branch.nut");
 require("builder_road.nut");
 require("builder_stations.nut");
 require("builder_track.nut");
@@ -26,10 +31,18 @@ function StationDirection(a, b) {
 	}
 }
 
+function FindMainlineStationSite(town, stationRotation, destination) {
+	return FindStationSite(town, stationRotation, destination, RAIL_STATION_WIDTH, RAIL_STATION_LENGTH, RAIL_STATION_PLATFORM_LENGTH);
+}
+
+function FindBranchStationSite(town, stationRotation, destination) {
+	return FindStationSite(town, stationRotation, destination, BRANCH_STATION_WIDTH, BRANCH_STATION_LENGTH, BRANCH_STATION_PLATFORM_LENGTH, 5);
+}
+
 /**
  * Find a site for a station at the given town.
  */
-function FindStationSite(town, stationRotation, destination) {
+function FindStationSite(town, stationRotation, destination, width, length, platformLength, exitSpace=0) {
 	local location = AITown.GetLocation(town);
 	
 	local area = AITileList();
@@ -41,7 +54,7 @@ function FindStationSite(town, stationRotation, destination) {
 	
 	// must accept passengers
 	// we can capture more production by joining bus stations 
-	area.Valuate(CargoValue, stationRotation, [0, 0], [2, RAIL_STATION_PLATFORM_LENGTH], PAX, RAIL_STATION_RADIUS, true);
+	area.Valuate(CargoValue, stationRotation, [0, 0], [2, platformLength], PAX, RAIL_STATION_RADIUS, true);
 	area.KeepValue(1);
 	
 	// any production will do (we can capture more with bus stations)
@@ -52,9 +65,9 @@ function FindStationSite(town, stationRotation, destination) {
 	// room for a station - try to find a flat area first
 	local flat = AIList();
 	flat.AddList(area);
-	// flat.Valuate(IsBuildableRectangle, stationRotation, [0, 0], [RAIL_STATION_WIDTH, RAIL_STATION_LENGTH], true);
+	// flat.Valuate(IsBuildableRectangle, stationRotation, [0, -exitSpace], [width, length], true);
 	for (local tile = flat.Begin(); flat.HasNext(); tile = flat.Next()) {
-		flat.SetValue(tile, IsBuildableRectangle(tile, stationRotation, [0, 0], [RAIL_STATION_WIDTH, RAIL_STATION_LENGTH], true) ? 1 : 0);
+		flat.SetValue(tile, IsBuildableRectangle(tile, stationRotation, [0,  -exitSpace], [width, length], true) ? 1 : 0);
 	}
 	
 	flat.KeepValue(1);
@@ -63,9 +76,9 @@ function FindStationSite(town, stationRotation, destination) {
 		area = flat;
 	} else {
 		// try again, with terraforming
-		// area.Valuate(IsBuildableRectangle, stationRotation, [0, 0], [RAIL_STATION_WIDTH, RAIL_STATION_LENGTH], false);
+		// area.Valuate(IsBuildableRectangle, stationRotation, [0, -exitSpace], [width, length], false);
 		for (local tile = area.Begin(); area.HasNext(); tile = area.Next()) {
-			area.SetValue(tile, IsBuildableRectangle(tile, stationRotation, [0, 0], [RAIL_STATION_WIDTH, RAIL_STATION_LENGTH], false) ? 1 : 0);
+			area.SetValue(tile, IsBuildableRectangle(tile, stationRotation, [0, -exitSpace], [width, length], false) ? 1 : 0);
 		}
 		area.KeepValue(1);
 	}

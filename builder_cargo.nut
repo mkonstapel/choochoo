@@ -237,13 +237,13 @@ class BuildCargoLine extends Task {
 		
 		local nameA = AIIndustry.GetName(a);
 		local dirA = StationDirection(locA, locB);
-		local rotA = BuildTerminusStation.StationRotationForDirection(dirA);
+		local rotA = StationRotationForDirection(dirA);
 		//local siteA = FindIndustryStationSite(a, true, rotA, locB, CARGO_STATION_LENGTH + 3, 2);
 		local siteA = FindIndustryStationSite(a, true, rotA, locB);
 
 		local nameB = AIIndustry.GetName(b);
 		local dirB = StationDirection(locB, locA);
-		local rotB = BuildTerminusStation.StationRotationForDirection(dirB);
+		local rotB = StationRotationForDirection(dirB);
 		//local siteB = FindIndustryStationSite(b, false, rotB, locA, CARGO_STATION_LENGTH + 3, 2);
 		local siteB = FindIndustryStationSite(b, false, rotB, locA);
 		

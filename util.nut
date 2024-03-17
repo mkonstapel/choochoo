@@ -160,6 +160,10 @@ function StartsWith(a, b) {
 	return a.find(b) == 0;
 }
 
+function EndsWith(a, b) {
+	return a.find(b) == a.len() - b.len();
+}
+
 /**
  * Swap two tiles - used for swapping entrance/exit tile strips.
  */

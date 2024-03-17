@@ -5,6 +5,7 @@ class BuildTrack extends Task {
 	static LOOSE = 1;
 	static FAST = 2;
 	static FOLLOW = 3;
+	static BRANCH = 4;
 	
 	//static DEPOT_INTERVAL = 30;
 	static DEPOT_INTERVAL = 0;
@@ -114,6 +115,13 @@ class BuildTrack extends Task {
 			pathfinder.cost.slope = 0;
 			pathfinder.cost.diagonal_tile = u;
 			pathfinder.cost.adj_obstacle = 5*u;
+		} else if (style == BRANCH) {
+			// like straight, but no obstacle avoidance
+			// TODO: we may want to disallow/discourage bridges
+			
+			pathfinder.cost.turn = 2*u;
+			pathfinder.cost.slope = 0;
+			pathfinder.cost.diagonal_tile = u;
 		} else if (style == FOLLOW) {
 			// cheaper turns, penalty for no nearby track
 			pathfinder.cost.no_adj_rail = 2*u;

@@ -83,6 +83,13 @@ class Builder extends Task {
 			CheckError();
 		}
 	}
+
+	function RemoveSignal(tile, front) {
+		if (AIRail.GetSignalType(GetTile(tile), GetTile(front)) != AIRail.SIGNALTYPE_NONE) {
+			AIRail.RemoveSignal(GetTile(tile), GetTile(front));
+			CheckError();
+		}
+	}
 	
 	function BuildDepot(tile, front) {
 		// trying to build a depot where one already exists results in AREA_NOT_CLEAR, not ALREADY_BUILT

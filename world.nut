@@ -253,6 +253,83 @@ class TerminusStation extends WorldObject {
 	}
 }
 
+class BranchStation extends WorldObject {
+	
+	platformLength = null;
+	
+	constructor(location, rotation, platformLength) {
+		WorldObject.constructor(location, rotation);
+		this.platformLength = platformLength;
+	}
+	
+	function AtLocation(location, platformLength) {
+		// deduce the rotation of an existing station
+		local rotation;
+		local direction = AIRail.GetRailStationDirection(location);
+		if (direction == AIRail.RAILTRACK_NE_SW) {
+			if (AIRail.IsRailStationTile(location + AIMap.GetTileIndex(1,0))) {
+				rotation = Rotation.ROT_270;
+			} else {
+				rotation = Rotation.ROT_90;
+			}
+		} else if (direction == AIRail.RAILTRACK_NW_SE) {
+			if (AIRail.IsRailStationTile(location + AIMap.GetTileIndex(0,1))) {
+				rotation = Rotation.ROT_0;
+			} else {
+				rotation = Rotation.ROT_180;
+			}
+		} else {
+			throw "no station at " + location;
+		}
+		
+		return BranchStation(location, rotation, platformLength);
+	}
+	
+	function _tostring() {
+		return AIStation.GetName(AIStation.GetStationID(location));
+	}
+	
+	function GetEntrance() {
+		return TileStrip([0, platformLength], [0, platformLength - 1]);
+	}
+	
+	function GetExit() {
+		return Swap(GetEntrance());
+	}
+	
+	function GetReservedEntranceSpace() {
+		return TileStrip([0, platformLength], [0, platformLength + 2]);
+	}
+
+	function GetReservedExitSpace() {
+		return GetReservedEntranceSpace();
+	}
+	
+	function GetRearEntrance() {
+		return TileStrip([0, -1], [0, 0]);
+	}
+	
+	function GetRearExit() {
+		return Swap(GetRearEntrance());
+	}
+	
+	function GetReservedRearEntranceSpace() {
+		return TileStrip([0, 0], [0, -2]);
+	}
+	
+	function GetReservedRearExitSpace() {
+		return GetReservedRearEntranceSpace();
+	}
+
+	// function GetRoadDepot() {
+	// 	return GetTile([2,3]);
+	// }
+	
+	// function GetRoadDepotExit() {
+	// 	return GetTile([2,2]);
+	// }
+}
+
 class Network {
 	
 	railType = null;

@@ -1,10 +1,20 @@
-function GenerateName(train, depot) {
+function GenerateName(train, depot, prefix="T") {
 	local i = 0;
-	while (!AIVehicle.SetName(train, "T" + i + "D" + depot)) {
+	while (!AIVehicle.SetName(train, prefix + i + "D" + depot)) {
 		i++;
 	}
 }
-		
+
+function IsBranchLineTrain(train) {
+	local name = AIVehicle.GetName(train);
+	return name[0] == "B";
+}
+
+function IsBranchLineStation(station) {
+	local name = AIStation.GetName(station);
+	return EndsWith(name, " B");
+}
+
 function GetDepot(train) {
 	// D<tile index>
 	local name = AIVehicle.GetName(train);
