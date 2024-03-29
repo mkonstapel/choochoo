@@ -124,10 +124,29 @@ class ChooChoo extends AIController {
 				} else if (e instanceof NeedMoneyException) {
 					Debug(task + " needs £" + e.amount);
 					minMoney = e.amount;
+				} else if (e instanceof TooManyVehiclesException) {
+					// TODO cull more aggressively?
+					// we don't to keep building and failing each task because we can't build trains
+					// so instead, just continue building, but slow down?
+					Warning("Reached max number of vehicles, sleeping for 30 days");
+					Sleep(30*TICKS_PER_DAY);
+				} else {
+					throw e;
+				}
+			} else if (typeof(e) == "string") {
+				if (AIController.GetSetting("CarryOn") == 0) {
+					Error("Programming error:", e);
+					Error("Rerunning last task to obtain a stack trace");
+
+					// These are things like "the index 'foo' does not exist" due to programming errors.
+					// Rethrowing the string loses the original stack trace, making it impossible to debug
+					// so we run the failing task again to get a proper stack trace
+					task.Run();
 				} else {
 					throw e;
 				}
 			} else {
+				Error("Unknown error type:", typeof(e));
 				throw e;
 			}
 		}

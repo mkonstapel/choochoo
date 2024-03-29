@@ -40,6 +40,20 @@ class NeedMoneyException {
 	}
 }
 
+class TooManyVehiclesException {
+	
+	trains = 0;
+	road = 0;
+	
+	constructor() {
+		Warning(this);
+	}
+	
+	function _tostring() {
+		return "TooManyVehicles";
+	}
+}
+
 class Task {
 	
 	static MAX_ERR_UNKNOWN = 10;
@@ -126,6 +140,9 @@ class Task {
 			case AIError.ERR_VEHICLE_IN_THE_WAY:
 				errRetryCount++;
 				throw errRetryCount < MAX_RETRY ? TaskRetryException() : TaskFailedException("too many retries");
+
+			case AIVehicle.ERR_VEHICLE_TOO_MANY:
+				throw TooManyVehiclesException();
 			
 			case AIError.ERR_PRECONDITION_FAILED:
 			case AIError.ERR_PRECONDITION_STRING_TOO_LONG:
