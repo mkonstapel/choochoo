@@ -2,6 +2,7 @@ class BuildBranchLine extends Builder {
 
     static MIN_BRANCH_TOWN_POPULATION = 100;
     static MAX_BRANCH_DEPTH = 4;
+    static MAX_DISTANCE = 50;
     
     crossing = null;
     direction = null;
@@ -59,7 +60,7 @@ class BuildBranchLine extends Builder {
 
             local closestMainlineStationTile = AIStation.GetLocation(stationList.Begin());
             
-            local towns = FindTowns(crossing, direction, MIN_BRANCH_TOWN_POPULATION, 10, 50, 20, false);
+            local towns = FindTowns(crossing, direction, MIN_BRANCH_TOWN_POPULATION, 10, BuildBranchLine.MAX_DISTANCE, 20, false);
             towns.Valuate(AITown.GetDistanceManhattanToTile, crossing);
             towns.Sort(AIList.SORT_BY_VALUE, true);
     
@@ -81,6 +82,8 @@ class BuildBranchLine extends Builder {
                     stationTile = FindBranchStationSite(candidate, stationRotation, crossing);
                     if (stationTile) {
                         town = candidate;
+                    } else {
+                        Debug("Cannot build a branch station at " + AITown.GetName(candidate));
                     }
                 } else {
                     // remember if we have other options in case this town doesn't work out
@@ -97,9 +100,7 @@ class BuildBranchLine extends Builder {
             local stationTiles = AITileList();
             stationTiles.AddRectangle(stationCoordinates.GetTile([0, 0]), stationCoordinates.GetTile([BRANCH_STATION_WIDTH, BRANCH_STATION_LENGTH]));
 
-            // TODO: proper cost estimate
-            // building stations is fairly cheap, but it's no use to start
-            // construction if we don't have the money for pathfinding, tracks and trains 
+            // branch lines should be cheap
             local costEstimate = 40000;
             
             ClearSecondarySign();
@@ -176,17 +177,15 @@ class BuildBranchLine extends Builder {
         // extend the branch, update train to new end of line station
         tasks.insert(1, ExtendBranchLine(null, stationTile, direction, network, MAX_BRANCH_DEPTH - 1));
 
-        // Do branch stations get a bus service?
+        local towns = AITownList();
+        towns.Valuate(AITown.GetDistanceManhattanToTile, stationTile);
+        towns.KeepBelowValue(MAX_BUS_ROUTE_DISTANCE);
         
-        // local towns = AITownList();
-        // towns.Valuate(AITown.GetDistanceManhattanToTile, stationTile);
-        // towns.KeepBelowValue(MAX_BUS_ROUTE_DISTANCE);
-        
-        // // sort descending, then append back-to-front so the closest actually goes first
-        // towns.Sort(AIList.SORT_BY_VALUE, false);
-        // for (local town = towns.Begin(); towns.HasNext(); town = towns.Next()) {
-        //  tasks.insert(1, BuildBusService(null, stationTile, town));
-        // }
+        // sort descending, then append back-to-front so the closest actually goes first
+        towns.Sort(AIList.SORT_BY_VALUE, false);
+        for (local town = towns.Begin(); towns.HasNext(); town = towns.Next()) {
+         tasks.insert(1, BuildBusService(null, stationTile, town));
+        }
     }
     
     function Failed() {
@@ -318,14 +317,16 @@ class ExtendBranchLine extends Builder {
     }
     
     function Run() {
+        local stationRotation = StationRotationForDirection(direction);
+        local fromStation = BranchStation(fromStationTile, stationRotation, BRANCH_STATION_PLATFORM_LENGTH);
+
         if (!subtasks) {
             SetConstructionSign(fromStationTile, this);
 
-            local towns = FindTowns(fromStationTile, direction, BuildBranchLine.MIN_BRANCH_TOWN_POPULATION, 10, 50, 20, false);
+            local towns = FindTowns(fromStationTile, direction, BuildBranchLine.MIN_BRANCH_TOWN_POPULATION, 10, BuildBranchLine.MAX_DISTANCE, 20, false);
             towns.Valuate(AITown.GetDistanceManhattanToTile, fromStationTile);
             towns.Sort(AIList.SORT_BY_VALUE, true);
     
-            local stationRotation = StationRotationForDirection(direction);
             
             // TODO: try more than station site per town?
             // NOTE: give up on a town if pathfinding fails or you might try to pathfound around the sea over and over and over...
@@ -343,6 +344,8 @@ class ExtendBranchLine extends Builder {
                     stationTile = FindBranchStationSite(candidate, stationRotation, fromStationTile);
                     if (stationTile) {
                         town = candidate;
+                    } else {
+                        Debug("Cannot build a branch station at " + AITown.GetName(candidate));
                     }
                 } else {
                     // remember if we have other options in case this town doesn't work out
@@ -354,7 +357,6 @@ class ExtendBranchLine extends Builder {
                 throw TaskFailedException("no towns " + DirectionName(direction) + " of " + AIStation.GetName(AIStation.GetStationID(fromStationTile)) + " where we can build a branch station");
             }
 
-            local fromStation = BranchStation(fromStationTile, stationRotation, BRANCH_STATION_PLATFORM_LENGTH);
             local toStation = BranchStation(stationTile, stationRotation, BRANCH_STATION_PLATFORM_LENGTH);
             
             // so we don't reforest tiles we're about to build on again
@@ -363,6 +365,8 @@ class ExtendBranchLine extends Builder {
             stationTiles.AddRectangle(stationCoordinates.GetTile([0, 0]), stationCoordinates.GetTile([BRANCH_STATION_WIDTH, BRANCH_STATION_LENGTH]));
 
             ClearSecondarySign();
+            local reserved = toStation.GetReservedRearEntranceSpace();
+            reserved.extend(toStation.GetReservedEntranceSpace());
             subtasks = [
                 // branches should be cheap
                 // WaitForMoney(this, costEstimate),
@@ -373,22 +377,45 @@ class ExtendBranchLine extends Builder {
                 BuildBranchStation(this, stationTile, direction, network, town),
                 AppeaseLocalAuthority(this, town),
                 BuildBusStations(this, stationTile, town),
-                BuildTrack(this, fromStation.GetRearExit(), toStation.GetEntrance(), [], SignalMode.NONE, network)
+                BuildTrack(this, fromStation.GetRearExit(), toStation.GetEntrance(), reserved, SignalMode.NONE, network)
             ];
         }
         
         RunSubtasks();
 
-        local train = AIVehicleList_Station(fromStationID).Begin();
+        // we don't need a signal, but building one prevents the whole branch from "lighting up"
+        // with a track reservation the whole time (and I think it looks nice and sensible)
+        // FIXME this is the wrong way but building it right way round is a pain (needs the path)
+        // local exit = fromStation.GetRearExit();
+        // AIRail.BuildSignal(exit[1], exit[0], AIRail.SIGNALTYPE_PBS);
+
+        local vehicles = AIVehicleList_Station(fromStationID);
+        vehicles.Valuate(AIVehicle.GetVehicleType);
+        vehicles.KeepValue(AIVehicle.VT_RAIL);
+        local train = vehicles.Begin();
 
         // modify/replace the last order to go to the new station
-        local orderPosition = AIOrder.GetOrderCount(train) - 1;
+        local orderCount = AIOrder.GetOrderCount(train);
+        local orderPosition = orderCount - 1;
         local orderFlags = AIOrder.GetOrderFlags(train, orderPosition);
         AIOrder.AppendOrder(train, stationTile, orderFlags);
         AIOrder.RemoveOrder(train, orderPosition);
 
+        // extend the branch if we're allowed to
         if (maxDepth > 1) {
             tasks.insert(1, ExtendBranchLine(null, stationTile, direction, network, maxDepth - 1));
+        }
+
+        // Build bus service; note that the road pathfinder won't cross rails, but the rail pathfinder
+        // will cross roads, so we do the road building first (inserting before ExtendBranchLine)
+        local towns = AITownList();
+        towns.Valuate(AITown.GetDistanceManhattanToTile, stationTile);
+        towns.KeepBelowValue(MAX_BUS_ROUTE_DISTANCE);
+        
+        // sort descending, then append back-to-front so the closest actually goes first
+        towns.Sort(AIList.SORT_BY_VALUE, false);
+        for (local town = towns.Begin(); towns.HasNext(); town = towns.Next()) {
+            tasks.insert(1, BuildBusService(null, stationTile, town));
         }
     }
 
@@ -410,5 +437,70 @@ class ExtendBranchLine extends Builder {
             // continue to clean up the exit
             Debug("no towns left to try");
         }
+    }
+}
+
+class ConnectBranchStation extends Task {
+    
+    crossingTile = null;
+    direction = null;
+    stationTile = null;
+    network = null;
+    
+    constructor(parentTask, crossingTile, direction, stationTile, network) {
+        Task.constructor(parentTask);
+        this.crossingTile = crossingTile;
+        this.direction = direction;
+        this.stationTile = stationTile;
+        this.network = network;
+    }
+    
+    function Run() {
+        SetConstructionSign(crossingTile, this);
+        
+        local crossing = Crossing(crossingTile);
+        
+        if (!subtasks) {
+            subtasks = [];
+            local station = TrainStation.AtLocation(stationTile);
+            local reserved = station.GetReservedRearEntranceSpace();
+            reserved.extend(station.GetReservedEntranceSpace());
+            foreach (d in [Direction.NE, Direction.SW, Direction.NW, Direction.SE]) {
+                if (d != direction) {
+                    reserved.extend(crossing.GetReservedEntranceSpace(d));
+                    reserved.extend(crossing.GetReservedExitSpace(d));
+                }
+            }
+            
+            // because the pathfinder returns a path as a linked list from the
+            // goal back to the start, we build "in reverse", and because we
+            // want the first signal block (from the station or junction
+            // exit) to be large enough, we always want to start building
+            // from that end so we actually pathfind in reverse (entrance to
+            // exit) and therefore, build forward (exit to entrance)
+            local from, to;
+            if (network.rightSide) {
+                from = Swap(crossing.GetEntrance(direction));
+            } else {
+                from = crossing.GetExit(direction);
+            }
+            
+            to = station.GetEntrance();
+
+            local buildTrack = BuildTrack(this,
+                from, to,
+                reserved, SignalMode.NONE, network, BuildTrack.BRANCH);
+            
+            subtasks.append(buildTrack);
+
+        }
+        
+        RunSubtasks();
+    }
+    
+    function _tostring() {
+        local station = AIStation.GetStationID(stationTile);
+        local name = AIStation.IsValidStation(station) ? AIStation.GetName(station) : "unnamed";
+        return "ConnectBranchStation " + name + " to " + Crossing(crossingTile) + " " + DirectionName(direction);
     }
 }

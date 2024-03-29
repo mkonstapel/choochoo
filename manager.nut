@@ -14,24 +14,27 @@ function CullTrains() {
 	trains.Valuate(AIVehicle.GetCapacity, PAX);
 	trains.KeepAboveValue(0);
 	Debug(trains.Count() + " trains carrying PAX");
+	// don't clone trains on branch lines, that'll deadlock
+	// and don't delete them, because each branch only has one train servicing it
+	trains.Valuate(IsBranchLineTrain);
+	trains.KeepValue(0);
+	Debug(trains.Count() + " mainline trains");
+
 	trains.Valuate(AIVehicle.GetProfitLastYear);
-	
 	local n = trains.Count();
 	local best = AIList();
 	local worst = AIList();
 	best.AddList(trains);
-
-	// don't clone trains on branch lines, that'll deadlock
-	best.Valuate(IsBranchLineTrain);
-	best.KeepValue(0);
-
 	worst.AddList(trains);
-	
+
 	best.KeepTop(n/10);
+	
+	// TODO don't delete trains that are the only one servicing a station
+	// see AIVehicleList_Station
 	worst.KeepBottom(n/10);
 
-	// TODO: always keep one or two trains per stations, so we don't get empty branch lines
-	// see AIVehicleList_Station
+
+	// TODO: send vehicles that are too old (GetAgeLeft() < 0) for replacement (rebuild)
 	
 	local clones = 0;
 	foreach (train, profit in best) {

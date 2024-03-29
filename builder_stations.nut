@@ -112,37 +112,72 @@ class BuildCargoStation extends Builder {
 }
 
 /**
- * Single platform through station.
+ * Two-wide single platform through station.
  */
 class BuildBranchStation extends Builder {
 	
+	direction = null;
 	network = null;
 	town = null;
 	platformLength = null;
+	builtPlatform1 = null;
+	builtPlatform2 = null;
 	
 	constructor(parentTask, location, direction, network, town, platformLength = BRANCH_STATION_PLATFORM_LENGTH) {
 		Builder.constructor(parentTask, location, StationRotationForDirection(direction));
+		this.direction = direction;
 		this.network = network;
 		this.town = town;
 		this.platformLength = platformLength;
+		this.builtPlatform1 = false;
+		this.builtPlatform2 = false;
 	}
 	
 	function Run() {
 		SetConstructionSign(location, this);
 		
 		local stationID = BuildPlatform();
+
+		local p = platformLength;
+		AIRail.RemoveRailStationTileRectangle(GetTile([1,1]), GetTile([1,p-1]), false);
+		BuildRoadDepot([1,1], [1,2]);
+		BuildRoadDriveThrough([1,2], [1,3], true, stationID);
+
 		local name = AIStation.GetName(stationID);
+
+		// try to not let branch stations take the "Central" name
+		if (name.find("Centr") > 0) {
+			AIStation.SetName(stationID, AITown.GetName(town) + " B");
+		}
+
+		// ensure we get the B suffix to identify branch stations
+		name = AIStation.GetName(stationID);
 		if (!EndsWith(name, " B")) {
 			AIStation.SetName(stationID, name + " B");
 		}
 
-		local p = platformLength;
-		// do we need this bit?
-		// BuildSegment([0, p], [0, p+1]);
+		BuildRail([0, p-1], [0, p], [0, p+1]);
+
+		// if the road depot and the town are on different sides of the tracks, prebuild a rail crossing
+		// TODO: nicer way to do this would be to be able to mirror the station, building the road on the other side
+		
+		local roadDepotTile = GetTile([1,1]);
+		local townTile = AITown.GetLocation(town);
+
+		if (
+			direction == Direction.NE && AIMap.GetTileY(townTile) > AIMap.GetTileY(roadDepotTile) ||
+			direction == Direction.NW && AIMap.GetTileX(townTile) < AIMap.GetTileX(roadDepotTile) ||
+			direction == Direction.SE && AIMap.GetTileX(townTile) > AIMap.GetTileX(roadDepotTile) ||
+			direction == Direction.SW && AIMap.GetTileY(townTile) < AIMap.GetTileY(roadDepotTile)
+		) {
+			// these are not essential, skip CheckError
+			AIRoad.BuildRoad(GetTile([1,p-1]), GetTile([1,p]));
+			AIRoad.BuildRoadFull(GetTile([0,p]), GetTile([1,p]));
+			AIRoad.RemoveRoad(GetTile([2,p]), GetTile([1,p]));
+		}
 		
 		// probably don't want this, you can't send arbitrary trains here
 		// we could track branches and branch stations but I don't think we need to
-
 		// network.stations.append(AIStation.GetStationID(location));
 	}
 	
@@ -173,7 +208,56 @@ class BuildBranchStation extends Builder {
 		} else {
 			direction = AIRail.RAILTRACK_NE_SW;
 		}
+
+		// on the map, location of the station is the topmost tile
+		local platform1;
+		local platform2;
+		local cover;
+		local uncover;
+		local p = platformLength;
+		if (this.rotation == Rotation.ROT_0) {
+			platform1 = GetTile([0, 0]);
+			platform2 = GetTile([1, 0]);
+			cover = platform1;
+			uncover = GetTile([0, 1]);
+		} else if (this.rotation == Rotation.ROT_90) {
+			platform1 = GetTile([0, p-1]);
+			platform2 = GetTile([1, p-1]);
+			cover = GetTile([0,1]);
+			uncover = GetTile([0, 1]);
+		} else if (this.rotation == Rotation.ROT_180) {
+			platform1 = GetTile([0, p-1]);
+			platform2 = GetTile([1, p-1]);
+			cover = GetTile([1,1]);
+			uncover = GetTile([1, 1]);
+		} else if (this.rotation == Rotation.ROT_270) {
+			platform1 = GetTile([0,0]);
+			platform2 = GetTile([1,0]);
+			cover = platform2;
+			uncover = GetTile([1, 1]);
+		} else {
+			throw "invalid rotation";
+		}
 		
+		if (!builtPlatform1) {
+			AIRail.BuildRailStation(platform1, direction, 1, p, AIStation.STATION_NEW);
+			CheckError();
+			builtPlatform1 = true;
+		}
+		
+		if (!builtPlatform2) {
+			AIRail.BuildRailStation(platform2, direction, 1, p, AIStation.GetStationID(platform1));
+			CheckError();
+			builtPlatform2 = true;
+		}
+		
+		AIRail.BuildRailStation(cover, direction, 2, 2, AIStation.GetStationID(platform1));
+		AIRail.BuildRailStation(uncover, direction, 2, 1, AIStation.GetStationID(platform1));
+
+		return AIStation.GetStationID(platform1);
+
+
+		/*
 		// on the map, location of the station is the topmost tile
 		local platform;
 		if (this.rotation == Rotation.ROT_0) {
@@ -196,10 +280,22 @@ class BuildBranchStation extends Builder {
 		AIRail.BuildRailStation(platform, direction, 1, platformLength, AIStation.STATION_NEW);
 		CheckError();
 		return AIStation.GetStationID(platform);
+
+		*/
 	}
 	
 	function _tostring() {
 		return "BuildBranchStation at " + AITown.GetName(town);
+	}
+
+	function Failed() {
+		Task.Failed();
+
+		foreach (x in Range(0, 2)) {
+			foreach (y in Range(0, platformLength+1)) {
+				Demolish([x,y]);
+			}
+		}
 	}
 }
 
@@ -348,6 +444,8 @@ class BuildTerminusStation extends Builder {
  */
 class BuildBusStations extends Task {
 
+	static MAX_STATIONS = 4;
+
 	stationTile = null;
 	town = null;
 	stations = null;
@@ -380,6 +478,9 @@ class BuildBusStations extends Task {
 			if (BuildStationAt(tile)) {
 				stations.append(tile);
 				area.RemoveRectangle(tile - AIMap.GetTileIndex(2, 2), tile + AIMap.GetTileIndex(2, 2));
+				if (stations.len() >= MAX_STATIONS) {
+					break;
+				}
 			}
 		}
 	}
@@ -543,7 +644,7 @@ class BuildBus extends Task {
 	}
 	
 	function Run() {
-		local depot = TerminusStation.AtLocation(trainStationTile, RAIL_STATION_PLATFORM_LENGTH).GetRoadDepot();
+		local depot = TrainStation.AtLocation(trainStationTile).GetRoadDepot();
 		local busStationTile = FindTownBusStation(town);
 		if (!busStationTile) throw TaskFailedException("No bus station in " + AITown.GetName(town));
 		

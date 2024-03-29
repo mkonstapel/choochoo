@@ -176,17 +176,16 @@ class Crossing extends WorldObject {
 	
 }
 
-class TerminusStation extends WorldObject {
-	
+class TrainStation extends WorldObject {
 	platformLength = null;
-	
+
 	constructor(location, rotation, platformLength) {
 		WorldObject.constructor(location, rotation);
 		this.platformLength = platformLength;
 	}
-	
-	function AtLocation(location, platformLength) {
-		// deduce the rotation of an existing station
+
+	function AtLocation(location) {
+		// deduce the type and rotation of an existing station
 		local rotation;
 		local direction = AIRail.GetRailStationDirection(location);
 		if (direction == AIRail.RAILTRACK_NE_SW) {
@@ -204,8 +203,28 @@ class TerminusStation extends WorldObject {
 		} else {
 			throw "no station at " + location;
 		}
-		
-		return TerminusStation(location, rotation, platformLength);
+
+
+		local coordinates = RelativeCoordinates(location, rotation);
+		local platformLength = 0;
+		while (AIRail.IsRailStationTile(coordinates.GetTile([0, platformLength]))) {
+			platformLength++;
+		}
+
+		if (AIRail.IsRailStationTile(coordinates.GetTile([1,1]))) {
+			return TerminusStation(location, rotation, platformLength);
+		} else if (AIRoad.IsRoadDepotTile(coordinates.GetTile([1,1]))) {
+			return BranchStation(location, rotation, platformLength);
+		} else {
+			throw "cannot identify type of station at " + location;
+		}
+	}
+}
+
+class TerminusStation extends TrainStation {
+	
+	constructor(location, rotation, platformLength) {
+		TrainStation.constructor(location, rotation, platformLength);
 	}
 	
 	function _tostring() {
@@ -253,36 +272,10 @@ class TerminusStation extends WorldObject {
 	}
 }
 
-class BranchStation extends WorldObject {
-	
-	platformLength = null;
+class BranchStation extends TrainStation {
 	
 	constructor(location, rotation, platformLength) {
-		WorldObject.constructor(location, rotation);
-		this.platformLength = platformLength;
-	}
-	
-	function AtLocation(location, platformLength) {
-		// deduce the rotation of an existing station
-		local rotation;
-		local direction = AIRail.GetRailStationDirection(location);
-		if (direction == AIRail.RAILTRACK_NE_SW) {
-			if (AIRail.IsRailStationTile(location + AIMap.GetTileIndex(1,0))) {
-				rotation = Rotation.ROT_270;
-			} else {
-				rotation = Rotation.ROT_90;
-			}
-		} else if (direction == AIRail.RAILTRACK_NW_SE) {
-			if (AIRail.IsRailStationTile(location + AIMap.GetTileIndex(0,1))) {
-				rotation = Rotation.ROT_0;
-			} else {
-				rotation = Rotation.ROT_180;
-			}
-		} else {
-			throw "no station at " + location;
-		}
-		
-		return BranchStation(location, rotation, platformLength);
+		TrainStation.constructor(location, rotation, platformLength);
 	}
 	
 	function _tostring() {
@@ -290,7 +283,7 @@ class BranchStation extends WorldObject {
 	}
 	
 	function GetEntrance() {
-		return TileStrip([0, platformLength], [0, platformLength - 1]);
+		return TileStrip([0, platformLength+1], [0, platformLength]);
 	}
 	
 	function GetExit() {
@@ -298,7 +291,10 @@ class BranchStation extends WorldObject {
 	}
 	
 	function GetReservedEntranceSpace() {
-		return TileStrip([0, platformLength], [0, platformLength + 2]);
+		// space for the road to exit
+		// no longer needed now that we manually build a road/rail crossing if needed
+		// return TileStrip([1, platformLength], [1, platformLength + 2]);
+		return [];
 	}
 
 	function GetReservedExitSpace() {
@@ -321,13 +317,13 @@ class BranchStation extends WorldObject {
 		return GetReservedRearEntranceSpace();
 	}
 
-	// function GetRoadDepot() {
-	// 	return GetTile([2,3]);
-	// }
+	function GetRoadDepot() {
+		return GetTile([1,1]);
+	}
 	
-	// function GetRoadDepotExit() {
-	// 	return GetTile([2,2]);
-	// }
+	function GetRoadDepotExit() {
+		return GetTile([1,2]);
+	}
 }
 
 class Network {

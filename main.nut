@@ -25,7 +25,7 @@ enum Rotation {
 }
 
 enum SignalMode {
-	NONE, FORWARD, BACKWARD
+	NONE, FORWARD, BACKWARD, BRANCH
 }
 
 class ChooChoo extends AIController {
@@ -75,7 +75,8 @@ class ChooChoo extends AIController {
 					MainLoop();
 				} catch (e) {
 					Error("Unexpected error: " + e);
-					Warning("To capture a stack trace, disable \"Keep running on unexpected errors\" in the AI settings (this will kill the AI company)");
+					Warning("To capture a stack trace, disable \"Keep running on unexpected errors\" in the AI settings.");
+					Warning("This will terminate the AI company, but will help the developer fix the bug!");
 					// sleep on it and hope it goes away
 					Sleep(TICKS_PER_DAY);
 				}

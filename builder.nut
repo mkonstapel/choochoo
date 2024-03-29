@@ -3,7 +3,7 @@ const RAIL_STATION_WIDTH = 3;
 const RAIL_STATION_PLATFORM_LENGTH = 4;
 const RAIL_STATION_LENGTH = 7; // actual building and rails plus room for entrance/exit
 
-const BRANCH_STATION_WIDTH = 1;
+const BRANCH_STATION_WIDTH = 2;
 const BRANCH_STATION_PLATFORM_LENGTH = 3;
 const BRANCH_STATION_LENGTH = 3;
 
@@ -36,7 +36,9 @@ function FindMainlineStationSite(town, stationRotation, destination) {
 }
 
 function FindBranchStationSite(town, stationRotation, destination) {
-	return FindStationSite(town, stationRotation, destination, BRANCH_STATION_WIDTH, BRANCH_STATION_LENGTH, BRANCH_STATION_PLATFORM_LENGTH, 5);
+	// don't increase BRANCH_STATION_LENGTH because that's the area we flatten,
+	// but we do need some space to allow the track to get in, and ideally out the back, too
+	return FindStationSite(town, stationRotation, destination, BRANCH_STATION_WIDTH, BRANCH_STATION_LENGTH+2, BRANCH_STATION_PLATFORM_LENGTH, 4);
 }
 
 /**

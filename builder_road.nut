@@ -19,7 +19,8 @@ class BuildRoad extends Task {
 	
 	function Run() {
 		SetConstructionSign(stationTile, this);
-		local depot = TerminusStation.AtLocation(stationTile, RAIL_STATION_PLATFORM_LENGTH).GetRoadDepotExit();
+
+		local depot = TrainStation.AtLocation(stationTile).GetRoadDepotExit();
 		local center = AITown.GetLocation(town); 
 		if (!path) path = FindPath(depot, center);
 		ClearSecondarySign();
@@ -35,7 +36,8 @@ class BuildRoad extends Task {
 		local pathfinder = Road();
 		pathfinder.cost.max_bridge_length = 4;
 		pathfinder.cost.max_tunnel_length = 4;
-		pathfinder.cost.max_cost = pathfinder.cost.tile * 4 * AIMap.DistanceManhattan(a, b);
+		pathfinder.cost.no_existing_road = pathfinder.cost.tile; // we want reuse
+		pathfinder.cost.max_cost = pathfinder.cost.tile * 4 * max(10, AIMap.DistanceManhattan(a, b));
 		
 		// Pathfinding needs money since it attempts to build in test mode.
 		// We can't get the price of a tunnel, but we can get it for a bridge
@@ -56,8 +58,17 @@ class BuildRoad extends Task {
 			if (par != null) {
 				local last_node = path.GetTile();
 				if (AIMap.DistanceManhattan(path.GetTile(), par.GetTile()) == 1 ) {
-					if (!AIRoad.BuildRoad(path.GetTile(), par.GetTile())) {
-						CheckError();
+					// building from path to par fails if trying to build from a bridge to a clear tile in 14.0RC1
+					// try building it in the other direction? That works in the UI
+					if (AIRoad.AreRoadTilesConnected(path.GetTile(), par.GetTile())) {
+						// already connected
+					} else if (!AIRoad.BuildRoad(path.GetTile(), par.GetTile())) {
+						Error("Couldn't build road at " + TileToString(path.GetTile()) + " to " + TileToString(par.GetTile()));
+						if (AIRoad.BuildRoad(par.GetTile(), path.GetTile())) {
+							Debug("But the other way around worked");
+						} else {
+							CheckError();
+						}
 					}
 				} else {
 					/* Build a bridge or tunnel. */

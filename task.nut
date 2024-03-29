@@ -25,6 +25,7 @@ class TaskRetryException {
 		return "Retry: " + sleep;
 	}
 }
+
 class NeedMoneyException {
 	
 	amount = 0;

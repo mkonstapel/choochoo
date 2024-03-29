@@ -85,7 +85,7 @@ class BuildNewNetwork extends Task {
 	function Run() {
 		local tile;
 		local count = 0;
-		
+
 		if (!subtasks) {
 			while (true) {
 				tile = RandomTile();
@@ -278,8 +278,7 @@ class ConnectStation extends Task {
 		
 		if (!subtasks) {
 			subtasks = [];
-			local station = TerminusStation.AtLocation(stationTile, RAIL_STATION_PLATFORM_LENGTH);
-			
+			local station = TrainStation.AtLocation(stationTile);
 			local reserved = network.rightSide ? station.GetReservedEntranceSpace() : station.GetReservedExitSpace();
 			reserved.extend(network.rightSide ? crossing.GetReservedExitSpace(direction) : crossing.GetReservedEntranceSpace(direction));
 			foreach (d in [Direction.NE, Direction.SW, Direction.NW, Direction.SE]) {
@@ -362,71 +361,6 @@ class ConnectStation extends Task {
 		local station = AIStation.GetStationID(stationTile);
 		local name = AIStation.IsValidStation(station) ? AIStation.GetName(station) : "unnamed";
 		return "ConnectStation " + name + " to " + Crossing(crossingTile) + " " + DirectionName(direction);
-	}
-}
-
-class ConnectBranchStation extends Task {
-	
-	crossingTile = null;
-	direction = null;
-	stationTile = null;
-	network = null;
-	
-	constructor(parentTask, crossingTile, direction, stationTile, network) {
-		Task.constructor(parentTask);
-		this.crossingTile = crossingTile;
-		this.direction = direction;
-		this.stationTile = stationTile;
-		this.network = network;
-	}
-	
-	function Run() {
-		SetConstructionSign(crossingTile, this);
-		
-		local crossing = Crossing(crossingTile);
-		
-		if (!subtasks) {
-			subtasks = [];
-			local station = BranchStation.AtLocation(stationTile, BRANCH_STATION_PLATFORM_LENGTH);
-			
-			local reserved = station.GetReservedRearEntranceSpace();
-			foreach (d in [Direction.NE, Direction.SW, Direction.NW, Direction.SE]) {
-				if (d != direction) {
-					reserved.extend(crossing.GetReservedEntranceSpace(d));
-					reserved.extend(crossing.GetReservedExitSpace(d));
-				}
-			}
-			
-			// because the pathfinder returns a path as a linked list from the
-			// goal back to the start, we build "in reverse", and because we
-			// want the first signal block (from the station or junction
-			// exit) to be large enough, we always want to start building
-			// from that end so we actually pathfind in reverse (entrance to
-			// exit) and therefore, build forward (exit to entrance)
-			local from, to;
-			if (network.rightSide) {
-				from = Swap(crossing.GetEntrance(direction));
-			} else {
-				from = crossing.GetExit(direction);
-			}
-			
-			to = station.GetEntrance();
-
-			local buildTrack = BuildTrack(this,
-				from, to,
-				reserved, SignalMode.NONE, network, BuildTrack.BRANCH);
-			
-			subtasks.append(buildTrack);
-
-		}
-		
-		RunSubtasks();
-	}
-	
-	function _tostring() {
-		local station = AIStation.GetStationID(stationTile);
-		local name = AIStation.IsValidStation(station) ? AIStation.GetName(station) : "unnamed";
-		return "ConnectBranchStation " + name + " to " + Crossing(crossingTile) + " " + DirectionName(direction);
 	}
 }
 
@@ -594,6 +528,7 @@ class ExtendCrossing extends Builder {
 			local towns = FindTowns(crossing, direction, MIN_TOWN_POPULATION, network.minDistance, network.maxDistance, network.maxDistance/2, true);
 			towns.Valuate(AITown.GetPopulation);
 			towns.Sort(AIList.SORT_BY_VALUE, false);
+			local stationDirection = direction;
 			local stationRotation = StationRotationForDirection(direction);
 			
 			// TODO: try more than station site per town?
@@ -635,6 +570,42 @@ class ExtendCrossing extends Builder {
 			
 			SetSecondarySign("Looking for junction site");
 			crossingTile = FindCrossingSite(stationTile);
+
+			// if we build a crossing, we should orient the station towards the exit if possible
+			if (crossingTile) {
+				local newStationDirection = CrossingExitDirection(crossingTile, stationTile);
+				local newStationRotation = StationRotationForDirection(newStationDirection);
+				local newStationTile = FindMainlineStationSite(town, newStationRotation, crossingTile);
+				// the rotated station may well end up too close to the crossing to still be buildable
+				// so we have to check if we still have a valid crossing site
+				local newCrossingTile = newStationTile ? FindCrossingSite(newStationTile) : null;
+				if (newStationTile && newCrossingTile) {
+					Debug("Can rotate station towards crossing");
+					crossingTile = newCrossingTile;
+					stationDirection = newStationDirection;
+					stationRotation = newStationRotation;
+					stationTile = newStationTile;
+					stationCoordinates = RelativeCoordinates(stationTile, stationRotation);
+					stationTiles = AITileList();
+					stationTiles.AddRectangle(stationCoordinates.GetTile([0, 0]), stationCoordinates.GetTile([RAIL_STATION_WIDTH, RAIL_STATION_LENGTH]));
+				} else {
+					Debug("Can't rotate station towards crossing");
+				}
+			}
+
+			// If we're not going to build a new crossing, see if we'd rather
+			// build a branch line instead, but only if we have at least one
+			// mainline station in the network already. We could check
+			// AITown.IsCity(town) if we always want to give cities a
+			// mainline station, but this way, they might get branch stations
+			// and later a mainline station, which is kinda cool, too.
+
+			// NOTE: wouldn't it be fine to build a branch line off a crossing?
+			// Also, throwing TaskFailed will just make it go to the next town in the list.
+			if (!crossingTile && network.stations.len() > 0 && FindBranchStationSite(town, stationRotation, crossing)) {
+				throw TaskFailedException("Opting for branch line");
+			}
+
 			ClearSecondarySign();
 			if (crossingTile) {
 				local crossingEntranceDirection = InverseDirection(direction);
@@ -645,7 +616,7 @@ class ExtendCrossing extends Builder {
 					BuildTownBusStation(this, town),
 					LevelTerrain(this, stationTile, stationRotation, [0, 0], [RAIL_STATION_WIDTH-1, RAIL_STATION_LENGTH-2], true),
 					AppeaseLocalAuthority(this, town, stationTiles),
-					BuildTerminusStation(this, stationTile, direction, network, town),
+					BuildTerminusStation(this, stationTile, stationDirection, network, town),
 					AppeaseLocalAuthority(this, town),
 					BuildBusStations(this, stationTile, town),
 					LevelTerrain(this, crossingTile, Rotation.ROT_0, [1, 1], [Crossing.WIDTH-2, Crossing.WIDTH-2], true),
@@ -661,7 +632,7 @@ class ExtendCrossing extends Builder {
 					BuildTownBusStation(this, town),
 					LevelTerrain(this, stationTile, stationRotation, [0, 0], [RAIL_STATION_WIDTH-1, RAIL_STATION_LENGTH-2], true),
 					AppeaseLocalAuthority(this, town, stationTiles),
-					BuildTerminusStation(this, stationTile, direction, network, town),
+					BuildTerminusStation(this, stationTile, stationDirection, network, town),
 					AppeaseLocalAuthority(this, town),
 					BuildBusStations(this, stationTile, town),
 					ConnectStation(this, crossing, direction, stationTile, network),
@@ -687,6 +658,10 @@ class ExtendCrossing extends Builder {
 		if (crossingTile) {
 			foreach (d in [Direction.NE, Direction.SW, Direction.NW, Direction.SE]) {
 				local extender = ExtendCrossing(null, crossingTile, d, network);
+
+				// TESTING
+				// extender = BuildBranchLine(null, crossingTile, d, network);
+
 				if (d == direction) {
 					// index 0 is us, the currently running task
 					tasks.insert(1, extender);
@@ -727,7 +702,7 @@ class ExtendCrossing extends Builder {
 	function FindCrossingSite(stationTile) {
 		local dx = AIMap.GetTileX(stationTile) - AIMap.GetTileX(crossing);
 		local dy = AIMap.GetTileY(stationTile) - AIMap.GetTileY(crossing);
-		if (abs(dx) <= Crossing.WIDTH || abs(dy) <= Crossing.WIDTH) return null;
+		if (abs(dx) <= 2*Crossing.WIDTH || abs(dy) <= 2*Crossing.WIDTH) return null;
 		
 		local centerTile = crossing;
 		if (direction == Direction.NE || direction == Direction.SW) {
@@ -852,7 +827,7 @@ class ExtendCrossing extends Builder {
 			RemoveRail([2,1], [2,2], [2,3]);
 		}
 		
-		if (!HasRail([1,0]) && !HasRail([1,0])) {
+		if (!HasRail([1,0]) && !HasRail([2,0])) {
 			RemoveRail([1,2], [2,2], [3,2]);
 			RemoveRail([2,0], [2,1], [2,2]);
 			RemoveRail([2,1], [2,2], [2,3]);

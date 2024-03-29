@@ -122,16 +122,20 @@ class BuildBranchTrain extends Task {
 	}
 	
 	function Run() {
+		local from = AIStation.GetStationID(mainlineStationTile);
+		local to = AIStation.GetStationID(branchStationTile);
+		local fromDepot = ClosestDepot(network, from);
+
 		if (!subtasks) {
-			local from = AIStation.GetStationID(mainlineStationTile);
-			local to = AIStation.GetStationID(branchStationTile);
-			local fromDepot = ClosestDepot(network, from);
 			SetConstructionSign(fromDepot, this);
-			
 			subtasks = [AddTrain(this, from, to, fromDepot, null, network, network.trainLength - 1, fromFlags, toFlags, cargo)];
 		}
 		
 		RunSubtasks();
+
+		// encode "branch" status in name so we can skip it during cloning
+		local train = completed[0].train;
+		GenerateName(train, fromDepot, "B");
 	}
 }
 
@@ -184,10 +188,6 @@ class AddTrain extends Task {
 		RunSubtasks();
 
 		train = completed[0].train;
-
-		// encode "branch" status in name so we can skip it during cloning
-		GenerateName(train, fromDepot, "B");
-
 		network.trains.append(train);
 		AIOrder.AppendOrder(train, AIStation.GetLocation(from), fromFlags);
 		AIOrder.AppendOrder(train, fromDepot, AIOrder.AIOF_SERVICE_IF_NEEDED);

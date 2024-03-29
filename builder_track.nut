@@ -121,7 +121,10 @@ class BuildTrack extends Task {
 			
 			pathfinder.cost.turn = 2*u;
 			pathfinder.cost.slope = 0;
-			pathfinder.cost.diagonal_tile = u;
+
+			// see if more non-diagonal track looks better
+			// pathfinder.cost.diagonal_tile = u;
+			pathfinder.cost.diagonal_tile = 2*u;
 		} else if (style == FOLLOW) {
 			// cheaper turns, penalty for no nearby track
 			pathfinder.cost.no_adj_rail = 2*u;
