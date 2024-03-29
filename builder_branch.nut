@@ -273,7 +273,7 @@ class BuildBranchLine extends Builder {
             RemoveRail([2,1], [2,2], [2,3]);
         }
         
-        if (!HasRail([1,0]) && !HasRail([1,0])) {
+        if (!HasRail([1,0]) && !HasRail([2,0])) {
             RemoveRail([1,2], [2,2], [3,2]);
             RemoveRail([2,0], [2,1], [2,2]);
             RemoveRail([2,1], [2,2], [2,3]);
