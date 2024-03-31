@@ -111,6 +111,20 @@ function Sum(list) {
 }
 
 /**
+ * Shuffle the items in an array.
+ */
+function Shuffle(a) {
+	local n = a.len();
+	for (local i = 0; i < n; i++) {
+		local j = AIBase.RandRange(n);
+		local temp = a[i];
+		a[i] = a[j];
+		a[j] = temp;
+	}
+}
+
+
+/**
  * Create a string of all elements of an array, separated by a comma.
  */
 function ArrayToString(a) {

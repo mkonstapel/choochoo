@@ -141,35 +141,113 @@ class Crossing extends WorldObject {
 	function CountConnections() {
 		local count = 0;
 		
-		local exits = [
-			GetExit(Direction.NE),
-			GetExit(Direction.SE),
-			GetExit(Direction.SW),
-			GetExit(Direction.NW),
-		];
-		
-		foreach (exit in exits) {
+		foreach (d in [Direction.NE, Direction.SW, Direction.NW, Direction.SE]) {
+			// check both the entrance and the exit, because in left hand drive, these are reversed
+			local entrance = GetEntrance(d);
+			local exit = GetExit(d);
+
 			// TODO: this may be incorrect if another track runs right past the crossing
-			if (AITile.GetOwner(exit[1]) == COMPANY && AIRail.IsRailTile(exit[1])) {
+			if (AITile.GetOwner(entrance[0]) == COMPANY && AIRail.IsRailTile(entrance[0]) ||
+				AITile.GetOwner(exit[1]) == COMPANY && AIRail.IsRailTile(exit[1])) {
 				count++;
 			}
 		}
 		
 		return count;
 	}
-	
-	function GetName() {
+
+	function CountPotentialConnections() {
+		// like CountConnections, but also counts unconnected (but still present) directions
+		local count = 0;
+		
+		foreach (d in [Direction.NE, Direction.SW, Direction.NW, Direction.SE]) {
+			local entrance = GetEntrance(d);
+			local exit = GetExit(d);
+
+			// this looks at the other tile of the entrance/exit strip, which is present
+			// as long as that direction hasn't been deconstructed
+			if (AITile.GetOwner(entrance[1]) == COMPANY && AIRail.IsRailTile(entrance[1]) ||
+				AITile.GetOwner(exit[0]) == COMPANY && AIRail.IsRailTile(exit[0])) {
+				count++;
+			}
+		}
+		
+		return count;
+	}
+
+	function GetWaypointID() {
 		local waypoints = [ [0,2], [0,1], [2,3], [1,3], [3,1], [3,2], [1,0], [2,0] ];
 		foreach (tile in waypoints) {
-			local waypoint = AIWaypoint.GetWaypointID(GetTile(tile));
-			if (AIWaypoint.IsValidWaypoint(waypoint)) {
-				return AIWaypoint.GetName(waypoint);
+			local waypointID = AIWaypoint.GetWaypointID(GetTile(tile));
+			if (AIWaypoint.IsValidWaypoint(waypointID)) {
+				return waypointID;
 			}
+		}
+
+		return null;
+	}
+	
+	function GetName() {
+		local waypointID = GetWaypointID();
+		if (waypointID != null) {
+			return AIWaypoint.GetName(waypointID);
 		}
 		
 		return "unnamed junction at " + TileToString(location);
 	}
-	
+
+	function SetName(name) {
+		local waypointID = GetWaypointID();
+		if (waypointID != null) {
+			return AIWaypoint.SetName(waypointID, name);
+		}
+		
+		return null;
+	}
+
+	function UpdateName(_useCount = null) {
+		// TODO: while still potentially being extended, prefer "junction"?
+		// then downgrade to waypoint or upgrade to "crossing"?
+		Debug("UpdateName for " + this);
+
+
+		local waypointID = GetWaypointID();
+		if (waypointID == null) return;
+
+		local suffixesForCount = [
+			null,
+			["Stop"],
+			["Waypoint"],
+			["Junction", "Switch", "Points"],
+			["Crossing", "Cross", "Union"]
+		];
+
+		local town = AITile.GetClosestTown(AIWaypoint.GetLocation(waypointID));
+		local count = _useCount == null ? CountPotentialConnections() : _useCount;
+		local suffixes = suffixesForCount[count];
+
+		// we want "stable" names for the same number of exits, not cycle through
+		// renaming from Crossing to Union to Cross, etc.
+		foreach (suffix in suffixes) {
+			if (EndsWith(AIWaypoint.GetName(waypointID), suffix)) {
+				return;
+			}
+		}
+
+		Shuffle(suffixes);
+		foreach (suffix in suffixes) {
+			local name = AITown.GetName(town) + " " + suffix;
+			if (AIWaypoint.SetName(waypointID, name)) {
+				return;
+			}
+		}
+
+		if (count == 4) {
+			// the names for 3 connections are also usable for 4 connections
+			UpdateName(3);
+		}
+	}
+
 	function _tostring() {
 		return GetName();
 	}

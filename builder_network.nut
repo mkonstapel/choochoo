@@ -338,25 +338,16 @@ class ConnectStation extends Task {
 		// open up the exit by removing the signal
 		local exit = network.rightSide ? crossing.GetExit(direction) : Swap(crossing.GetEntrance(direction));
 		AIRail.RemoveSignal(exit[0], exit[1]);
-		
-		if (StartsWith(crossing.GetName(), "unnamed") && AIController.GetSetting("JunctionNames")) {
-			BuildWaypoint(exit[0]);
-		}
-	}
-	
-	function BuildWaypoint(tile) {
-		local town = AITile.GetClosestTown(tile);
-		if (AIRail.BuildRailWaypoint(tile) ) {
-			local waypoint = AIWaypoint.GetWaypointID(tile);
-			local suffixes = ["Junction", "Crossing", "Point", "Union", "Switch", "Cross", "Points"]
-			foreach (suffix in suffixes) {
-				if (AIWaypoint.SetName(waypoint, AITown.GetName(town) + " " + suffix)) {
-					break;
-				}
+
+		if (AIController.GetSetting("JunctionNames")) {
+			if (StartsWith(crossing.GetName(), "unnamed")) {
+				AIRail.BuildRailWaypoint(exit[0]);
 			}
+
+			crossing.UpdateName();
 		}
 	}
-	
+
 	function _tostring() {
 		local station = AIStation.GetStationID(stationTile);
 		local name = AIStation.IsValidStation(station) ? AIStation.GetName(station) : "unnamed";
@@ -445,29 +436,24 @@ class ConnectCrossing extends Task {
 		RunSubtasks();
 		
 		// open up both crossings' exits
-		local exit = network.rightSide ? fromCrossing.GetExit(fromDirection) : Swap(fromCrossing.GetEntrance(fromDirection));
-		AIRail.RemoveSignal(exit[0], exit[1]);
-		if (StartsWith(fromCrossing.GetName(), "unnamed") && AIController.GetSetting("JunctionNames")) {
-			BuildWaypoint(exit[0]);
-		}
+		local fromExit = network.rightSide ? fromCrossing.GetExit(fromDirection) : Swap(fromCrossing.GetEntrance(fromDirection));
+		AIRail.RemoveSignal(fromExit[0], fromExit[1]);
 		
-		exit = network.rightSide ? toCrossing.GetExit(toDirection) : Swap(toCrossing.GetEntrance(toDirection));
-		AIRail.RemoveSignal(exit[0], exit[1]);
-		if (StartsWith(toCrossing.GetName(), "unnamed") && AIController.GetSetting("JunctionNames")) {
-			BuildWaypoint(exit[0]);
-		}
-	}
-	
-	function BuildWaypoint(tile) {
-		local town = AITile.GetClosestTown(tile);
-		if (AIRail.BuildRailWaypoint(tile)) {
-			local waypoint = AIWaypoint.GetWaypointID(tile);
-			local suffixes = ["Junction", "Crossing", "Point", "Union", "Switch", "Cross", "Points"]
-			foreach (suffix in suffixes) {
-				if (AIWaypoint.SetName(waypoint, AITown.GetName(town) + " " + suffix)) {
-					break;
-				}
+		local toExit = network.rightSide ? toCrossing.GetExit(toDirection) : Swap(toCrossing.GetEntrance(toDirection));
+		AIRail.RemoveSignal(toExit[0], toExit[1]);
+
+		if (AIController.GetSetting("JunctionNames")) {
+			if (StartsWith(fromCrossing.GetName(), "unnamed")) {
+				AIRail.BuildRailWaypoint(fromExit[0]);
 			}
+
+			fromCrossing.UpdateName();
+
+			if (StartsWith(toCrossing.GetName(), "unnamed")) {
+				AIRail.BuildRailWaypoint(toExit[0]);
+			}
+
+			toCrossing.UpdateName();
 		}
 	}
 	
@@ -481,7 +467,7 @@ class ExtendCrossing extends Builder {
 
 	static MIN_TOWN_POPULATION = 300;
 	
-	crossing = null;
+	crossingTile = null;
 	direction = null;
 	network = null;
 	failedTowns = null;
@@ -489,11 +475,11 @@ class ExtendCrossing extends Builder {
 	town = null;
 	candidateTowns = null;
 	stationTile = null;
-	crossingTile = null;
+	newCrossingTile = null;
 	
-	constructor(parentTask, crossing, direction, network, failedTowns = null) {
-		Builder.constructor(parentTask, crossing);
-		this.crossing = crossing;
+	constructor(parentTask, crossingTile, direction, network, failedTowns = null) {
+		Builder.constructor(parentTask, crossingTile);
+		this.crossingTile = crossingTile;
 		this.direction = direction;
 		this.network = network;
 		this.failedTowns = failedTowns == null ? [] : failedTowns;
@@ -501,11 +487,11 @@ class ExtendCrossing extends Builder {
 		this.town = null;
 		this.candidateTowns = [];
 		this.stationTile = null;
-		this.crossingTile = null;
+		this.newCrossingTile = null;
 	}
 	
 	function _tostring() {
-		return "ExtendCrossing " + Crossing(crossing) + " " + DirectionName(direction);
+		return "ExtendCrossing " + Crossing(crossingTile) + " " + DirectionName(direction);
 	}
 	
 	function Cancel() {
@@ -518,14 +504,15 @@ class ExtendCrossing extends Builder {
 		
 		// see if we've not already built this direction
 		// if we have subtasks but we do find rails, assume we're still building
-		local exit = Crossing(crossing).GetExit(direction);
+		local crossing = Crossing(crossingTile);
+		local exit = crossing.GetExit(direction);
 		if (!subtasks && AIRail.IsRailTile(exit[1])) {
 			return;
 		}
 		
 		if (!subtasks) {
-			SetConstructionSign(crossing, this);
-			local towns = FindTowns(crossing, direction, MIN_TOWN_POPULATION, network.minDistance, network.maxDistance, network.maxDistance/2, true);
+			SetConstructionSign(crossingTile, this);
+			local towns = FindTowns(crossingTile, direction, MIN_TOWN_POPULATION, network.minDistance, network.maxDistance, network.maxDistance/2, true);
 			towns.Valuate(AITown.GetPopulation);
 			towns.Sort(AIList.SORT_BY_VALUE, false);
 			local stationDirection = direction;
@@ -544,7 +531,7 @@ class ExtendCrossing extends Builder {
 				if (!town) {
 					SetSecondarySign("Considering " + AITown.GetName(candidate));
 					Debug("Considering " + AITown.GetName(candidate));
-					stationTile = FindMainlineStationSite(candidate, stationRotation, crossing);
+					stationTile = FindMainlineStationSite(candidate, stationRotation, crossingTile);
 					if (stationTile) {
 						town = candidate;
 					}
@@ -555,7 +542,7 @@ class ExtendCrossing extends Builder {
 			}
 			
 			if (!stationTile) {
-				throw TaskFailedException("no towns " + DirectionName(direction) + " of " + Crossing(crossing) + " where we can build a station");
+				throw TaskFailedException("no towns " + DirectionName(direction) + " of " + crossing + " where we can build a station");
 			}
 			
 			// so we don't reforest tiles we're about to build on again
@@ -569,19 +556,19 @@ class ExtendCrossing extends Builder {
 			local costEstimate = 80000;
 			
 			SetSecondarySign("Looking for junction site");
-			crossingTile = FindCrossingSite(stationTile);
+			newCrossingTile = FindCrossingSite(stationTile, stationRotation);
 
 			// if we build a crossing, we should orient the station towards the exit if possible
-			if (crossingTile) {
-				local newStationDirection = CrossingExitDirection(crossingTile, stationTile);
+			if (newCrossingTile) {
+				local newStationDirection = CrossingExitDirection(newCrossingTile, stationTile);
 				local newStationRotation = StationRotationForDirection(newStationDirection);
-				local newStationTile = FindMainlineStationSite(town, newStationRotation, crossingTile);
+				local newStationTile = FindMainlineStationSite(town, newStationRotation, newCrossingTile);
 				// the rotated station may well end up too close to the crossing to still be buildable
 				// so we have to check if we still have a valid crossing site
-				local newCrossingTile = newStationTile ? FindCrossingSite(newStationTile) : null;
-				if (newStationTile && newCrossingTile) {
+				local newNewCrossingTile = newStationTile ? FindCrossingSite(newStationTile, newStationRotation) : null;
+				if (newStationTile && newNewCrossingTile) {
 					Debug("Can rotate station towards crossing");
-					crossingTile = newCrossingTile;
+					newCrossingTile = newNewCrossingTile;
 					stationDirection = newStationDirection;
 					stationRotation = newStationRotation;
 					stationTile = newStationTile;
@@ -602,14 +589,14 @@ class ExtendCrossing extends Builder {
 
 			// NOTE: wouldn't it be fine to build a branch line off a crossing?
 			// Also, throwing TaskFailed will just make it go to the next town in the list.
-			if (!crossingTile && network.stations.len() > 0 && FindBranchStationSite(town, stationRotation, crossing)) {
+			if (!newCrossingTile && network.stations.len() > 0 && FindBranchStationSite(town, stationRotation, crossingTile)) {
 				throw TaskFailedException("Opting for branch line");
 			}
 
 			ClearSecondarySign();
-			if (crossingTile) {
+			if (newCrossingTile) {
 				local crossingEntranceDirection = InverseDirection(direction);
-				local crossingExitDirection = CrossingExitDirection(crossingTile, stationTile);
+				local crossingExitDirection = CrossingExitDirection(newCrossingTile, stationTile);
 				subtasks = [
 					WaitForMoney(this, costEstimate),
 					AppeaseLocalAuthority(this, town),
@@ -619,10 +606,10 @@ class ExtendCrossing extends Builder {
 					BuildTerminusStation(this, stationTile, stationDirection, network, town),
 					AppeaseLocalAuthority(this, town),
 					BuildBusStations(this, stationTile, town),
-					LevelTerrain(this, crossingTile, Rotation.ROT_0, [1, 1], [Crossing.WIDTH-2, Crossing.WIDTH-2], true),
-					BuildCrossing(this, crossingTile, network),
-					ConnectCrossing(this, crossing, direction, crossingTile, crossingEntranceDirection, network),
-					ConnectStation(this, crossingTile, crossingExitDirection, stationTile, network),
+					LevelTerrain(this, newCrossingTile, Rotation.ROT_0, [1, 1], [Crossing.WIDTH-2, Crossing.WIDTH-2], true),
+					BuildCrossing(this, newCrossingTile, network),
+					ConnectCrossing(this, crossingTile, direction, newCrossingTile, crossingEntranceDirection, network),
+					ConnectStation(this, newCrossingTile, crossingExitDirection, stationTile, network),
 					BuildTrains(this, stationTile, network, PAX),
 				];
 			} else {
@@ -635,7 +622,7 @@ class ExtendCrossing extends Builder {
 					BuildTerminusStation(this, stationTile, stationDirection, network, town),
 					AppeaseLocalAuthority(this, town),
 					BuildBusStations(this, stationTile, town),
-					ConnectStation(this, crossing, direction, stationTile, network),
+					ConnectStation(this, crossingTile, direction, stationTile, network),
 					BuildTrains(this, stationTile, network, PAX),
 				];
 			}
@@ -655,12 +642,12 @@ class ExtendCrossing extends Builder {
 		// (front of the queue) but put sideways extension on the back of the
 		// queue. That should create a fractal pattern of depth-first
 		// expansion, returning later to fill out the internal space.
-		if (crossingTile) {
+		if (newCrossingTile) {
 			foreach (d in [Direction.NE, Direction.SW, Direction.NW, Direction.SE]) {
-				local extender = ExtendCrossing(null, crossingTile, d, network);
+				local extender = ExtendCrossing(null, newCrossingTile, d, network);
 
 				// TESTING
-				// extender = BuildBranchLine(null, crossingTile, d, network);
+				// extender = BuildBranchLine(null, newCrossingTile, d, network);
 
 				if (d == direction) {
 					// index 0 is us, the currently running task
@@ -699,12 +686,16 @@ class ExtendCrossing extends Builder {
 		}
 	}
 	
-	function FindCrossingSite(stationTile) {
-		local dx = AIMap.GetTileX(stationTile) - AIMap.GetTileX(crossing);
-		local dy = AIMap.GetTileY(stationTile) - AIMap.GetTileY(crossing);
-		if (abs(dx) <= 2*Crossing.WIDTH || abs(dy) <= 2*Crossing.WIDTH) return null;
+	function FindCrossingSite(stationTile, stationRotation) {
+		local station = TerminusStation(stationTile, stationRotation, RAIL_STATION_PLATFORM_LENGTH);
+		local stationEntrance = station.GetEntrance()[0];
+		local crossingExit = Crossing(crossingTile).GetExit(direction)[1];
+
+		local dx = AIMap.GetTileX(stationEntrance) - AIMap.GetTileX(crossingExit);
+		local dy = AIMap.GetTileY(stationEntrance) - AIMap.GetTileY(crossingExit);
+		if (abs(dx) <= 4 || abs(dy) <= 4) return null;
 		
-		local centerTile = crossing;
+		local centerTile = crossingTile;
 		if (direction == Direction.NE || direction == Direction.SW) {
 			centerTile += AIMap.GetTileIndex(dx - Sign(dx) * (RAIL_STATION_LENGTH + 1), 0);
 		} else {
@@ -725,7 +716,7 @@ class ExtendCrossing extends Builder {
 		if (!tiles.IsEmpty()) {
 			tiles.Valuate(LakeDetector, stationTile);
 			tiles.KeepValue(0);
-			tiles.Valuate(LakeDetector, crossing);
+			tiles.Valuate(LakeDetector, crossingTile);
 			tiles.KeepValue(0);
 
 			if (tiles.IsEmpty()) {
@@ -735,7 +726,7 @@ class ExtendCrossing extends Builder {
 		
 		// try for a more symmetrical layout by not prefering to stay close to the source crossing?
 		tiles.Valuate(AIMap.DistanceManhattan, centerTile);
-		// tiles.Valuate(AIMap.DistanceManhattan, crossing);
+		// tiles.Valuate(AIMap.DistanceManhattan, crossingTile);
 
 		tiles.KeepBottom(1);
 		return tiles.IsEmpty() ? null : tiles.Begin();
@@ -751,7 +742,7 @@ class ExtendCrossing extends Builder {
 			// other crossings first.
 			Debug(AITown.GetName(town) + " didn't work out");
 			failedTowns.append(town);
-			tasks.append(ExtendCrossing(null, crossing, direction, network, failedTowns));
+			tasks.append(ExtendCrossing(null, crossingTile, direction, network, failedTowns));
 			
 			// leave the exit in place
 			return;
@@ -759,15 +750,16 @@ class ExtendCrossing extends Builder {
 			Debug("no towns left to try");
 
 			// maybe we can still build a branch line
-			tasks.append(BuildBranchLine(null, crossing, direction, network));
+			tasks.append(BuildBranchLine(null, crossingTile, direction, network));
 
 			// leave the exit in place
 			return;
 		}
 		
 		// either we didn't find a town, or one of our subtasks failed
-		local entrance = Crossing(crossing).GetEntrance(direction);
-		local exit = Crossing(crossing).GetExit(direction);
+		local crossing = Crossing(crossingTile);
+		local entrance = crossing.GetEntrance(direction);
+		local exit = crossing.GetExit(direction);
 		
 		// use the NE direction as a template and derive the others
 		// by rotation and offset
@@ -797,7 +789,7 @@ class ExtendCrossing extends Builder {
 		}
 		
 		// move coordinate system
-		if (location == crossing) {
+		if (location == crossingTile) {
 			SetLocalCoordinateSystem(GetTile(offset), rotation);
 		}
 		
@@ -833,7 +825,9 @@ class ExtendCrossing extends Builder {
 			RemoveRail([2,1], [2,2], [2,3]);
 		}
 
-		// TODO if only two directions remain, rename from "crossing"/"junction" to "waypoint"
+		// TODO: if we reduce the crossing to one direction,
+		// we should delete the whole line
+		crossing.UpdateName();
 	}
 	
 	function HasRail(tileCoords) {

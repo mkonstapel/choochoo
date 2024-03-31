@@ -63,9 +63,14 @@ class BuildRoad extends Task {
 					if (AIRoad.AreRoadTilesConnected(path.GetTile(), par.GetTile())) {
 						// already connected
 					} else if (!AIRoad.BuildRoad(path.GetTile(), par.GetTile())) {
-						Error("Couldn't build road at " + TileToString(path.GetTile()) + " to " + TileToString(par.GetTile()));
-						if (AIRoad.BuildRoad(par.GetTile(), path.GetTile())) {
-							Debug("But the other way around worked");
+						// VEHICLE_IN_THE_WAY is expected, I just want to see if the error in RC1 mentioned above still happens
+						if (AIError.GetLastError() != AIError.ERR_VEHICLE_IN_THE_WAY) {
+							Error("Couldn't build road at " + TileToString(path.GetTile()) + " to " + TileToString(par.GetTile()) + ": " + AIError.GetLastErrorString());
+							if (AIRoad.BuildRoad(par.GetTile(), path.GetTile())) {
+								Warning("But the other way around worked");
+							} else {
+								CheckError();
+							}
 						} else {
 							CheckError();
 						}

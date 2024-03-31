@@ -4,7 +4,7 @@ class BuildBranchLine extends Builder {
     static MAX_BRANCH_DEPTH = 4;
     static MAX_DISTANCE = 50;
     
-    crossing = null;
+    crossingTile = null;
     direction = null;
     network = null;
     failedTowns = null;
@@ -13,9 +13,9 @@ class BuildBranchLine extends Builder {
     candidateTowns = null;
     stationTile = null;
     
-    constructor(parentTask, crossing, direction, network, failedTowns = null) {
-        Builder.constructor(parentTask, crossing);
-        this.crossing = crossing;
+    constructor(parentTask, crossingTile, direction, network, failedTowns = null) {
+        Builder.constructor(parentTask, crossingTile);
+        this.crossingTile = crossingTile;
         this.direction = direction;
         this.network = network;
         this.failedTowns = failedTowns == null ? [] : failedTowns;
@@ -26,7 +26,7 @@ class BuildBranchLine extends Builder {
     }
     
     function _tostring() {
-        return "BuildBranchLine " + Crossing(crossing) + " " + DirectionName(direction);
+        return "BuildBranchLine " + Crossing(crossingTile) + " " + DirectionName(direction);
     }
     
     function Cancel() {
@@ -39,19 +39,20 @@ class BuildBranchLine extends Builder {
         
         // see if we've not already built this direction
         // if we have subtasks but we do find rails, assume we're still building
-        local entrance = Crossing(crossing).GetEntrance(direction);
+        local crossing = Crossing(crossingTile);
+        local entrance = crossing.GetEntrance(direction);
         if (!subtasks && AIRail.IsRailTile(entrance[0])) {
             return;
         }
         
         if (!subtasks) {
-            SetConstructionSign(crossing, this);
+            SetConstructionSign(crossingTile, this);
 
             local stationList = AIList();
             foreach (station in network.stations) {
                 stationList.AddItem(station, 0);
             }
-            stationList.Valuate(AIStation.GetDistanceManhattanToTile, crossing);
+            stationList.Valuate(AIStation.GetDistanceManhattanToTile, crossingTile);
             stationList.KeepBottom(1);
 
             if (stationList.IsEmpty()) {
@@ -60,8 +61,8 @@ class BuildBranchLine extends Builder {
 
             local closestMainlineStationTile = AIStation.GetLocation(stationList.Begin());
             
-            local towns = FindTowns(crossing, direction, MIN_BRANCH_TOWN_POPULATION, 10, BuildBranchLine.MAX_DISTANCE, 20, false);
-            towns.Valuate(AITown.GetDistanceManhattanToTile, crossing);
+            local towns = FindTowns(crossingTile, direction, MIN_BRANCH_TOWN_POPULATION, 10, BuildBranchLine.MAX_DISTANCE, 20, false);
+            towns.Valuate(AITown.GetDistanceManhattanToTile, crossingTile);
             towns.Sort(AIList.SORT_BY_VALUE, true);
     
             local stationRotation = StationRotationForDirection(direction);
@@ -79,7 +80,7 @@ class BuildBranchLine extends Builder {
                 if (!town) {
                     SetSecondarySign("Considering " + AITown.GetName(candidate));
                     Debug("Considering " + AITown.GetName(candidate));
-                    stationTile = FindBranchStationSite(candidate, stationRotation, crossing);
+                    stationTile = FindBranchStationSite(candidate, stationRotation, crossingTile);
                     if (stationTile) {
                         town = candidate;
                     } else {
@@ -92,7 +93,7 @@ class BuildBranchLine extends Builder {
             }
             
             if (!stationTile) {
-                throw TaskFailedException("no towns " + DirectionName(direction) + " of " + Crossing(crossing) + " where we can build a branch station");
+                throw TaskFailedException("no towns " + DirectionName(direction) + " of " + crossing + " where we can build a branch station");
             }
             
             // so we don't reforest tiles we're about to build on again
@@ -113,7 +114,7 @@ class BuildBranchLine extends Builder {
                 BuildBranchStation(this, stationTile, direction, network, town),
                 AppeaseLocalAuthority(this, town),
                 BuildBusStations(this, stationTile, town),
-                ConnectBranchStation(this, crossing, direction, stationTile, network),
+                ConnectBranchStation(this, crossingTile, direction, stationTile, network),
                 BuildBranchTrain(this, closestMainlineStationTile, stationTile, network, PAX)
             ];
         }
@@ -148,7 +149,7 @@ class BuildBranchLine extends Builder {
         }
         
         // move coordinate system
-        if (location == crossing) {
+        if (location == crossingTile) {
             SetLocalCoordinateSystem(GetTile(offset), rotation);
         }
         
@@ -198,7 +199,7 @@ class BuildBranchLine extends Builder {
             // other crossings first.
             Debug(AITown.GetName(town) + " didn't work out");
             failedTowns.append(town);
-            tasks.append(BuildBranchLine(null, crossing, direction, network, failedTowns));
+            tasks.append(BuildBranchLine(null, crossingTile, direction, network, failedTowns));
             
             // leave the exit in place
             return;
@@ -208,8 +209,9 @@ class BuildBranchLine extends Builder {
         }
         
         // either we didn't find a town, or one of our subtasks failed
-        local entrance = Crossing(crossing).GetEntrance(direction);
-        local exit = Crossing(crossing).GetExit(direction);
+        local crossing = Crossing(crossingTile);
+        local entrance = crossing.GetEntrance(direction);
+        local exit = crossing.GetExit(direction);
         
         // use the NE direction as a template and derive the others
         // by rotation and offset
@@ -279,7 +281,9 @@ class BuildBranchLine extends Builder {
             RemoveRail([2,1], [2,2], [2,3]);
         }
 
-        // TODO if only two directions remain, rename from "crossing"/"junction" to "waypoint"
+        // TODO: if we reduce the crossing to one direction,
+        // we should delete the whole line
+        crossing.UpdateName();
     }
     
     function HasRail(tileCoords) {
