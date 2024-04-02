@@ -693,7 +693,8 @@ class ExtendCrossing extends Builder {
 
 		local dx = AIMap.GetTileX(stationEntrance) - AIMap.GetTileX(crossingExit);
 		local dy = AIMap.GetTileY(stationEntrance) - AIMap.GetTileY(crossingExit);
-		if (abs(dx) <= 4 || abs(dy) <= 4) return null;
+
+		if (abs(dx) <= 2*Crossing.WIDTH || abs(dy) <= 2*Crossing.WIDTH) return null;
 		
 		local centerTile = crossingTile;
 		if (direction == Direction.NE || direction == Direction.SW) {
