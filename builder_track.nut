@@ -95,7 +95,12 @@ class BuildTrack extends Task {
 		// and tunnels jump towards the goal, making all intermediate tiles
 		// seem bad options because they are being overestimated. We have to
 		// increase the cost to make it prefer short bridges.
+		//
+		// IDEA: have the pathfinder opt for bridges happily, but when building,
+		// for each bridge tile see if it could actually be replaced by plain track.
+		// pathfinder.cost.bridge_per_tile = 0;
 		pathfinder.cost.bridge_per_tile = 2*u + (5*u * pathfinder.estimate_multiplier);
+		
 		// The terrain is rarely suitable for tunnels, so when it is, might as
 		// well use it. Tunnels are limited in length, and they aren't
 		// eyesores like big cantilever bridges.
@@ -333,6 +338,9 @@ class BuildTrack extends Task {
 							CheckError();
 						}
 					} else {
+						// TODO:PATH routine to try to minimize actual needed bridge length,
+						// or even skip the bridge entirely and build it as plain track
+						// and then let the pathfinder go wild on bridges, skipping ahead merrily
 						AIBridge.BuildBridge(AIVehicle.VT_RAIL, SelectBridge(length), prev, node.GetTile());
 						//costEstimate = GetMaxBridgeCost(length);
 						CheckError();

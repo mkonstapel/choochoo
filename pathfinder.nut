@@ -486,7 +486,8 @@ function Rail::_GetDirection(pre_from, from, to, is_bridge)
 function Rail::_AddTunnelsBridges(tiles, last_node, cur_node, bridge_dir)
 {
 	local slope = AITile.GetSlope(cur_node);
-	if (slope == AITile.SLOPE_FLAT && AITile.IsBuildable(cur_node + (cur_node - last_node))) return [];
+	// TODO:PATH allow bridges on flat tiles, "reduce" them later
+	// if (slope == AITile.SLOPE_FLAT && AITile.IsBuildable(cur_node + (cur_node - last_node))) return [];
 	// local tiles = [];
 
 	for (local i = 2; i < this._max_bridge_length; i++) {

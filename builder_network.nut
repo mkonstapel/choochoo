@@ -555,6 +555,7 @@ class ExtendCrossing extends Builder {
 			// construction if we don't have the money for pathfinding, tracks and trains 
 			local costEstimate = 80000;
 			
+			// FIXME:PERF this step is current really quite slow
 			SetSecondarySign("Looking for junction site");
 			newCrossingTile = FindCrossingSite(stationTile, stationRotation);
 
