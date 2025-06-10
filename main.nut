@@ -9,6 +9,7 @@ require("builder.nut");
 require("planner.nut");
 require("manager.nut");
 require("vehicles.nut");
+require("tests.nut");
 
 const MIN_DISTANCE =  30;
 const MAX_DISTANCE = 100;
@@ -49,6 +50,7 @@ class ChooChoo extends AIController {
 		::TICKS_PER_DAY <- 74;
 		::SIGN1 <- -1;
 		::SIGN2 <- -1;
+		::TESTING <- false;
 		
 		::tasks <- [];
 
@@ -56,8 +58,22 @@ class ChooChoo extends AIController {
 
 		AIRail.SetCurrentRailType(AIRailTypeList().Begin());
 		//CalculateRoutes();
+
+		if (AIController.GetSetting("RunTests") == 1) {
+			local towns = AITownList();
+			for (local town = towns.Begin(); towns.HasNext(); town = towns.Next()) {
+				Debug(AITown.GetName(town));
+				if (AITown.GetName(town) == "CHOOCHOOTEST") {
+					Debug("Running tests");
+					::TESTING <- true;
+					break;
+				}
+			}
+		}
 		
-		if (AIStationList(AIStation.STATION_TRAIN).IsEmpty()) {
+		if (TESTING) {
+			tasks.push(RunTests());
+		} else if (AIStationList(AIStation.STATION_TRAIN).IsEmpty()) {
 			// start with some point to point lines
 			tasks.push(Bootstrap());
 		}
