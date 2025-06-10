@@ -260,8 +260,23 @@ class BuildTrack extends Task {
 	function PathToList(path) {
 		local list = AIList();
 		local node = path;
+		local prevTile = null;
 		while (node != null) {
-			list.AddItem(node.GetTile(), 1);
+			// when we come across a bridge or tunnel, also insert
+			// the "implied" tiles in between, or they'll be invisible
+			// and the follower won't follow the track there
+			local tile = node.GetTile();
+			if (prevTile != null && AIMap.DistanceManhattan(prevTile, tile) > 1) {
+				// bridge or tunnel - insert the tiles in between
+				local span = AITileList();
+				span.AddRectangle(prevTile, tile);
+				for (local spanTile = span.Begin(); span.HasNext(); spanTile = span.Next()) {
+					list.AddItem(spanTile, 1);
+				}
+			}
+
+			list.AddItem(tile, 1);
+			prevTile = tile;
 			node = node.GetParent();
 		}
 		
