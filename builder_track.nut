@@ -334,14 +334,14 @@ class BuildTrack extends Task {
 						// since we can resume building, check if there already is a tunnel
 						if (!AITunnel.IsTunnelTile(prev)) {
 							AITunnel.BuildTunnel(AIVehicle.VT_RAIL, prev);
-							costEstimate = GetMaxBridgeCost(length);
+							//costEstimate = GetMaxBridgeCost(length);
 							CheckError();
 						}
 					} else {
 						// TODO:PATH routine to try to minimize actual needed bridge length,
 						// or even skip the bridge entirely and build it as plain track
 						// and then let the pathfinder go wild on bridges, skipping ahead merrily
-						AIBridge.BuildBridge(AIVehicle.VT_RAIL, SelectBridge(length), prev, node.GetTile());
+						BuildBridge(prev, node.GetTile());
 						//costEstimate = GetMaxBridgeCost(length);
 						CheckError();
 					}
@@ -395,6 +395,16 @@ class BuildTrack extends Task {
 				node = node.GetParent();
 			}
 		}
+	}
+
+	function BuildBridge(fromTile, toTile) {
+		// The pathfinder can return bridges that are longer than necessary,
+		// or even completely unneeded. When building these, see if we can replace
+		// parts of the bridge with plain track.
+		local length = AIMap.DistanceManhattan(fromTile, toTile) + 1;
+		AISign.BuildSign(fromTile, "BS");
+		AISign.BuildSign(toTile, "BE");
+		AIBridge.BuildBridge(AIVehicle.VT_RAIL, SelectBridge(length), fromTile, toTile);
 	}
 	
 	/**

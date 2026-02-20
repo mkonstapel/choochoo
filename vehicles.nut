@@ -31,3 +31,17 @@ function Clone(train) {
 	
 	return copy;
 }
+
+function Replace(train) {
+	// build a replacement for a train using a newer engine and wagons
+	// TODO this should be a task so it can be retried if we run out of money
+	// TODO for branch trains, this should first send the original train to the depot to prevent deadlocking the branch line
+	local depot = GetDepot(train);
+	local engineType = AIVehicle.GetEngineType(train);
+	local railType = AIEngine.GetRailType(engine);
+	// select and build engine
+	// add equal number of wagons
+	// remove wagons while longer than original train
+	// cull original train
+	return copy;
+}
