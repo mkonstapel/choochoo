@@ -23,7 +23,7 @@ require("builder_trains.nut");
 function StationDirection(a, b) {
 	local dx = AIMap.GetTileX(a) - AIMap.GetTileX(b);
 	local dy = AIMap.GetTileY(a) - AIMap.GetTileY(b);
-	
+
 	if (abs(dx) > abs(dy)) {
 		return dx > 0 ? Direction.SW : Direction.NE;
 	} else {
@@ -46,24 +46,24 @@ function FindBranchStationSite(town, stationRotation, destination) {
  */
 function FindStationSite(town, stationRotation, destination, width, length, platformLength, exitSpace=0) {
 	local location = AITown.GetLocation(town);
-	
+
 	local area = AITileList();
 	SafeAddRectangle(area, location, 20);
-	
+
 	// only tiles that "belong" to the town
 	area.Valuate(AITile.GetClosestTown)
 	area.KeepValue(town);
-	
+
 	// must accept passengers
-	// we can capture more production by joining bus stations 
+	// we can capture more production by joining bus stations
 	area.Valuate(CargoValue, stationRotation, [0, 0], [2, platformLength], PAX, RAIL_STATION_RADIUS, true);
 	area.KeepValue(1);
-	
+
 	// any production will do (we can capture more with bus stations)
 	// but we need some, or we could connect, for example, a steel mill that only accepts passengers
 	area.Valuate(AITile.GetCargoProduction, PAX, 1, 1, RAIL_STATION_RADIUS);
 	area.KeepAboveValue(0);
-	
+
 	// room for a station - try to find a flat area first
 	local flat = AIList();
 	flat.AddList(area);
@@ -71,9 +71,9 @@ function FindStationSite(town, stationRotation, destination, width, length, plat
 	for (local tile = flat.Begin(); flat.HasNext(); tile = flat.Next()) {
 		flat.SetValue(tile, IsBuildableRectangle(tile, stationRotation, [0,  -exitSpace], [width, length], true) ? 1 : 0);
 	}
-	
+
 	flat.KeepValue(1);
-	
+
 	if (flat.Count() > 0) {
 		area = flat;
 	} else {
@@ -93,7 +93,7 @@ function FindStationSite(town, stationRotation, destination, width, length, plat
 			Warning("LakeDetector rejected " + AITown.GetName(town));
 		}
 	}
-	
+
 	// pick the tile closest to the crossing
 	//area.Valuate(AITile.GetDistanceManhattanToTile, destination);
 	//area.KeepBottom(1);
@@ -101,7 +101,7 @@ function FindStationSite(town, stationRotation, destination, width, length, plat
 	// pick the tile closest to the city center
 	area.Valuate(AITile.GetDistanceManhattanToTile, location);
 	area.KeepBottom(1);
-	
+
 	return area.IsEmpty() ? null : area.Begin();
 }
 
@@ -165,7 +165,7 @@ function IsBuildableRectangle(location, rotation, from, to, mustBeFlat) {
 	// TODO: don't require it to be flat, check if it can be leveled
 	local coords = RelativeCoordinates(location, rotation);
 	local height = AITile.GetMaxHeight(location);
-	
+
 	for (local x = from[0]; x < to[0]; x++) {
 		for (local y = from[1]; y < to[1]; y++) {
 			local tile = coords.GetTile([x, y]);
@@ -173,7 +173,7 @@ function IsBuildableRectangle(location, rotation, from, to, mustBeFlat) {
 			if (!AITile.IsBuildable(tile) || (mustBeFlat && !flat)) {
 				return false;
 			}
-			
+
 			local area = AITileList();
 			SafeAddRectangle(area, tile, 1);
 			area.Valuate(AITile.GetMinHeight);
@@ -182,18 +182,18 @@ function IsBuildableRectangle(location, rotation, from, to, mustBeFlat) {
 			area.KeepBelowValue(height + 2);
 			area.Valuate(AITile.IsBuildable);
 			area.KeepValue(1);
-			
+
 			local flattenable = (
 				area.Count() == 9 &&
 				abs(AITile.GetMinHeight(tile) - height) <= 1 &&
 				abs(AITile.GetMaxHeight(tile) - height) <= 1);
-			
+
 			if (!AITile.IsBuildable(tile) || !flattenable || (mustBeFlat && !flat)) {
 				return false;
 			}
 		}
 	}
-	
+
 	return true;
 }
 
@@ -209,6 +209,6 @@ function CargoValue(location, rotation, from, to, cargo, radius, accept) {
 			}
 		}
 	}
-	
+
 	return 0;
 }

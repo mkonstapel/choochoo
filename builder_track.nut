@@ -6,10 +6,10 @@ class BuildTrack extends Task {
 	static FAST = 2;
 	static FOLLOW = 3;
 	static BRANCH = 4;
-	
+
 	//static DEPOT_INTERVAL = 30;
 	static DEPOT_INTERVAL = 0;
-	
+
 	a = null;
 	b = null;
 	c = null;
@@ -22,9 +22,9 @@ class BuildTrack extends Task {
 	path = null;
 	lastDepot = null;
 	follow = null;
-	
+
 	constructor(parentTask, from, to, ignored, signalMode, network, style = null, follow = null) {
-		Task.constructor(parentTask); 
+		Task.constructor(parentTask);
 		this.a = from[0];
 		this.b = from[1];
 		this.c = to[0];
@@ -35,26 +35,26 @@ class BuildTrack extends Task {
 		this.network = network;
 		this.style = style ? style : STRAIGHT;
 		this.follow = follow;
-		
+
 		//this.lastDepot = -DEPOT_INTERVAL;	// build one as soon as possible
 		this.lastDepot = 0;
 		this.path = null;
 	}
-	
+
 	function _tostring() {
 		return "BuildTrack";
 	}
-	
+
 	function Run() {
 		SetConstructionSign(a, this);
-		
+
 		/*
 		AISign.BuildSign(a, "a");
 		AISign.BuildSign(b, "b");
 		AISign.BuildSign(c, "c");
 		AISign.BuildSign(d, "d");
 		*/
-		
+
 		local startDate = AIDate.GetCurrentDate();
 		if (!path) path = FindPath();
 		local endDate = AIDate.GetCurrentDate();
@@ -66,11 +66,11 @@ class BuildTrack extends Task {
 		Debug("    Found path in " + days + " days");
 		BuildPath(path);
 	}
-	
+
 	function GetPath() {
 		return path;
 	}
-	
+
 	function FindPath() {
 		local startDate = AIDate.GetCurrentDate()
 		local pathfinder = Rail();
@@ -78,14 +78,14 @@ class BuildTrack extends Task {
 		pathfinder.cost.max_bridge_length = bridgeLength;
 		pathfinder.cost.max_tunnel_length = 8;
 		if (follow) pathfinder.follow = PathToList(follow.GetPath());
-		
+
 		switch (AIController.GetSetting("PathfinderMultiplier")) {
 			case 1:  pathfinder.estimate_multiplier = 1.1; break;
 			case 2:  pathfinder.estimate_multiplier = 1.4; break;
 			case 3:  pathfinder.estimate_multiplier = 1.7; break;
 			default: pathfinder.estimate_multiplier = 2.0; break;
 		}
-		
+
 		local u = pathfinder.cost.tile;
 		//pathfinder.cost.max_cost = u * 4 * AIMap.DistanceManhattan(a, d);
 		pathfinder.cost.slope = 0.1*u;
@@ -100,15 +100,15 @@ class BuildTrack extends Task {
 		// for each bridge tile see if it could actually be replaced by plain track.
 		// pathfinder.cost.bridge_per_tile = 0;
 		pathfinder.cost.bridge_per_tile = 2*u + (5*u * pathfinder.estimate_multiplier);
-		
+
 		// The terrain is rarely suitable for tunnels, so when it is, might as
 		// well use it. Tunnels are limited in length, and they aren't
 		// eyesores like big cantilever bridges.
 		pathfinder.cost.tunnel_per_tile = 0.5*u;
-		
+
 		if (style == STRAIGHT) {
 			// straight, avoiding obstacles
-			
+
 			// Do we care about turns? If not, pathfinding may be a little faster
 			// since we don't need to calculate turn costs. The windy snaky paths
 			// may be a feature, but for rail lines I like the straighter paths,
@@ -123,7 +123,7 @@ class BuildTrack extends Task {
 		} else if (style == BRANCH) {
 			// like straight, but no obstacle avoidance
 			// TODO: we may want to disallow/discourage bridges
-			
+
 			pathfinder.cost.turn = 2*u;
 			pathfinder.cost.slope = 0;
 
@@ -149,7 +149,7 @@ class BuildTrack extends Task {
 			pathfinder.cost.turn = 0;
 			pathfinder.cost.slope = 0;
 		}
-		
+
 		// Pathfinding needs money since it attempts to build in test mode.
 		// We can't get the price of a tunnel, but we can get it for a bridge
 		// and we'll assume they're comparable.
@@ -157,7 +157,7 @@ class BuildTrack extends Task {
 		if (GetBankBalance() < maxBridgeCost*2) {
 			throw NeedMoneyException(maxBridgeCost*2);
 		}
-		
+
 		SetSecondarySign("Pathfinding...");
 		pathfinder.InitializePath([[b, a]], [[c, d]], ignored);
 
@@ -165,7 +165,7 @@ class BuildTrack extends Task {
 		// do we want to search longer on longer routes?
 		// do we want to search "harder" if we really need this track?
 		local startDate = AIDate.GetCurrentDate();
-		local endDate = startDate + 365; 
+		local endDate = startDate + 365;
 		local res = null;
 		local distance = Sqrt(AIMap.DistanceSquare(a, d));
 
@@ -261,7 +261,7 @@ class BuildTrack extends Task {
 
 		return res;
 	}
-	
+
 	function PathToList(path) {
 		local list = AIList();
 		local node = path;
@@ -284,7 +284,7 @@ class BuildTrack extends Task {
 			prevTile = tile;
 			node = node.GetParent();
 		}
-		
+
 		return list;
 	}
 
@@ -315,7 +315,7 @@ class BuildTrack extends Task {
 
 		return bridge;
 	}
-	
+
 	function BuildPath(path) {
 		local node = path;
 		local prev = null;
@@ -334,14 +334,14 @@ class BuildTrack extends Task {
 						// since we can resume building, check if there already is a tunnel
 						if (!AITunnel.IsTunnelTile(prev)) {
 							AITunnel.BuildTunnel(AIVehicle.VT_RAIL, prev);
-							costEstimate = GetMaxBridgeCost(length);
+							//costEstimate = GetMaxBridgeCost(length);
 							CheckError();
 						}
 					} else {
 						// TODO:PATH routine to try to minimize actual needed bridge length,
 						// or even skip the bridge entirely and build it as plain track
 						// and then let the pathfinder go wild on bridges, skipping ahead merrily
-						AIBridge.BuildBridge(AIVehicle.VT_RAIL, SelectBridge(length), prev, node.GetTile());
+						BuildBridge(prev, node.GetTile());
 						//costEstimate = GetMaxBridgeCost(length);
 						CheckError();
 					}
@@ -350,12 +350,12 @@ class BuildTrack extends Task {
 					node = node.GetParent();
 				} else {
 					local built = AIRail.BuildRail(prevprev, prev, node.GetTile());
-					
+
 					// reset our cost estimate, because we can continue building track even with
 					// only a little money
 					//costEstimate = 5000;
 					CheckError();
-					
+
 					// since we can be restarted, we can process a tile more than once
 					// don't build signals again, or they'll be flipped around!
 					local forward = signalMode == SignalMode.FORWARD;
@@ -367,7 +367,7 @@ class BuildTrack extends Task {
 					{
 						AIRail.BuildSignal(prev, front, AIRail.SIGNALTYPE_NORMAL);
 					}
-					
+
 					local possibleDepot = DEPOT_INTERVAL > 0 && prevprevprev && node.GetParent();
 					local depotSite = possibleDepot ? GetDepotSite(prevprevprev, prevprev, prev, node.GetTile(), node.GetParent().GetTile(), forward, true) : null;
 					if (count % signalInterval == 1 && count - lastDepot > DEPOT_INTERVAL && depotSite) {
@@ -381,13 +381,13 @@ class BuildTrack extends Task {
 							AITile.DemolishTile(depotSite);
 							AIRail.RemoveRail(depotSite, prev, prevprev);
 							AIRail.RemoveRail(depotSite, prev, node.GetTile());
-						}							
+						}
 					}
-					
+
 					count++;
 				}
 			}
-			
+
 			if (node != null) {
 				prevprevprev = prevprev;
 				prevprev = prev;
@@ -396,7 +396,17 @@ class BuildTrack extends Task {
 			}
 		}
 	}
-	
+
+	function BuildBridge(fromTile, toTile) {
+		// The pathfinder can return bridges that are longer than necessary,
+		// or even completely unneeded. When building these, see if we can replace
+		// parts of the bridge with plain track.
+		local length = AIMap.DistanceManhattan(fromTile, toTile) + 1;
+//		AISign.BuildSign(fromTile, "BS");
+//		AISign.BuildSign(toTile, "BE");
+		AIBridge.BuildBridge(AIVehicle.VT_RAIL, SelectBridge(length), fromTile, toTile);
+	}
+
 	/**
 	 * Return a tile suitable for building a depot, or null.
 	 */
@@ -410,7 +420,7 @@ class BuildTrack extends Task {
 			TileCoordinates(next),
 			TileCoordinates(nextnext)
 		];
-		
+
 		local depotSite = null;
 		if (MatchCoordinates(coordinates, 0)) {
 			// same X
@@ -421,7 +431,7 @@ class BuildTrack extends Task {
 				// decreasing Y
 				depotSite = AIMap.GetTileIndex(coordinates[2][0] + (forward ? 1 : -1), coordinates[2][1]);
 			}
-			
+
 		} else if (MatchCoordinates(coordinates, 1)) {
 			// same Y
 			if (coordinates[0][0] < coordinates[1][0]) {
@@ -432,10 +442,10 @@ class BuildTrack extends Task {
 				depotSite = AIMap.GetTileIndex(coordinates[2][0], coordinates[2][1] + (forward ? -1 : 1));
 			}
 		}
-		
-		return (depotSite && (!checkBuildable || AITile.IsBuildable(depotSite))) ? depotSite : null; 
+
+		return (depotSite && (!checkBuildable || AITile.IsBuildable(depotSite))) ? depotSite : null;
 	}
-	
+
 	/**
 	 * Test whether the X or Y coordinates of a list are all the same.
 	 */
@@ -444,22 +454,22 @@ class BuildTrack extends Task {
 		foreach (c in coordinates) {
 			if (c[index] != value) return false;
 		}
-		
+
 		return true;
 	}
-	
+
 	function TileCoordinates(tile) {
 		return [AIMap.GetTileX(tile), AIMap.GetTileY(tile)];
 	}
-	
+
 	function Failed() {
 		Task.Failed();
-		
+
 		if (path == false) {
 			// no path found
 			return;
 		}
-		
+
 		Debug("Removing...");
 		local node = path;
 		local prev = null;
@@ -484,7 +494,7 @@ class BuildTrack extends Task {
 					}
 				}
 			}
-			
+
 			if (node != null) {
 				prevprevprev = prevprev;
 				prevprev = prev;
@@ -492,22 +502,22 @@ class BuildTrack extends Task {
 				node = node.GetParent();
 			}
 		}
-		
+
 		Debug("Done!");
 	}
 }
 
 class BuildSignals extends Builder {
-	
+
 	trackBuilder = null;
 	signalMode = null;
-	
+
 	constructor(trackBuilder, signalMode, signalInterval) {
 		this.trackBuilder = trackBuilder;
 		this.signalMode = signalMode;
 		this.signalInterval = signalInterval;
 	}
-	
+
 	function Run() {
 		local path = trackBuilder.GetPath();
 		Debug("Building signals...");
@@ -535,11 +545,11 @@ class BuildSignals extends Builder {
 					{
 						AIRail.BuildSignal(prev, front, AIRail.SIGNALTYPE_NORMAL);
 					}
-					
+
 					count++;
 				}
 			}
-			
+
 			if (node != null) {
 				prevprevprev = prevprev;
 				prevprev = prev;
@@ -547,7 +557,7 @@ class BuildSignals extends Builder {
 				node = node.GetParent();
 			}
 		}
-		
+
 		Debug("Done!");
 	}
 }

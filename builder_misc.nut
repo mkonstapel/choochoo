@@ -1,63 +1,63 @@
 class BuildHQ extends Builder {
-	
+
 	constructor(parentTask, location) {
 		Builder.constructor(parentTask, location);
 	}
-	
+
 	function _tostring() {
 		return "BuildHQ";
 	}
-	
+
 	function Run() {
 		// build our HQ at a four point crossing, if we don't have one yet
 		if (HaveHQ()) return;
-		
+
 		local crossing = Crossing(location);
 		if (crossing.CountConnections() == 4) {
 			AICompany.BuildCompanyHQ(GetTile([-1, -1]));
 		}
-	}	
+	}
 }
 
 class LevelTerrain extends Builder {
-	
+
 	location = null;
 	from = null;
 	to = null;
 	clear = null;
-	
+
 	constructor(parentTask, location, rotation, from, to, clear = false) {
 		Builder.constructor(parentTask, location, rotation);
 		this.from = from;
 		this.to = to;
 		this.clear = clear;
 	}
-	
+
 	function Run() {
 		SetConstructionSign(location, this);
-		
+
 		local tiles = AITileList();
 		tiles.AddRectangle(GetTile(from), GetTile(to));
-		
+
 		local min = 100;
 		local max = 0;
-		
+
 		for (local tile = tiles.Begin(); tiles.HasNext(); tile = tiles.Next()) {
 			if (AITile.GetMaxHeight(tile) > max) max = AITile.GetMaxHeight(tile);
 			if (AITile.GetMinHeight(tile) < min) min = AITile.GetMinHeight(tile);
 		}
-		
+
 		// prefer rounding up, because foundations can help us raise
 		// tiles to the appropriate height
 		local targetHeight = (min + max + 1) / 2;
 		for (local tile = tiles.Begin(); tiles.HasNext(); tile = tiles.Next()) {
 			LevelTile(tile, targetHeight);
-			
+
 			// if desired, clear the area, preemptively removing any trees (for town ratings)
 			if (clear) AITile.DemolishTile(tile);
 		}
 	}
-	
+
 	function LevelTile(tile, height) {
 		// raise or lower each corner of the tile to the target height
 		foreach (corner in [AITile.CORNER_N, AITile.CORNER_E, AITile.CORNER_S, AITile.CORNER_W]) {
@@ -75,7 +75,7 @@ class LevelTerrain extends Builder {
 					break;
 				}
 			}
-			
+
 			while (AITile.GetCornerHeight(tile, corner) > height) {
 				AITile.LowerTile(tile, 1 << corner);
 				if (AIError.GetLastError() == AIError.ERR_NONE) {
@@ -88,7 +88,7 @@ class LevelTerrain extends Builder {
 			}
 		}
 	}
-	
+
 	function CheckTerraformingError() {
 		switch (AIError.GetLastError()) {
 			case AIError.ERR_NONE:
@@ -105,20 +105,20 @@ class LevelTerrain extends Builder {
 				break;
 		}
 	}
-	
+
 	function _tostring() {
 		return "LevelTerrain";
 	}
-	
+
 }
 
 
 class AppeaseLocalAuthority extends Task {
-	
+
 	town = null;
 	excludeArea = null;
 	minTownRating = null;
-	
+
 	constructor(parentTask, town, excludeArea = null, minTownRating = AITown.TOWN_RATING_MEDIOCRE) {
 		// POOR is the minimum for building a station, but a little margin is probably nice
 		// and it only takes an extra 29 trees
@@ -131,11 +131,11 @@ class AppeaseLocalAuthority extends Task {
 			throw TaskFailedException("building trees can only get you up to TOWN_RATING_MEDIOCRE");
 		}
 	}
-	
+
 	function _tostring() {
 		return "AppeaseLocalAuthority at " + AITown.GetName(town);
 	}
-	
+
 	function Run() {
 		local location = AITown.GetLocation(town);
 		SetConstructionSign(location, this);
@@ -153,7 +153,7 @@ class AppeaseLocalAuthority extends Task {
 
 		// We can't know our exact numeric rating, but we can get a worst case estimate.
 		// These are *maximums* from town.h, so APPALLING could be as low as -1000,
-		// VERYPOOR is -399 to -200, etc. NONE 
+		// VERYPOOR is -399 to -200, etc. NONE
 		// RATING_MINIMUM     = -1000,
 		// RATING_APPALLING   =  -400,
 		// RATING_VERYPOOR    =  -200,
@@ -177,7 +177,7 @@ class AppeaseLocalAuthority extends Task {
 
 		local numericRating = ratings[currentTownRating];
 		local minRating = ratings[minTownRating];
-		
+
 		// building a tree gets you 7 rep, up to 220 (GOOD)
 		// NB: only the *first* tree on a tile that didn't have one improves company rating!
 		// https://github.com/OpenTTD/OpenTTD/blob/master/src/tree_cmd.cpp#L433
@@ -193,7 +193,7 @@ class AppeaseLocalAuthority extends Task {
 		Debug("Looks like we can plant", freeTiles, "trees");
 
 		local treeTiles = 0;
-		
+
 		// if our rating is already really bad, see if we could get away with nuking a bunch of trees so we can replant them
 		if (freeTiles < treesNeeded) {
 			local area = GetTreeArea(town);
@@ -284,7 +284,7 @@ class AppeaseLocalAuthority extends Task {
 		area.Valuate(AITile.IsCoastTile);
 		area.KeepValue(0);
 	}
-	
+
 	function GetTreeArea(town) {
 		local location = AITown.GetLocation(town);
 		local distance = GetGameSetting("economy.dist_local_authority", 20);
@@ -293,7 +293,7 @@ class AppeaseLocalAuthority extends Task {
 		if (excludeArea) {
 			area.RemoveList(excludeArea);
 		}
-		
+
 		// for tree building, the game just checks `ClosestTownFromTile(current_tile, _settings_game.economy.dist_local_authority)`
 		// area.Valuate(AITile.IsWithinTownInfluence, town);
 		// area.KeepValue(1);

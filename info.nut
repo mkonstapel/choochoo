@@ -8,7 +8,7 @@ class ChooChoo extends AIInfo {
 	function GetShortName()	  { return "CHOO"; }
 	function GetAPIVersion()  { return "1.0"; }
 	function GetURL()         { return "https://www.tt-forums.net/viewtopic.php?t=44225"; }
-	
+
 	function GetSettings() {
 	    AddSetting({name = "CargoLines", description = "Number of single track cargo lines to start with", min_value = 0, max_value = 20, easy_value = 5, medium_value = 10, hard_value = 20, custom_value = 10, flags = CONFIG_INGAME});
 	    AddSetting({name = "MaxBridgeLength", description = "Maximum bridge length", min_value = 0, max_value = 40, easy_value = 20, medium_value = 20, hard_value = 20, custom_value = 20, flags = CONFIG_INGAME});
