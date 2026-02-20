@@ -402,8 +402,8 @@ class BuildTrack extends Task {
 		// or even completely unneeded. When building these, see if we can replace
 		// parts of the bridge with plain track.
 		local length = AIMap.DistanceManhattan(fromTile, toTile) + 1;
-		AISign.BuildSign(fromTile, "BS");
-		AISign.BuildSign(toTile, "BE");
+//		AISign.BuildSign(fromTile, "BS");
+//		AISign.BuildSign(toTile, "BE");
 		AIBridge.BuildBridge(AIVehicle.VT_RAIL, SelectBridge(length), fromTile, toTile);
 	}
 
