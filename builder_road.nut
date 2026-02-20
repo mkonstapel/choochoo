@@ -5,40 +5,40 @@ class BuildRoad extends Task {
 	stationTile = null;
 	town = null;
 	path = null;
-	
+
 	constructor(parentTask, stationTile, town) {
 		Task.constructor(parentTask);
 		this.stationTile = stationTile;
 		this.town = town;
 		this.path = null;
 	}
-	
+
 	function _tostring() {
 		return "BuildRoad";
 	}
-	
+
 	function Run() {
 		SetConstructionSign(stationTile, this);
 
 		local depot = TrainStation.AtLocation(stationTile).GetRoadDepotExit();
-		local center = AITown.GetLocation(town); 
+		local center = AITown.GetLocation(town);
 		if (!path) path = FindPath(depot, center);
 		ClearSecondarySign();
 		if (!path) throw TaskFailedException("no path");
 		BuildPath(path);
 	}
-	
+
 	function GetPath() {
 		return path;
 	}
-	
+
 	function FindPath(a, b) {
 		local pathfinder = Road();
 		pathfinder.cost.max_bridge_length = 4;
 		pathfinder.cost.max_tunnel_length = 4;
 		pathfinder.cost.no_existing_road = pathfinder.cost.tile; // we want reuse
 		pathfinder.cost.max_cost = pathfinder.cost.tile * 4 * max(10, AIMap.DistanceManhattan(a, b));
-		
+
 		// Pathfinding needs money since it attempts to build in test mode.
 		// We can't get the price of a tunnel, but we can get it for a bridge
 		// and we'll assume they're comparable.
@@ -46,12 +46,12 @@ class BuildRoad extends Task {
 		if (GetBankBalance() < maxBridgeCost*2) {
 			throw NeedMoneyException(maxBridgeCost*2);
 		}
-		
+
 		SetSecondarySign("Pathfinding...");
 		pathfinder.InitializePath([a], [b]);
 		return pathfinder.FindPath(AIMap.DistanceManhattan(a, b) * 3 * TICKS_PER_DAY);
 	}
-	
+
 	function BuildPath(path) {
 		while (path != null) {
 			local par = path.GetParent();
@@ -98,10 +98,10 @@ class BuildRoad extends Task {
 			path = par;
 		}
 	}
-	
+
 	function Failed() {
 		Task.Failed();
 		// TODO: remove road
 	}
-	
+
 }

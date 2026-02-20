@@ -4,14 +4,14 @@ function BuildSign(tile, text) {
 	local mode = AIExecMode();
 	AISign.BuildSign(tile, text);
 }
-	
+
 /**
  * A Rail Pathfinder.
  */
 class Rail
 {
 	estimate_multiplier = 1;
-	
+
 	// _aystar_class = import("graph.aystar", "", 4);
 	_aystar_class = AyStar;
 	_max_cost = null;              ///< The maximum cost for a route.
@@ -31,7 +31,7 @@ class Rail
 	cost = null;                   ///< Used to change the costs.
 	_running = null;
 	_goals = null;
-	
+
 	follow = null;
 	tileBaseCosts = null;
 	tileEstimates = null;
@@ -262,7 +262,7 @@ function Rail::_Cost(path, new_tile, new_direction, self)
 				baseCost += self._cost_adj_obstacle;
 			}
 		}
-		
+
 		/* Check if the new tile is a coast tile. */
 		if (self._cost_coast && AITile.IsCoastTile(new_tile)) {
 			baseCost += self._cost_coast;
@@ -303,7 +303,7 @@ function Rail::_Cost(path, new_tile, new_direction, self)
 
 	/* If the new tile is a bridge / tunnel tile, check whether we came from the other
 	 *  end of the bridge / tunnel or if we just entered the bridge / tunnel. */
-	
+
 	// As we don't use existing rail, we also don't reuse tunnels and bridges
 	/*
 	if (AIBridge.IsBridgeTile(new_tile) &&  AIBridge.GetOtherBridgeEnd(new_tile) == prev_tile) {
@@ -326,12 +326,12 @@ function Rail::_Cost(path, new_tile, new_direction, self)
 			cost += dist * (self._cost_tile + self._cost_bridge_per_tile) + self._GetBridgeNumSlopes(new_tile, prev_tile) * self._cost_slope;
 		}
 	}
-	
+
 	/* Check for a turn. We do this by substracting the TileID of the current
 	 *  node from the TileID of the previous node and comparing that to the
 	 *  difference between the tile before the previous node and the node before
 	 *  that. */
-	 
+
 	// if we don't have enough parents to determine a turn, assume diagonal is bad
 	// because we want to exit straight from stations and crossings
 	if (self._cost_turn) {
@@ -342,13 +342,13 @@ function Rail::_Cost(path, new_tile, new_direction, self)
 				//path.GetParent().GetParent().GetTile() - path.GetParent().GetTile() != prev_tile - new_tile) {
 			cost += self._cost_turn;
 		}
-		
+
 		/* Check for a double turn. */
 		if (pppt && self._IsTurn(pppt, ppt, pt, prev_tile)) {
 			cost += 2*self._cost_turn;
 		}
 	}
-	
+
 	// ops = ops - AIController.GetOpsTillSuspend();
 	// while (ops < 0) ops += 10000;
 	// self.costOps += ops;
@@ -373,11 +373,11 @@ function Rail::_Estimate(cur_tile, cur_direction, goal_tile, self)
 		est = (min_cost*self.estimate_multiplier).tointeger();
 		self.tileEstimates.AddItem(cur_tile, est);
 	}
-	
+
 	// ops = ops - AIController.GetOpsTillSuspend();
 	// while (ops < 0) ops += 10000;
 	// self.estimateOps += ops;
-	
+
 	return est;
 }
 
@@ -392,7 +392,7 @@ function Rail::_Neighbours(path, cur_node, self)
 
 	/* self._max_cost is the maximum path cost, if we go over it, the path isn't valid. */
 	if (path.GetCost() >= self._max_cost) return [];
-	
+
 	local tiles = [];
 	local par = path.GetParent();
 	local par_tile = par && par.GetTile();
@@ -428,7 +428,7 @@ function Rail::_Neighbours(path, cur_node, self)
 				local NE = cur_node - 1 == par_tile || cur_node - 1 == next_tile;
 				local SE = cur_node + MAP_SIZE_X == par_tile || cur_node + MAP_SIZE_X == next_tile;
 				local SW = cur_node + 1 == par_tile || cur_node + 1 == next_tile;
-				
+
 				buildable = (
 					   NW && NE && tracks == AIRail.RAILTRACK_SW_SE
 					|| SW && SE && tracks == AIRail.RAILTRACK_NW_NE

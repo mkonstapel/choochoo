@@ -1,5 +1,5 @@
 class RelativeCoordinates {
-	
+
 	static matrices = [
 		// ROT_0
 		[ 1, 0,
@@ -17,15 +17,15 @@ class RelativeCoordinates {
 		[ 0, 1,
 		 -1, 0]
 	];
-	
+
 	location = null;
-	rotation = null;	
-	
+	rotation = null;
+
 	constructor(location, rotation = Rotation.ROT_0) {
 		this.location = location;
 		this.rotation = rotation;
 	}
-	
+
 	function GetTile(coordinates) {
 		local matrix = matrices[rotation];
 		local x = coordinates[0] * matrix[0] + coordinates[1] * matrix[1];
@@ -33,28 +33,28 @@ class RelativeCoordinates {
 		//Debug(coordinates[0] + "," + coordinates[1] + " -> " + x + "," + y);
 		return location + AIMap.GetTileIndex(x, y);
 	}
-	
+
 }
 
 class WorldObject {
-	
+
 	relativeCoordinates = null;
 	location = null;
 	rotation = null;
-	
+
 	constructor(location, rotation = Rotation.ROT_0) {
 		this.relativeCoordinates = RelativeCoordinates(location, rotation);
 		this.location = location;
 		this.rotation = rotation;
 	}
-	
+
 	function GetTile(coordinates) {
 		return relativeCoordinates.GetTile(coordinates);
 	}
-	
+
 	function TileStrip(start, end) {
 		local tiles = [];
-		
+
 		local count, xstep, ystep;
 		if (start[0] == end[0]) {
 			count = abs(end[1] - start[1]);
@@ -65,26 +65,26 @@ class WorldObject {
 			xstep = end[0] < start[0] ? -1 : 1;
 			ystep = 0
 		}
-		
+
 		for (local i = 0, x  = start[0], y = start[1]; i <= count; i++, x += xstep, y += ystep) {
 			tiles.append(GetTile([x, y]));
 		}
-				
+
 		return tiles;
 	}
 }
 
 class Crossing extends WorldObject {
-	
+
 	static WIDTH = 4;
-	
+
 	constructor(location) {
 		WorldObject.constructor(location);
 	}
-	
+
 	function GetEntrance(direction) {
 		local a, b;
-		
+
 		switch (direction) {
 			case Direction.NE: a = [-1, 1]; b = [0,1]; break;
 			case Direction.SE: a = [ 1, 4]; b = [1,3]; break;
@@ -92,13 +92,13 @@ class Crossing extends WorldObject {
 			case Direction.NW: a = [ 2,-1]; b = [2,0]; break;
 			default: throw "Invalid direction";
 		}
-		
+
 		return TileStrip(a, b);
 	}
-	
+
 	function GetExit(direction) {
 		local a, b;
-		
+
 		switch (direction) {
 			case Direction.NE: a = [0,2]; b = [-1, 2]; break;
 			case Direction.SE: a = [2,3]; b = [ 2, 4]; break;
@@ -106,13 +106,13 @@ class Crossing extends WorldObject {
 			case Direction.NW: a = [1,0]; b = [ 1,-1]; break;
 			default: throw "Invalid direction";
 		}
-		
+
 		return TileStrip(a, b);
 	}
-	
+
 	function GetReservedEntranceSpace(direction) {
 		local a, b;
-		
+
 		switch (direction) {
 			case Direction.NE: a = [-5, 1]; b = [0,1]; break;
 			case Direction.SE: a = [ 1, 8]; b = [1,3]; break;
@@ -120,13 +120,13 @@ class Crossing extends WorldObject {
 			case Direction.NW: a = [ 2,-5]; b = [2,0]; break;
 			default: throw "Invalid direction";
 		}
-		
+
 		return TileStrip(a, b);
 	}
 
 	function GetReservedExitSpace(direction) {
 		local a, b;
-		
+
 		switch (direction) {
 			case Direction.NE: a = [0,2]; b = [-5, 2]; break;
 			case Direction.SE: a = [2,3]; b = [ 2, 8]; break;
@@ -134,13 +134,13 @@ class Crossing extends WorldObject {
 			case Direction.NW: a = [1,0]; b = [ 1,-5]; break;
 			default: throw "Invalid direction";
 		}
-		
+
 		return TileStrip(a, b);
 	}
-	
+
 	function CountConnections() {
 		local count = 0;
-		
+
 		foreach (d in [Direction.NE, Direction.SW, Direction.NW, Direction.SE]) {
 			// check both the entrance and the exit, because in left hand drive, these are reversed
 			local entrance = GetEntrance(d);
@@ -152,14 +152,14 @@ class Crossing extends WorldObject {
 				count++;
 			}
 		}
-		
+
 		return count;
 	}
 
 	function CountPotentialConnections() {
 		// like CountConnections, but also counts unconnected (but still present) directions
 		local count = 0;
-		
+
 		foreach (d in [Direction.NE, Direction.SW, Direction.NW, Direction.SE]) {
 			local entrance = GetEntrance(d);
 			local exit = GetExit(d);
@@ -171,7 +171,7 @@ class Crossing extends WorldObject {
 				count++;
 			}
 		}
-		
+
 		return count;
 	}
 
@@ -186,13 +186,13 @@ class Crossing extends WorldObject {
 
 		return null;
 	}
-	
+
 	function GetName() {
 		local waypointID = GetWaypointID();
 		if (waypointID != null) {
 			return AIWaypoint.GetName(waypointID);
 		}
-		
+
 		return "unnamed junction at " + TileToString(location);
 	}
 
@@ -201,7 +201,7 @@ class Crossing extends WorldObject {
 		if (waypointID != null) {
 			return AIWaypoint.SetName(waypointID, name);
 		}
-		
+
 		return null;
 	}
 
@@ -251,7 +251,7 @@ class Crossing extends WorldObject {
 	function _tostring() {
 		return GetName();
 	}
-	
+
 }
 
 class TrainStation extends WorldObject {
@@ -300,23 +300,23 @@ class TrainStation extends WorldObject {
 }
 
 class TerminusStation extends TrainStation {
-	
+
 	constructor(location, rotation, platformLength) {
 		TrainStation.constructor(location, rotation, platformLength);
 	}
-	
+
 	function _tostring() {
 		return AIStation.GetName(AIStation.GetStationID(location));
 	}
-	
+
 	function GetEntrance() {
 		return TileStrip([0, platformLength + 2], [0, platformLength + 1]);
 	}
-	
+
 	function GetExit() {
 		return TileStrip([1, platformLength + 1], [1, platformLength + 2]);
 	}
-	
+
 	function GetReservedEntranceSpace() {
 		return TileStrip([0, platformLength], [0, platformLength + 2]);
 	}
@@ -324,15 +324,15 @@ class TerminusStation extends TrainStation {
 	function GetReservedExitSpace() {
 		return TileStrip([1, platformLength], [1, platformLength + 2]);
 	}
-	
+
 	function GetRearEntrance() {
 		return TileStrip([1, -1], [1, 0]);
 	}
-	
+
 	function GetRearExit() {
 		return TileStrip([0, 0], [0, -1]);
 	}
-	
+
 	function GetReservedRearEntranceSpace() {
 		return TileStrip([1, -1], [1, -2]);
 	}
@@ -340,34 +340,34 @@ class TerminusStation extends TrainStation {
 	function GetReservedRearExitSpace() {
 		return TileStrip([0, 0], [0, -2]);
 	}
-	
+
 	function GetRoadDepot() {
 		return GetTile([2,3]);
 	}
-	
+
 	function GetRoadDepotExit() {
 		return GetTile([2,2]);
 	}
 }
 
 class BranchStation extends TrainStation {
-	
+
 	constructor(location, rotation, platformLength) {
 		TrainStation.constructor(location, rotation, platformLength);
 	}
-	
+
 	function _tostring() {
 		return AIStation.GetName(AIStation.GetStationID(location));
 	}
-	
+
 	function GetEntrance() {
 		return TileStrip([0, platformLength+1], [0, platformLength]);
 	}
-	
+
 	function GetExit() {
 		return Swap(GetEntrance());
 	}
-	
+
 	function GetReservedEntranceSpace() {
 		// space for the road to exit
 		// no longer needed now that we manually build a road/rail crossing if needed
@@ -378,19 +378,19 @@ class BranchStation extends TrainStation {
 	function GetReservedExitSpace() {
 		return GetReservedEntranceSpace();
 	}
-	
+
 	function GetRearEntrance() {
 		return TileStrip([0, -1], [0, 0]);
 	}
-	
+
 	function GetRearExit() {
 		return Swap(GetRearEntrance());
 	}
-	
+
 	function GetReservedRearEntranceSpace() {
 		return TileStrip([0, 0], [0, -2]);
 	}
-	
+
 	function GetReservedRearExitSpace() {
 		return GetReservedRearEntranceSpace();
 	}
@@ -398,14 +398,14 @@ class BranchStation extends TrainStation {
 	function GetRoadDepot() {
 		return GetTile([1,1]);
 	}
-	
+
 	function GetRoadDepotExit() {
 		return GetTile([1,2]);
 	}
 }
 
 class Network {
-	
+
 	railType = null;
 	rightSide = null;
 	trainLength = null;
@@ -414,7 +414,7 @@ class Network {
 	stations = null;
 	depots = null;
 	trains = null;
-	
+
 	constructor(railType, rightSide, trainLength, minDistance, maxDistance) {
 		this.railType = railType;
 		this.rightSide = rightSide;
@@ -425,5 +425,5 @@ class Network {
 		this.depots = [];
 		this.trains = [];
 	}
-	
+
 }

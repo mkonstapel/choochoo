@@ -26,9 +26,9 @@ function Clone(train) {
 	local depot = GetDepot(train);
 	local copy = AIVehicle.CloneVehicle(depot, train, true);
 	if (AIVehicle.IsValidVehicle(copy)) {
-		GenerateName(copy, depot);	
+		GenerateName(copy, depot);
 	}
-	
+
 	return copy;
 }
 

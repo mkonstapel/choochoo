@@ -3,7 +3,7 @@ function Debug(...) {
 	for(local i = 0; i< vargc; i++) {
 		s = s + " " + vargv[i];
 	}
-	
+
 	AILog.Info(GetDate() + ":" + s);
 }
 
@@ -12,7 +12,7 @@ function Warning(...) {
 	for(local i = 0; i< vargc; i++) {
 		s = s + " " + vargv[i];
 	}
-	
+
 	AILog.Warning(GetDate() + ":" + s);
 }
 
@@ -21,7 +21,7 @@ function Error(...) {
 	for(local i = 0; i< vargc; i++) {
 		s = s + " " + vargv[i];
 	}
-	
+
 	AILog.Error(GetDate() + ":" + s);
 }
 
@@ -82,7 +82,7 @@ function Range(from, to) {
 	for (local i=from; i<to; i++) {
 		range.append(i);
 	}
-	
+
 	return range;
 }
 
@@ -106,7 +106,7 @@ function Sum(list) {
 	for (local item = list.Begin(); list.HasNext(); item = list.Next()) {
 		sum += list.GetValue(item);
 	}
-	
+
 	return sum;
 }
 
@@ -129,13 +129,13 @@ function Shuffle(a) {
  */
 function ArrayToString(a) {
 	if (a == null) return "";
-	
+
 	local s = "";
 	foreach (index, item in a) {
 		if (index > 0) s += ", ";
 		s += item;
 	}
-	
+
 	return s;
 }
 
@@ -154,7 +154,7 @@ function StringN(s, n) {
 	for (local i=0; i<n; i++) {
 		r += s;
 	}
-	
+
 	return r;
 }
 
@@ -223,15 +223,15 @@ function Concat(a, b) {
 /**
  * Add a rectangular area to an AITileList containing tiles that are within /radius/
  * tiles from the center tile, taking the edges of the map into account.
- */  
+ */
 function SafeAddRectangle(list, tile, radius) {
 	local x1 = max(1, AIMap.GetTileX(tile) - radius);
 	local y1 = max(1, AIMap.GetTileY(tile) - radius);
-	
+
 	local x2 = min(AIMap.GetMapSizeX() - 2, AIMap.GetTileX(tile) + radius);
 	local y2 = min(AIMap.GetMapSizeY() - 2, AIMap.GetTileY(tile) + radius);
-	
-	list.AddRectangle(AIMap.GetTileIndex(x1, y1),AIMap.GetTileIndex(x2, y2)); 
+
+	list.AddRectangle(AIMap.GetTileIndex(x1, y1),AIMap.GetTileIndex(x2, y2));
 }
 
 /**
@@ -249,7 +249,7 @@ function InverseDirection(direction) {
 		case Direction.E: return Direction.W;
 		case Direction.S: return Direction.N;
 		case Direction.W: return Direction.E;
-		
+
 		case Direction.NE: return Direction.SW;
 		case Direction.SE: return Direction.NW;
 		case Direction.SW: return Direction.NE;
@@ -264,7 +264,7 @@ function DirectionName(direction) {
 		case Direction.E: return "E";
 		case Direction.S: return "S";
 		case Direction.W: return "W";
-		
+
 		case Direction.NE: return "NE";
 		case Direction.SE: return "SE";
 		case Direction.SW: return "SW";
@@ -311,7 +311,7 @@ function GetMaxBridgeLength() {
 	while (length > 0 && AIBridgeList_Length(length).IsEmpty()) {
 		length--;
 	}
-	
+
 	return length;
 }
 
@@ -344,7 +344,7 @@ function GetEngine(cargo, railType, bannedEngines, cheap) {
 	engineList.Valuate(AIEngine.CanPullCargo, cargo);
 	engineList.KeepValue(1);
 	engineList.RemoveList(ArrayToList(bannedEngines));
-	
+
 	engineList.Valuate(AIEngine.GetPrice);
 	if (cheap) {
 		// go for the cheapest
@@ -355,7 +355,7 @@ function GetEngine(cargo, railType, bannedEngines, cheap) {
 		engineList.Sort(AIList.SORT_BY_VALUE, true);
 		engineList.RemoveTop(engineList.Count() / 2);
 	}
-	
+
 	if (engineList.IsEmpty()) throw TaskFailedException("no suitable engine");
 	return engineList.Begin();
 }
@@ -367,10 +367,10 @@ function GetWagon(cargo, railType) {
 	engineList.KeepValue(1);
 	engineList.Valuate(AIEngine.IsWagon);
 	engineList.KeepValue(1);
-	
+
 	engineList.Valuate(AIEngine.CanRunOnRail, railType);
 	engineList.KeepValue(1);
-	
+
 	// prefer engines that can carry this cargo without a refit,
 	// because their refitted capacity may be different from
 	// their "native" capacity - for example, NARS Ore Hoppers
@@ -381,10 +381,10 @@ function GetWagon(cargo, railType) {
 	if (!native.IsEmpty()) {
 		engineList = native;
 	}
-	
+
 	engineList.Valuate(AIEngine.GetCapacity)
 	engineList.KeepTop(1);
-	
+
 	if (engineList.IsEmpty()) throw TaskFailedException("no suitable wagon");
 	return engineList.Begin();
 }
@@ -405,17 +405,17 @@ function GetGameSetting(setting, defaultValue) {
 }
 
 class Counter {
-	
+
 	count = 0;
-	
+
 	constructor() {
 		count = 0;
 	}
-	
+
 	function Get() {
 		return count;
 	}
-	
+
 	function Inc() {
 		count++;
 	}
@@ -425,17 +425,17 @@ class Counter {
  * A boolean flag, usable as a static field.
  */
 class Flag {
-	
+
 	value = null;
-	
+
 	constructor() {
 		value = false;
 	}
-	
+
 	function Set(value) {
 		this.value = value;
 	}
-	
+
 	function Get() {
 		return value;
 	}

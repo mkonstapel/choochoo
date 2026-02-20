@@ -3,7 +3,7 @@
  */
 function CullTrains() {
 	Debug("Culling the herd...");
-	
+
 	local trains = AIVehicleList();
 	trains.Valuate(AIVehicle.GetVehicleType);
 	trains.KeepValue(AIVehicle.VT_RAIL);
@@ -28,14 +28,14 @@ function CullTrains() {
 	worst.AddList(trains);
 
 	best.KeepTop(n/10);
-	
+
 	// TODO don't delete trains that are the only one servicing a station
 	// see AIVehicleList_Station
 	worst.KeepBottom(n/10);
 
 
 	// TODO: send vehicles that are too old (GetAgeLeft() < 0) for replacement (rebuild)
-	
+
 	local clones = 0;
 	foreach (train, profit in best) {
 		Debug("Cloning " + AIVehicle.GetName(train) + ", made " + profit + " last year");
@@ -45,7 +45,7 @@ function CullTrains() {
 			clones++;
 		}
 	}
-	
+
 	foreach (train, profit in worst) {
 		Debug("Culling " + AIVehicle.GetName(train) + ", made " + profit + " last year");
 		Cull(train);
@@ -53,7 +53,7 @@ function CullTrains() {
 		if (clones <= 0)
 			break;
 	}
-	
+
 	Debug("Done culling");
 }
 

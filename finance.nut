@@ -67,9 +67,9 @@ function GetMinimumSafeMoney() {
 	local runningCosts = Sum(vehicles) / 12;
 	local maintenance = AIStationList(AIStation.STATION_ANY).Count() * MONTHLY_STATION_MAINTENANCE;
 	local safety = 3*(runningCosts + maintenance);
-	
+
 	// at the start, just risk it
-	return safety < 10000 ? 0 : safety; 
+	return safety < 10000 ? 0 : safety;
 }
 
 /**
@@ -88,7 +88,6 @@ function GetAutoRenewMoney() {
 			return AIEngine.GetPrice(engine);
 		}
 	}
-	
+
 	return 0;
 }
-	

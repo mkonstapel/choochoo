@@ -5,16 +5,16 @@ function ClosestDepot(network, stationID) {
 	foreach (depot in network.depots) {
 		depotList.AddItem(depot, 0);
 	}
-	
+
 	depotList.Valuate(AIMap.DistanceManhattan, AIStation.GetLocation(stationID));
 	depotList.KeepBottom(1);
 	return depotList.IsEmpty() ? null : depotList.Begin();
 }
 
 class BuildTrains extends Task {
-	
+
 	static TRAINS_ADDED_PER_STATION = 4;
-	
+
 	stationTile = null;
 	network = null;
 	cargo = null;
@@ -22,7 +22,7 @@ class BuildTrains extends Task {
 	toFlags = null;
 	cheap = null;
 	engine = null;
-	
+
 	constructor(parentTask, stationTile, network, cargo, fromFlags = null, toFlags = null, cheap = false) {
 		Task.constructor(parentTask);
 		this.stationTile = stationTile;
@@ -32,33 +32,33 @@ class BuildTrains extends Task {
 		this.toFlags = toFlags == null ? AIOrder.AIOF_NONE : toFlags;
 		this.cheap = cheap;
 	}
-	
+
 	function _tostring() {
 		return "BuildTrains";
 	}
-	
+
 	function Run() {
 		if (!subtasks) {
 			local from = AIStation.GetStationID(stationTile);
 			local fromDepot = ClosestDepot(network, from);
 			SetConstructionSign(fromDepot, this);
-			
+
 			// add trains to the N stations with the greatest capacity deficit
 			local stationList = ArrayToList(network.stations);
 			stationList.RemoveItem(from);
 			stationList.Valuate(StationCapacityDeficit);
 			stationList.KeepTop(TRAINS_ADDED_PER_STATION);
-			
+
 			subtasks = [];
 			for (local to = stationList.Begin(); stationList.HasNext(); to = stationList.Next()) {
 				local toDepot = ClosestDepot(network, to);
 				subtasks.append(AddTrain(this, from, to, fromDepot, toDepot, network, network.trainLength, fromFlags, toFlags, cargo));
 			}
 		}
-		
+
 		RunSubtasks();
 	}
-	
+
 	/**
 	 * Calculates the difference between the amount of cargo/passengers produced
 	 * and the transport capacity of currently assigned trains.
@@ -68,30 +68,30 @@ class BuildTrains extends Task {
 		local trains = AIVehicleList_Station(station);
 		trains.Valuate(BuildTrains.TrainCapacity);
 		local capacity = Sum(trains);
-		
+
 		//Debug("Station " + AIStation.GetName(station) + " production: " + production + ", capacity: " + capacity + ", deficit: " + (production - capacity));
 		return production - capacity;
 	}
-	
+
 	/**
 	 * Estimates train capacity in terms of cargo/passengers transported per month.
 	 * Speed conversion from http://wiki.openttd.org/Game_mechanics#Vehicle_speeds:
 	 * 160 km/h = 5.6 tiles/day, so 1 km/h = 0.035 tiles/day = 1.05 tiles/month.
-	 */ 
+	 */
 	function TrainCapacity(train) {
 		local capacity = AIVehicle.GetCapacity(train, PAX);
-		
+
 		local a = AIOrder.GetOrderDestination(train, 0);
 		local b = AIOrder.GetOrderDestination(train, 1);
 		local distance = AIMap.DistanceManhattan(a, b);
-		
+
 		local speedKph = AIEngine.GetMaxSpeed(AIVehicle.GetEngineType(train)) / 2;
 		local speedTpm = speedKph * 1.05;
 		local triptime = distance/speedTpm;
-		
+
 		//Debug("Vehicle " + AIVehicle.GetName(train) + " at speed " + speedKph + " km/h can travel " +
 		//	distance + " tiles in " + triptime + " months with " + capacity + " passengers");
-		
+
 		return (capacity/triptime).tointeger();
 	}
 }
@@ -105,7 +105,7 @@ class BuildBranchTrain extends Task {
 	toFlags = null;
 	cheap = null;
 	engine = null;
-	
+
 	constructor(parentTask, mainlineStationTile, branchStationTile, network, cargo, fromFlags = null, toFlags = null, cheap = false) {
 		Task.constructor(parentTask);
 		this.mainlineStationTile = mainlineStationTile;
@@ -116,11 +116,11 @@ class BuildBranchTrain extends Task {
 		this.toFlags = toFlags == null ? AIOrder.AIOF_NONE : toFlags;
 		this.cheap = cheap;
 	}
-	
+
 	function _tostring() {
 		return "BuildBranchTrain";
 	}
-	
+
 	function Run() {
 		local from = AIStation.GetStationID(mainlineStationTile);
 		local to = AIStation.GetStationID(branchStationTile);
@@ -130,7 +130,7 @@ class BuildBranchTrain extends Task {
 			SetConstructionSign(fromDepot, this);
 			subtasks = [AddTrain(this, from, to, fromDepot, null, network, network.trainLength - 1, fromFlags, toFlags, cargo)];
 		}
-		
+
 		RunSubtasks();
 
 		// encode "branch" status in name so we can skip it during cloning
@@ -140,9 +140,9 @@ class BuildBranchTrain extends Task {
 }
 
 class AddTrain extends Task {
-	
+
 	static bannedEngines = [];
-	
+
 	from = null;
 	to = null;
 	fromDepot = null;
@@ -155,7 +155,7 @@ class AddTrain extends Task {
 	cargo = null;
 	train = null;
 	hasMail = null;
-	
+
 	constructor(parentTask, from, to, fromDepot, toDepot, network, trainLength, fromFlags, toFlags, cargo = null, cheap = false) {
 		Task.constructor(parentTask);
 		this.from = from;
@@ -170,11 +170,11 @@ class AddTrain extends Task {
 		this.cheap = cheap;
 		this.train = null;
 	}
-	
+
 	function _tostring() {
 		return "AddTrain from " + AIStation.GetName(from) + " to " + AIStation.GetName(to) + " at " + TileToString(fromDepot);
 	}
-	
+
 	function Run() {
 		// there appears to be a bug
 		if (!AIStation.IsValidStation(from) || !AIStation.IsValidStation(to)) {
@@ -212,9 +212,9 @@ class ReplaceTrain extends Task {
 }
 
 class BuildTrain extends Task {
-	
+
 	static bannedEngines = [];
-	
+
 	depot = null;
 	cargo = null;
 	maxLength = null;
@@ -222,7 +222,7 @@ class BuildTrain extends Task {
 	railType = null;
 	train = null;
 	hasMail = null;
-	
+
 	constructor(parentTask, depot, maxLength, cargo = null, cheap = false) {
 		Task.constructor(parentTask);
 		this.depot = depot;
@@ -233,16 +233,16 @@ class BuildTrain extends Task {
 		this.train = null;
 		this.hasMail = false;
 	}
-	
+
 	function _tostring() {
 		return "BuildTrain for " + AICargo.GetCargoLabel(cargo) + " at " + TileToString(depot);
 	}
-	
+
 	function Run() {
 		// we need an engine
 		if (!train || !AIVehicle.IsValidVehicle(train)) {
 			local engineType = GetEngine(cargo, railType, bannedEngines, cheap);
-			
+
 			// don't try building the train until we (probably) have enough
 			// for the wagons as well, or it may sit in a depot for ages
 			CheckFunds(engineType);
@@ -253,7 +253,7 @@ class BuildTrain extends Task {
 			// TODO check for ERR_VEHICLE_TOO_MANY and stop building routes
 			// and/or initiate culling
 		}
-		
+
 		if (cargo == PAX && MAIL != null) {
 			// include one mail wagon
 			if (!hasMail) {
@@ -271,27 +271,27 @@ class BuildTrain extends Task {
 					// no mail wagons available - can happen in some train sets
 					// just skip it, we'll build another passenger wagon instead
 				}
-				
+
 				// moving it into the train makes it stop existing as a separate vehicleID,
 				// so use a boolean flag, not a vehicle ID
 				hasMail = true;
 			}
 		}
-		
-		
+
+
 		// and fill the rest of the train with passenger wagons
 		local wagonType = GetWagon(cargo, railType);
 		while (TrainLength(train) <= maxLength) {
 			local wagon = AIVehicle.BuildVehicle(depot, wagonType);
 			CheckError();
-			
+
 			AIVehicle.RefitVehicle(wagon, cargo);
 			CheckError();
-			
+
 			if (!AIVehicle.MoveWagon(wagon, 0, train, 0)) {
 				// can't add passenger wagons to this type of engine, so don't build it again
 				bannedEngines.append(AIVehicle.GetEngineType(train));
-				
+
 				// sell it and try again
 				AIVehicle.SellVehicle(train);
 				AIVehicle.SellVehicle(wagon);
@@ -299,7 +299,7 @@ class BuildTrain extends Task {
 				throw TaskRetryException();
 			}
 		}
-		
+
 		// see if we went over - newgrfs can introduce non-half-tile wagons
 		while (TrainLength(train) > maxLength) {
 			AIVehicle.SellWagon(train, 1);
@@ -307,7 +307,7 @@ class BuildTrain extends Task {
 
 		GenerateName(train, depot);
 	}
-	
+
 	function CheckFunds(engineType) {
 		// assume half tile wagons
 		local wagonType = GetWagon(cargo, railType);
