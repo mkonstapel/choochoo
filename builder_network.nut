@@ -74,6 +74,7 @@ class BuildNewNetwork extends Task {
 
 	static MAX_ATTEMPTS = 50;
 	network = null;
+	network_tile = null;
 
 	constructor(parentTask, minDistance = MIN_DISTANCE, maxDistance = MAX_DISTANCE) {
 		Task.constructor(parentTask);
@@ -83,18 +84,17 @@ class BuildNewNetwork extends Task {
 	}
 
 	function Run() {
-		local tile;
 		local count = 0;
 
 		if (!subtasks) {
 			while (true) {
-				tile = RandomTile();
-				SetConstructionSign(tile, this);
-				if (AIMap.IsValidTile(tile) &&
+				network_tile = RandomTile();
+				SetConstructionSign(network_tile, this);
+				if (AIMap.IsValidTile(network_tile) &&
 					AITile.IsBuildableRectangle(
-						tile - AIMap.GetTileIndex(Crossing.WIDTH, Crossing.WIDTH),
+						network_tile - AIMap.GetTileIndex(Crossing.WIDTH, Crossing.WIDTH),
 						Crossing.WIDTH*3, Crossing.WIDTH*3) &&
-					EstimateNetworkStationCount(tile) >= 3) break;
+					EstimateNetworkStationCount(network_tile) >= 3) break;
 
 				count++;
 				if (count >= MAX_ATTEMPTS) {
@@ -107,18 +107,18 @@ class BuildNewNetwork extends Task {
 
 			AIRail.SetCurrentRailType(network.railType);
 			subtasks = [
-				LevelTerrain(this, tile, Rotation.ROT_0, [1, 1], [Crossing.WIDTH-2, Crossing.WIDTH-2], false),
-				BuildCrossing(this, tile, network)
+				LevelTerrain(this, network_tile, Rotation.ROT_0, [1, 1], [Crossing.WIDTH-2, Crossing.WIDTH-2], false),
+				BuildCrossing(this, network_tile, network)
 			];
 		}
 
 		RunSubtasks();
 
 		// TOOD maybe preferentially expand in the direction farthest from the edge of the map?
-		tasks.append(ExtendCrossing(null, tile, Direction.NE, network));
-		tasks.append(ExtendCrossing(null, tile, Direction.SW, network));
-		tasks.append(ExtendCrossing(null, tile, Direction.NW, network));
-		tasks.append(ExtendCrossing(null, tile, Direction.SE, network));
+		tasks.append(ExtendCrossing(null, network_tile, Direction.NE, network));
+		tasks.append(ExtendCrossing(null, network_tile, Direction.SW, network));
+		tasks.append(ExtendCrossing(null, network_tile, Direction.NW, network));
+		tasks.append(ExtendCrossing(null, network_tile, Direction.SE, network));
 	}
 
 	function _tostring() {
