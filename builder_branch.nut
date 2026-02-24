@@ -241,7 +241,9 @@ class BuildBranchLine extends Builder {
         }
         
         // move coordinate system
-        SetLocalCoordinateSystem(GetTile(offset), rotation);
+        if (location == crossingTile) {
+            SetLocalCoordinateSystem(GetTile(offset), rotation);
+        }
         
         // the exit might have a waypoint
         if (network.rightSide) {
@@ -260,14 +262,17 @@ class BuildBranchLine extends Builder {
         RemoveRail([0,2], [1,2], [1,3]);
         
         RemoveRail([2,2], [2,1], [1,1]);
-        RemoveRail([2,1], [2,2], [1,2]);
+        // I think this one is incorrect
+        // RemoveRail([2,1], [2,2], [1,2]);
 
-        RemoveRail([2,0], [2,1], [1,1]);
-        RemoveRail([1,2], [1,1], [0,1]);
+        if (network.rightSide) {
+            RemoveRail([2,0], [2,1], [1,1]);
+            RemoveRail([1,2], [1,1], [0,1]);
+        } else {
+            RemoveRail([2,3], [2,2], [1,2]);
+            RemoveRail([1,1], [1,2], [0,2]);
+        }
 
-        RemoveRail([2,3], [2,2], [1,2]);
-        RemoveRail([1,1], [1,2], [0,2]);
-        
         // we can remove more bits if another direction is already gone
         if (!HasRail([1,3]) && !HasRail([2,3])) {
             RemoveRail([1,1], [2,1], [3,1]);
