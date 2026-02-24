@@ -266,10 +266,10 @@ class BuildBranchLine extends Builder {
         // RemoveRail([2,1], [2,2], [1,2]);
 
         if (network.rightSide) {
-            RemoveRail([2,0], [2,1], [1,1]);
+            // RemoveRail([2,0], [2,1], [1,1]);
             RemoveRail([1,2], [1,1], [0,1]);
         } else {
-            RemoveRail([2,3], [2,2], [1,2]);
+            // RemoveRail([2,3], [2,2], [1,2]);
             RemoveRail([1,1], [1,2], [0,2]);
         }
 
