@@ -200,14 +200,72 @@ class AddTrain extends Task {
 }
 
 class ReplaceTrain extends Task {
-	constructor(parerentTask, train) {
-		Task.constructor(parentTask);
+	train = null;
+	depot = null;
+	cargo = null;
 
-		// check if train is still due for replacement (R...)
-		// determine train cargo (largest total capacity, if mail -> PAX)
-		// build new replacement train
-		// copy (shared?) orders
-		// cull original train
+	constructor(parentTask, train) {
+		Task.constructor(parentTask);
+		this.train = train;
+	}
+
+	function _tostring() {
+		return "ReplaceTrain " + AIVehicle.GetName(train);
+	}
+
+	function Run() {
+		if (!AIVehicle.IsValidVehicle(train)) {
+			throw TaskFailedException("Train no longer exists");
+		}
+
+		local name = AIVehicle.GetName(train);
+		depot = GetDepot(train);
+		local railType = AIRail.GetRailType(depot);
+		local trainLength = TrainLength(train);
+
+		// determine cargo: use the largest capacity cargo
+		cargo = AIVehicle.GetCapacity(train, PAX) > 0 ? PAX : null;
+		if (cargo == null) {
+			local cargoList = AICargoList();
+			local bestCargo = -1;
+			local bestCapacity = 0;
+			for (local c = cargoList.Begin(); cargoList.HasNext(); c = cargoList.Next()) {
+				local cap = AIVehicle.GetCapacity(train, c);
+				if (cap > bestCapacity) {
+					bestCapacity = cap;
+					bestCargo = c;
+				}
+			}
+			cargo = bestCargo;
+		}
+
+		if (cargo == null || cargo == -1) {
+			throw TaskFailedException("Cannot determine cargo for " + name);
+		}
+
+		if (!subtasks) {
+			subtasks = [BuildTrain(this, depot, trainLength, cargo, false)];
+		}
+
+		RunSubtasks();
+
+		// copy orders from old train (shared)
+		local newTrain = completed[0].train;
+		AIOrder.ShareOrders(newTrain, train);
+
+		// name the new train with the same depot encoding
+		local prefix = IsBranchLineTrain(train) ? "B" : "T";
+		GenerateName(newTrain, depot, prefix);
+
+		// start the new train
+		// this should be safe to do before the old one is gone:
+		// - main lines support multiple trains on a route
+		// - cargo lines have no signals so the new train will wait in the depot for the track to clear
+		// - branch lines have no depots and no signals, so the new train will wait for the branch to be empty
+		AIVehicle.StartStopVehicle(newTrain);
+
+		// send old train to depot for selling
+		Cull(train);
 	}
 }
 

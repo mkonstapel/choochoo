@@ -34,8 +34,6 @@ function CullTrains() {
 	worst.KeepBottom(n/10);
 
 
-	// TODO: send vehicles that are too old (GetAgeLeft() < 0) for replacement (rebuild)
-	
 	local clones = 0;
 	foreach (train, profit in best) {
 		Debug("Cloning " + AIVehicle.GetName(train) + ", made " + profit + " last year");
@@ -54,6 +52,23 @@ function CullTrains() {
 			break;
 	}
 	
+	// replace aging trains
+	local allTrains = AIVehicleList();
+	allTrains.Valuate(AIVehicle.GetVehicleType);
+	allTrains.KeepValue(AIVehicle.VT_RAIL);
+	allTrains.Valuate(AIVehicle.GetAgeLeft);
+	allTrains.KeepBelowValue(1);
+
+	for (local train = allTrains.Begin(); allTrains.HasNext(); train = allTrains.Next()) {
+		local name = AIVehicle.GetName(train);
+		// skip already-marked trains (R or X prefix)
+		if (name.find("R") == 0 || name.find("X") == 0) continue;
+
+		Debug("Replacing aging train: " + name);
+		AIVehicle.SetName(train, "R" + name);
+		tasks.push(ReplaceTrain(null, train));
+	}
+
 	Debug("Done culling");
 }
 
