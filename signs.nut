@@ -1,6 +1,6 @@
 function SetConstructionSign(tile, task) {
 	local mode = AIExecMode();
-	AISign.RemoveSign(SIGN1);
+	RemoveSign1();
 	
 	if (!AIController.GetSetting("ActivitySigns")) return;
 	
@@ -22,7 +22,7 @@ function SetConstructionSign(tile, task) {
 function SetSecondarySign(text) {
 	local mode = AIExecMode();
 	if (!AIController.GetSetting("ActivitySigns")) {
-		AISign.RemoveSign(SIGN2);
+		RemoveSign2();
 		return;
 	}
 	
@@ -31,10 +31,10 @@ function SetSecondarySign(text) {
 	}
 	
 	local tile = AISign.GetLocation(SIGN1) + AIMap.GetTileIndex(1, 1);
-	if (AISign.GetLocation(SIGN2) == tile) {
+	if (SIGN2 != -1 && AISign.GetLocation(SIGN2) == tile) {
 		AISign.SetName(SIGN2, text);
 	} else {
-		AISign.RemoveSign(SIGN2);
+		RemoveSign2();
 		SIGN2 = AISign.BuildSign(tile, text);
 	}	
 }
@@ -42,4 +42,17 @@ function SetSecondarySign(text) {
 function ClearSecondarySign() {
 	local mode = AIExecMode();
 	AISign.RemoveSign(SIGN2);
+	SIGN2 = -1;
+}
+
+function RemoveSign1() {
+	if (SIGN1 == -1) return;
+	AISign.RemoveSign(SIGN1);
+	SIGN1 = -1;
+}
+
+function RemoveSign2() {
+	if (SIGN2 == -1) return;
+	AISign.RemoveSign(SIGN2);
+	SIGN2 = -1;
 }
