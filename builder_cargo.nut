@@ -8,6 +8,9 @@ class BuildCargoLine extends Task {
 	static bannedCargo = [];
 	static routes = [];
 	static routesCalculated = Flag();
+
+	maxAttempts = 5;
+	attempts = 0;
 	
 	constructor(parentTask=null) {
 		Task.constructor(parentTask, null);
@@ -76,13 +79,18 @@ class BuildCargoLine extends Task {
 			local b = route.to;
 			
 			local maxDistance = min(CARGO_MAX_DISTANCE, MaxDistance(cargo, CARGO_STATION_LENGTH));
-			local railType = SelectRailType(cargo);
+			local railType = GetRailType(cargo, true, [], []);
 			Debug("Selected cargo rail type: " + AIRail.GetName(railType));
 			AIRail.SetCurrentRailType(railType);
 			
 			if (AIIndustry.GetAmountOfStationsAround(a) > 0) {
 				Debug(AIIndustry.GetName(a), "is already being served");
-				throw TaskRetryException();
+				attempts++;
+				if (attempts < maxAttempts) {
+					throw TaskRetryException();
+				} else {
+					throw TaskFailedException("Too many attempts finding a cargo route");
+				}
 			}
 						
 			Debug("Selected:", AICargo.GetCargoLabel(cargo), "from", AIIndustry.GetName(a), "to", AIIndustry.GetName(b));
