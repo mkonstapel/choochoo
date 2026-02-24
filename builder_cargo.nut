@@ -55,7 +55,7 @@ class BuildCargoLine extends Task {
 				allCargoes.KeepValue(1);
 				local selectedCargo = allCargoes.Begin();
 				Debug("Finding rail with example cargo: " + AICargo.GetCargoLabel(selectedCargo));
-				local railType = SelectRailType(selectedCargo);
+				local railType = GetRailType(selectedCargo, true, []);
 				Debug("Selected cargo rail type: " + AIRail.GetName(railType));
 				AIRail.SetCurrentRailType(railType);
 				routes.extend(CalculateRoutes());
@@ -135,35 +135,6 @@ class BuildCargoLine extends Task {
 		}
 		
 		RunSubtasks();
-	}
-	
-	function SelectRailType(cargo) {
-		// select a rail type for which we can build a locomotive that can pull wagons for the desired cargo
-		local railTypes = AIRailTypeList();
-		railTypes.Valuate(CarriesCargo, cargo);
-		railTypes.KeepValue(1);
-		railTypes.Valuate(AIRail.GetBuildCost, AIRail.BT_TRACK);
-		railTypes.KeepAboveValue(0);	// filter out NuTracks planning tracks, which are free
-		railTypes.KeepBottom(1);		// use the cheap stuff for cargo
-		if (railTypes.IsEmpty()) {
-			bannedCargo.append(cargo);
-			throw TaskFailedException("no rail type for " + AICargo.GetCargoLabel(cargo));
-		} else {
-			return railTypes.Begin();
-		}
-	}
-	
-	function CarriesCargo(railType, cargo) {
-		local engineList = AIEngineList(AIVehicle.VT_RAIL);
-		engineList.Valuate(AIEngine.IsWagon);
-		engineList.KeepValue(0);
-		engineList.Valuate(AIEngine.CanRunOnRail, railType);
-		engineList.KeepValue(1);
-		engineList.Valuate(AIEngine.HasPowerOnRail, railType);
-		engineList.KeepValue(1);
-		engineList.Valuate(AIEngine.CanPullCargo, cargo);
-		engineList.KeepValue(1);
-		return engineList.IsEmpty() ? 0 : 1;
 	}
 	
 	function SelectCargo() {

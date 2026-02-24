@@ -78,10 +78,10 @@ class BuildNewNetwork extends Task {
 	constructor(parentTask, minDistance = MIN_DISTANCE, maxDistance = MAX_DISTANCE) {
 		Task.constructor(parentTask);
 		
-		// TODO SelectRailType(PAX), choose fastest?
-		this.network = Network(AIRailTypeList().Begin(), IsRightHandTraffic(), 3, minDistance, maxDistance);
+		local railType = GetRailType(PAX, false, [], AddTrain.bannedEngines)
+		this.network = Network(railType, IsRightHandTraffic(), 3, minDistance, maxDistance);
 	}
-	
+
 	function Run() {
 		local tile;
 		local count = 0;

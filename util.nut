@@ -333,6 +333,37 @@ function HaveHQ() {
 	return AICompany.GetCompanyHQ(COMPANY) != AIMap.TILE_INVALID;
 }
 
+function GetRailType(cargo, cheap, bannedCargo, bannedEngines) {
+	// select a rail type for which we can build a locomotive that can pull wagons for the desired cargo
+	local railTypes = AIRailTypeList();
+	railTypes.Valuate(HasEngine, cargo, bannedEngines);
+	railTypes.KeepValue(1);
+	railTypes.Valuate(AIRail.GetBuildCost, AIRail.BT_TRACK);
+	railTypes.KeepAboveValue(0);	// filter out NuTracks planning tracks, which are free
+	if (cheap) {
+		railTypes.KeepBottom(1);	// we use the cheap stuff for cargo
+	} else {
+		railTypes.KeepTop(1);		// use the fastest one for passengers
+	}
+
+	if (railTypes.IsEmpty()) {
+		bannedCargo.append(cargo);
+		throw TaskFailedException("no rail type for " + AICargo.GetCargoLabel(cargo));
+	} else {
+		return railTypes.Begin();
+	}
+}
+
+function HasEngine(railType, cargo, bannedEngines) {
+	// check if we have an engine that can pull the desired cargo on this rail type
+	try {
+		GetEngine(cargo, railType, bannedEngines, false)
+		return true;
+	} catch (e) {
+		return false;
+	}
+}
+
 function GetEngine(cargo, railType, bannedEngines, cheap) {
 	local engineList = AIEngineList(AIVehicle.VT_RAIL);
 	engineList.Valuate(AIEngine.IsWagon);
