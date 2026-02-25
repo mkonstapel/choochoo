@@ -387,7 +387,7 @@ function GetEngine(cargo, railType, bannedEngines, cheap) {
 		engineList.RemoveTop(engineList.Count() / 2);
 	}
 	
-	if (engineList.IsEmpty()) throw TaskFailedException("no suitable engine");
+	if (engineList.IsEmpty()) throw TaskFailedException("no suitable engine for " + AICargo.GetCargoLabel(cargo) + " on " + AIRail.GetName(railType));
 	return engineList.Begin();
 }
 

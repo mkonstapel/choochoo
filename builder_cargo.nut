@@ -55,7 +55,7 @@ class BuildCargoLine extends Task {
 				allCargoes.KeepValue(1);
 				local selectedCargo = allCargoes.Begin();
 				Debug("Finding rail with example cargo: " + AICargo.GetCargoLabel(selectedCargo));
-				local railType = GetRailType(selectedCargo, true, []);
+				local railType = GetRailType(selectedCargo, true, [], []);
 				Debug("Selected cargo rail type: " + AIRail.GetName(railType));
 				AIRail.SetCurrentRailType(railType);
 				routes.extend(CalculateRoutes());
