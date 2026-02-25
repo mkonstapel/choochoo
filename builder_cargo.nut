@@ -69,7 +69,7 @@ class BuildCargoLine extends Task {
 			// delay for a random time, so different ChooChoos run out of sync
 			// that way, they each get their choice from the best cargo routes
 			// after that, the main building routine is random anyway
-			AIController.Sleep(1 + abs(AIBase.Rand() % TICKS_PER_DAY));
+			AIController.Sleep(1 + abs(RANDOM.Rand() % TICKS_PER_DAY));
 			
 			local route = routes[0];
 			routes.remove(0);
@@ -162,7 +162,7 @@ class BuildCargoLine extends Task {
 		}
 		
 		// pick one at random
-		cargoList.Valuate(AIBase.RandItem);
+		cargoList.Valuate(RANDOM.RandItem);
 		cargoList.KeepTop(1);
 		return cargoList.Begin();
 	}
@@ -189,7 +189,7 @@ class BuildCargoLine extends Task {
 		producers.KeepValue(0);
 		
 		// find a random producer/consumer pair that's within our target distance
-		producers.Valuate(AIBase.RandItem);
+		producers.Valuate(RANDOM.RandItem);
 		producers.Sort(AIList.SORT_BY_VALUE, true);
 		for (local producer = producers.Begin(); producers.HasNext(); producer = producers.Next()) {
 			local consumers = AIIndustryList_CargoAccepting(cargo);

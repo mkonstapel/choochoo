@@ -2,8 +2,8 @@ class ChooChoo extends AIInfo {
 	function GetAuthor()      { return "Michiel Konstapel"; }
 	function GetName()        { return "ChooChoo"; }
 	function GetDescription() { return "Build nice looking train networks"; }
-	function GetVersion()     { return 431; }
-	function GetDate()        { return "2025-06-11"; }
+	function GetVersion()     { return 432; }
+	function GetDate()        { return "2026-02-25"; }
 	function CreateInstance() { return "ChooChoo"; }
 	function GetShortName()	  { return "CHOO"; }
 	function GetAPIVersion()  { return "1.0"; }
@@ -21,6 +21,7 @@ class ChooChoo extends AIInfo {
 	    AddLabels("PathfinderMultiplier", {_1 = "Slow", _2 = "Medium", _3 = "Fast", _4 = "Very fast"});
 	    AddSetting({name = "CarryOn", description = "Keep running on unexpected errors (rather than aborting with a stack trace)", easy_value = 1, medium_value = 1, hard_value = 1, custom_value = 1, flags = CONFIG_BOOLEAN|CONFIG_INGAME});
 	    AddSetting({name = "RunTests", description = "Detect test map and run tests", easy_value = 0, medium_value = 0, hard_value = 0, custom_value = 0, flags = CONFIG_BOOLEAN|CONFIG_INGAME|CONFIG_DEVELOPER});
+	    AddSetting({name = "RandomSeed", description = "Random seed (0=unset)", min_value = 0, max_value = 10, easy_value = 0, medium_value = 0, hard_value = 0, custom_value = 0, flags = CONFIG_INGAME|CONFIG_DEVELOPER});
 	}
 }
 

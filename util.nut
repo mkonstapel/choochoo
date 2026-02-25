@@ -95,7 +95,7 @@ function Ceiling(x) {
 }
 
 function RandomTile() {
-	return abs(AIBase.Rand()) % AIMap.GetMapSize();
+	return abs(RANDOM.Rand()) % AIMap.GetMapSize();
 }
 
 /**
@@ -469,5 +469,24 @@ class Flag {
 	
 	function Get() {
 		return value;
+	}
+}
+
+class Random {
+
+	seed = 0;
+	
+	constructor(seed) {
+		this.seed = seed;
+	}
+	
+	function Rand() {
+		// linear congruential generator
+		seed = (1103515245 * seed + 12345) % 0x80000000;
+		return seed;
+	}
+	
+	function RandItem(unused) {
+		return this.Rand();
 	}
 }

@@ -56,6 +56,14 @@ class ChooChoo extends AIController {
 
 		CheckGameSettings();
 
+		local seed = AIController.GetSetting("RandomSeed");
+		if (seed == 0) {
+			seed = AIBase.Rand();
+		}
+
+		Debug("Random seed:", seed);
+		::RANDOM <- Random(seed);
+
 		AIRail.SetCurrentRailType(AIRailTypeList().Begin());
 		//CalculateRoutes();
 
