@@ -815,17 +815,17 @@ class ExtendCrossing extends Builder {
 		RemoveRail([2,1], [2,2], [1,2]);
 		
 		// we can remove more bits if another direction is already gone
-		if (!HasRail([1,3]) && !HasRail([2,3])) {
-			RemoveRail([1,1], [2,1], [3,1]);
-			RemoveRail([2,0], [2,1], [2,2]);
-			RemoveRail([2,1], [2,2], [2,3]);
-		}
-		
-		if (!HasRail([1,0]) && !HasRail([2,0])) {
-			RemoveRail([1,2], [2,2], [3,2]);
-			RemoveRail([2,0], [2,1], [2,2]);
-			RemoveRail([2,1], [2,2], [2,3]);
-		}
+        if (!HasRail([1,3]) && !HasRail([2,3]) && !HasRail([2,0])) {
+            RemoveRail([1,1], [2,1], [3,1]);
+            RemoveRail([2,0], [2,1], [2,2]);
+            RemoveRail([2,1], [2,2], [2,3]);
+        }
+        
+        if (!HasRail([1,0]) && !HasRail([2,0]) && !HasRail([1,3])) {
+            RemoveRail([1,2], [2,2], [3,2]);
+            RemoveRail([2,0], [2,1], [2,2]);
+            RemoveRail([2,1], [2,2], [2,3]);
+        }
 
 		// TODO: if we reduce the crossing to one direction,
 		// we should delete the whole line
