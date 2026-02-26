@@ -113,10 +113,15 @@ class ChooChoo extends AIController {
 		
 		if (year != AIDate.GetYear(AIDate.GetCurrentDate())) {
 			year = AIDate.GetYear(AIDate.GetCurrentDate());
-			try {
-				CullTrains();
-			} catch (e) {
-				Error("Error culling trains: " + e);
+
+			if (AIController.GetSetting("CarryOn") == 0) {
+				ManageVehicles();
+			} else {
+				try {
+					ManageVehicles();
+				} catch (e) {
+					Error("Error managing vehicles: " + e);
+				}
 			}
 		}
 
@@ -216,13 +221,14 @@ class ChooChoo extends AIController {
   				case AIEvent.AI_ET_VEHICLE_UNPROFITABLE:
   					converted = AIEventVehicleUnprofitable.Convert(e);
   					vehicle = converted.GetVehicleID();
+  					Warning("Unprofitable: " + AIVehicle.GetName(vehicle));
   					Cull(vehicle);
   					break;
   					
 				case AIEvent.AI_ET_VEHICLE_WAITING_IN_DEPOT:
 					converted = AIEventVehicleWaitingInDepot.Convert(e);
 					vehicle = converted.GetVehicleID();
-					Warning("Selling: " + AIVehicle.GetName(vehicle));
+					Debug("Selling: " + AIVehicle.GetName(vehicle));
 					AIVehicle.SellVehicle(vehicle);
 					break;
 				

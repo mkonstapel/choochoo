@@ -1,6 +1,6 @@
-function GenerateName(train, depot, prefix="T") {
+function GenerateName(vehicle, depot, prefix="T") {
 	local i = 0;
-	while (!AIVehicle.SetName(train, prefix + i + "D" + depot)) {
+	while (!AIVehicle.SetName(vehicle, prefix + i + "D" + depot)) {
 		i++;
 	}
 }

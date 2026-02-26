@@ -651,6 +651,11 @@ class BuildBus extends Task {
 		local engineType = GetEngine(PAX);
 		local bus = AIVehicle.BuildVehicle(depot, engineType);
 		CheckError();
+
+		// B for Bus is already for branch line trains
+		// R for Road is used for replacement instead
+		// we can do W for Wheeled
+		GenerateName(bus, depot, "W")
 		
 		AIOrder.AppendOrder(bus, trainStationTile, AIOrder.AIOF_NONE);
 		AIOrder.AppendOrder(bus, busStationTile, AIOrder.AIOF_NONE);
