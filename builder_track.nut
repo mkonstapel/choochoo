@@ -15,6 +15,9 @@ class BuildTrack extends Task {
 	c = null;
 	d = null;
 	ignored = null;
+	midpoint = null;
+	radius = null;
+	boundary = null;
 	signalMode = null;
 	signalInterval = null;
 	network = null;
@@ -29,6 +32,11 @@ class BuildTrack extends Task {
 		this.b = from[1];
 		this.c = to[0];
 		this.d = to[1];
+
+		local midpointX = (AIMap.GetTileX(a) + AIMap.GetTileX(d)) / 2;
+		local midpointY = (AIMap.GetTileY(a) + AIMap.GetTileY(d)) / 2;
+		this.midpoint = AIMap.GetTileIndex(midpointX, midpointY);
+		this.radius = Sqrt(AIMap.DistanceSquare(a, d)) / 2 + 3;
 		this.ignored = ignored;
 		this.signalMode = signalMode;
 		this.signalInterval = network.trainLength + 1;
@@ -149,7 +157,7 @@ class BuildTrack extends Task {
 			pathfinder.cost.turn = 0;
 			pathfinder.cost.slope = 0;
 		}
-		
+
 		// Pathfinding needs money since it attempts to build in test mode.
 		// We can't get the price of a tunnel, but we can get it for a bridge
 		// and we'll assume they're comparable.
@@ -159,7 +167,13 @@ class BuildTrack extends Task {
 		}
 		
 		SetSecondarySign("Pathfinding...");
-		pathfinder.InitializePath([[b, a]], [[c, d]], ignored);
+		
+		// local boundary = GenerateCircle(midpointX, midpointY, radius);
+		// foreach (tile in boundary) {
+		// 	AISign.BuildSign(tile, "X");
+		// }
+
+		pathfinder.InitializePath([[b, a]], [[c, d]], ignored, midpoint, radius);
 
 		// how long should we search?
 		// do we want to search longer on longer routes?

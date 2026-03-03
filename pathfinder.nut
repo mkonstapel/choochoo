@@ -31,6 +31,8 @@ class Rail
 	cost = null;                   ///< Used to change the costs.
 	_running = null;
 	_goals = null;
+	_boundaryCenter = null;
+	_boundaryRadiusSquared = null;
 	
 	follow = null;
 	tileBaseCosts = null;
@@ -86,9 +88,11 @@ class Rail
 	 * @param sources The source tiles.
 	 * @param goals The target tiles.
 	 * @param ignored_tiles An array of tiles that cannot occur in the final path.
+	 * @param boundaryCenter Center of the circular boundary that limits pathfinding
+	 * @param boundaryCenter Radius of the circular boundary
 	 * @see AyStar::InitializePath()
 	 */
-	function InitializePath(sources, goals, ignored_tiles = []) {
+	function InitializePath(sources, goals, ignored_tiles = [], boundaryCenter = null, boundaryRadius = null) {
 		local nsources = [];
 
 		foreach (node in sources) {
@@ -97,6 +101,8 @@ class Rail
 			nsources.push(path);
 		}
 		this._goals = goals;
+		this._boundaryCenter = boundaryCenter;
+		this._boundaryRadiusSquared = boundaryRadius == null ? null : boundaryRadius * boundaryRadius;
 		this._pathfinder.InitializePath(nsources, goals, ignored_tiles);
 	}
 
@@ -437,6 +443,15 @@ function Rail::_Neighbours(path, cur_node, self)
 				);
 			}
 
+			// Don't go out of bounds. Ideally, and usually, we don't, so do
+			// this check after the "buildable" checks.
+			if (
+				self._boundaryRadiusSquared
+				&& AIMap.DistanceSquare(next_tile, self._boundaryCenter) > self._boundaryRadiusSquared
+			) {
+				continue;
+			}
+
 			if (buildable || par == null) {
 				tiles.push([next_tile, self._GetDirection(par_tile, cur_node, next_tile, false)]);
 			}
@@ -493,6 +508,13 @@ function Rail::_AddTunnelsBridges(tiles, last_node, cur_node, bridge_dir)
 	for (local i = 2; i < this._max_bridge_length; i++) {
 		local bridge_list = AIBridgeList_Length(i + 1);
 		local target = cur_node + i * (cur_node - last_node);
+		
+		// don't go out of bounds
+		if (_boundaryRadiusSquared && AIMap.DistanceSquare(target, _boundaryCenter) > _boundaryRadiusSquared) {
+			// we must start inside the bounding circle, so if any target is outside, then all further ones are too
+			break;
+		}
+
 		if (!bridge_list.IsEmpty() && AIBridge.BuildBridge(AIVehicle.VT_RAIL, bridge_list.Begin(), cur_node, target)) {
 			// don't allow the following track to jump over its peer, because it looks ugly
 			local ugly = false;

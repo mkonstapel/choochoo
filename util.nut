@@ -490,3 +490,39 @@ class Random {
 		return this.Rand();
 	}
 }
+
+function GenerateCircle(cx, cy, radius)
+{
+	local tiles = [];
+
+	local dx = 0;
+	local dy = radius;
+	local d = 1 - radius;
+
+	while (dx <= dy)
+	{
+		// 8-way symmetry
+		tiles.append(AIMap.GetTileIndex(cx + dx, cy + dy));
+		tiles.append(AIMap.GetTileIndex(cx - dx, cy + dy));
+		tiles.append(AIMap.GetTileIndex(cx + dx, cy - dy));
+		tiles.append(AIMap.GetTileIndex(cx - dx, cy - dy));
+		tiles.append(AIMap.GetTileIndex(cx + dy, cy + dx));
+		tiles.append(AIMap.GetTileIndex(cx - dy, cy + dx));
+		tiles.append(AIMap.GetTileIndex(cx + dy, cy - dx));
+		tiles.append(AIMap.GetTileIndex(cx - dy, cy - dx));
+
+		dx = dx + 1;
+
+		if (d < 0)
+		{
+			d = d + 2 * dx + 1;
+		}
+		else
+		{
+			dy = dy - 1;
+			d = d + 2 * (dx - dy) + 1;
+		}
+	}
+
+	return tiles;
+}
