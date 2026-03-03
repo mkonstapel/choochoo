@@ -75,7 +75,14 @@ function ManageVehicles() {
 		AIVehicle.SetName(vehicle, "R" + name);
 
 		local task = AIVehicle.GetVehicleType(vehicle) == AIVehicle.VT_RAIL ? ReplaceTrain(null, vehicle) : ReplaceBus(null, vehicle);
-		tasks.insert(1, task);
+
+		// it's actually possible for the list of tasks to be currently empty (unlikely, but it happened)
+		// and then inserting at index 1 would fail
+		if (tasks.len() == 0) {
+			tasks.append(task);
+		} else {
+			tasks.insert(1, task);
+		}
 	}
 
 	Debug("Done culling");
