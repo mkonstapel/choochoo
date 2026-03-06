@@ -491,10 +491,12 @@ class Random {
 	}
 }
 
-function GenerateCircle(cx, cy, radius)
+function GenerateCircle(centerTile, radius)
 {
 	local tiles = [];
 
+	local cx = AIMap.GetTileX(centerTile);
+	local cy = AIMap.GetTileY(centerTile);
 	local dx = 0;
 	local dy = radius;
 	local d = 1 - radius;

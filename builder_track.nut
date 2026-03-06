@@ -168,9 +168,11 @@ class BuildTrack extends Task {
 		
 		SetSecondarySign("Pathfinding...");
 		
-		// local boundary = GenerateCircle(midpointX, midpointY, radius);
-		// foreach (tile in boundary) {
-		// 	AISign.BuildSign(tile, "X");
+		// if (!follow) {
+		// 	local circle = GenerateCircle(midpoint, radius);
+		// 	foreach (tile in circle) {
+		// 		AISign.BuildSign(tile, "X");
+		// 	}
 		// }
 
 		pathfinder.InitializePath([[b, a]], [[c, d]], ignored, midpoint, radius);
