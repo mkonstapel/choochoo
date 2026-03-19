@@ -805,6 +805,7 @@ class ExtendCrossing extends Builder {
 		RemoveRail([-1,1], [0,1], [1,1]);
 		RemoveRail([-1,2], [0,2], [1,2]);
 		
+		/*
 		RemoveRail([0,1], [1,1], [1,0]);
 		RemoveRail([0,1], [1,1], [2,1]);
 		
@@ -826,6 +827,9 @@ class ExtendCrossing extends Builder {
             RemoveRail([2,0], [2,1], [2,2]);
             RemoveRail([2,1], [2,2], [2,3]);
         }
+        */
+
+        RemoveDeadRails(crossing);
 
 		// TODO: if we reduce the crossing to one direction,
 		// we should delete the whole line
@@ -834,5 +838,81 @@ class ExtendCrossing extends Builder {
 	
 	function HasRail(tileCoords) {
 		return AIRail.IsRailTile(GetTile(tileCoords));
+	}
+
+	function RemoveDeadRails(crossing) {
+		// call this after removing a crossing exit to remove any rail that is now unused
+		// we check the 2x2 center square to see if any bits of rail are unconnected
+		local rel = RelativeCoordinates(crossing.location);
+		local centerTiles = [[1,1], [1,2], [2,1], [2,2]];
+		
+		local dirs = {
+			[Direction.NE] = [-1, 0],
+			[Direction.SE] = [0, 1],
+			[Direction.SW] = [1, 0],
+			[Direction.NW] = [0, -1],
+		};
+
+		local X = AIRail.RAILTRACK_NE_SW;
+		local Y = AIRail.RAILTRACK_NW_SE;
+		local N = AIRail.RAILTRACK_NW_NE;
+		local S = AIRail.RAILTRACK_SW_SE;
+		local W = AIRail.RAILTRACK_NW_SW;
+		local E = AIRail.RAILTRACK_NE_SE;
+		local bits = [X, Y, N, S, W, E];
+		local bitNames = {
+			[X] = "X(NE_SW)",
+			[Y] = "Y(NW_SE)",
+			[N] = "N(NW_NE)",
+			[S] = "S(SW_SE)",
+			[W] = "W(NW_SW)",
+			[E] = "E(NE_SE)",
+		};
+		
+		local connectedBits = {
+			[X] = [[Direction.NE, W | X | S], [Direction.SW, N | X | E]],
+			[Y] = [[Direction.NW, S | Y | E], [Direction.SE, W | Y | N]],
+			[N] = [[Direction.NE, X | S], [Direction.NW, Y | S]],
+			[S] = [[Direction.SE, Y | N], [Direction.SW, X | N]],
+			[E] = [[Direction.NE, X | W], [Direction.SE, Y | W]],
+			[W] = [[Direction.NW, Y | E], [Direction.SW, X | E]],
+		};
+		
+		local keepGoing;
+		do {
+			keepGoing = false;
+			foreach (offset in centerTiles) {
+				local tile = crossing.location + AIMap.GetTileIndex(offset[0], offset[1]);
+				local trackBits = AIRail.IsRailTile(tile) ? AIRail.GetRailTracks(tile) : 0;
+				foreach (bit in bits) {
+					if (trackBits & bit) {
+						local alive = false;
+						local connections = connectedBits[bit];
+						local dir1 = connections[0][0];
+						local bits1 = connections[0][1];
+						local neighbourTile1 = tile + AIMap.GetTileIndex(dirs[dir1][0], dirs[dir1][1]);
+						local tracks1 = AIRail.IsRailTile(neighbourTile1) ? AIRail.GetRailTracks(neighbourTile1) : 0;
+						local connected1 = tracks1 & bits1;
+						Debug("checking bit " + bitNames[bit] + " at " + TileToString(tile) + ": neighbour1 in direction " + DirectionName(dir1) + " tile " + neighbourTile1 + " has tracks " + tracks1 + " and needs " + bits1 + " connected? " + connected1);
+
+						local dir2 = connections[1][0];
+						local bits2 = connections[1][1];
+						local neighbourTile2 = tile + AIMap.GetTileIndex(dirs[dir2][0], dirs[dir2][1]);
+						local tracks2 = AIRail.IsRailTile(neighbourTile2) ? AIRail.GetRailTracks(neighbourTile2) : 0;
+						local connected2 = tracks2 & bits2;
+						Debug("checking bit " + bitNames[bit] + " at " + TileToString(tile) + ": neighbour2 in direction " + DirectionName(dir2) + " tile " + neighbourTile2 + " has tracks " + tracks2 + " and needs " + bits2 + " connected? " + connected2);
+
+						if (!(connected1 && connected2)) {
+							// this bit isn't connecting anything, so it's dead
+							Debug("Removing bit " + bitNames[bit] + " at " + TileToString(tile) + " from bits " + trackBits);
+
+							RemoveRailTrackAbsolute(tile, bit, true);
+							// every time we remove a bit of rail, new dead rail might be exposed
+							keepGoing = true;
+						}
+					}
+				}
+			}
+		} while (keepGoing);
 	}
 }

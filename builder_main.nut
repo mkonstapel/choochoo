@@ -74,6 +74,32 @@ class Builder extends Task {
 		
 		if (check) CheckError();
 	}
+
+	function RemoveRailTrack(tile, track, check = false) {
+		while (true) {
+			AIRail.RemoveRailTrack(GetTile(tile), track);
+			if (AIError.GetLastError() == AIError.ERR_VEHICLE_IN_THE_WAY) {
+				AIController.Sleep(1);
+			} else {
+				break;
+			}
+		}
+		
+		if (check) CheckError();
+	}
+
+	function RemoveRailTrackAbsolute(tile, track, check = false) {
+		while (true) {
+			AIRail.RemoveRailTrack(tile, track);
+			if (AIError.GetLastError() == AIError.ERR_VEHICLE_IN_THE_WAY) {
+				AIController.Sleep(1);
+			} else {
+				break;
+			}
+		}
+		
+		if (check) CheckError();
+	}
 	
 	function BuildSignal(tile, front, type) {
 		// if we build a signal again on a tile that already has one,

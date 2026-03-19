@@ -251,10 +251,11 @@ class BuildBranchLine extends Builder {
         } else {
             Demolish([0,1]);
         }
-        
+
         RemoveRail([-1,1], [0,1], [1,1]);
         RemoveRail([-1,2], [0,2], [1,2]);
         
+        /*
         RemoveRail([0,1], [1,1], [1,0]);
         RemoveRail([0,1], [1,1], [2,1]);
         
@@ -262,14 +263,26 @@ class BuildBranchLine extends Builder {
         RemoveRail([0,2], [1,2], [1,3]);
         
         RemoveRail([2,2], [2,1], [1,1]);
-        // I think this one is incorrect
-        // RemoveRail([2,1], [2,2], [1,2]);
+        // is this one incorrect? not in general
+        RemoveRail([2,1], [2,2], [1,2]);
+        // BuildSign([2,1], "A0");
+        // BuildSign([2,2], "X0");
+        // BuildSign([1,2], "B0");
+
+        // TODO generic, iterative dead end removal!
+        // remove the exits, then any rails that are now dead ends, then repeat until we have no more dead ends
 
         if (network.rightSide) {
+            // this is definitely wrong
             // RemoveRail([2,0], [2,1], [1,1]);
+            BuildSign([2,0], "A1");
+            BuildSign([2,1], "X1");
+            BuildSign([1,1], "B1");
             RemoveRail([1,2], [1,1], [0,1]);
         } else {
+            // so this is also probably wrong (less well tested)
             // RemoveRail([2,3], [2,2], [1,2]);
+            BuildSign([1,2], "X2");
             RemoveRail([1,1], [1,2], [0,2]);
         }
 
@@ -285,6 +298,9 @@ class BuildBranchLine extends Builder {
             RemoveRail([2,0], [2,1], [2,2]);
             RemoveRail([2,1], [2,2], [2,3]);
         }
+        */
+
+        ExtendCrossing.RemoveDeadRails(crossing);
 
         // TODO: if we reduce the crossing to one direction,
         // we should delete the whole line
