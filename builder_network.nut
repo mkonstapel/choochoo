@@ -70,6 +70,49 @@ function GetYDistance(town, tile) {
 	return AIMap.GetTileY(AITown.GetLocation(town)) - AIMap.GetTileY(tile);
 }
 
+function CheckCompanyValueLimit() {
+	// if our company value is limited, see if we exceed the limit, and then don't expand
+	// TODO don't do so in the first year or so, to give the AI a chance to get going?
+	// finish building cargo routes first, plus first few passenger network trains?
+	// stop on ExtendCrossing and BuildNewNetwork, but finish up current line/station
+
+	/*
+	Debug("Leaderboard:")
+	for (local company = AICompany.COMPANY_FIRST; company < AICompany.COMPANY_LAST; company++) {
+		if (AICompany.ResolveCompanyID(company) == AICompany.COMPANY_INVALID) {
+			continue;
+		}
+		local name = AICompany.GetName(company);
+		local value = AICompany.GetQuarterlyCompanyValue(company, AICompany.CURRENT_QUARTER);
+		Debug(" - " + name + ": £" + value/1000 + "K");
+	}
+	*/
+
+	local limitSetting = AIController.GetSetting("CompanyValueLimit");
+	if (limitSetting == 0) {
+		// no limit
+		return;
+	}
+
+	local limitPercentage;
+	switch (limitSetting) {
+		case 1: limitPercentage = 0.5; break;	// 50% of company 1
+		case 2: limitPercentage = 1.0; break;	// 100% of company 1
+		case 3: limitPercentage = 1.5; break;	// 150% of company 1
+		case 4: limitPercentage = 2.0; break;	// 200% of company 1
+		default:
+			Warning("Invalid CompanyValueLimit setting:", limitSetting);
+			return;
+	}
+
+	local company1Value = AICompany.GetQuarterlyCompanyValue(AICompany.COMPANY_FIRST, AICompany.CURRENT_QUARTER);
+	local ourValue = AICompany.GetQuarterlyCompanyValue(COMPANY, AICompany.CURRENT_QUARTER);
+	if (company1Value > 0 && ourValue > company1Value * limitPercentage) {
+		Debug("Company value £" + ourValue/1000 + "K exceeds " + (limitPercentage*100) + "% of Company 1 (£" + company1Value/1000 + "K), not expanding");
+		throw TaskRetryException(30*TICKS_PER_DAY);
+	}
+}
+
 class BuildNewNetwork extends Task {
 	
 	static MAX_ATTEMPTS = 50;
@@ -84,6 +127,9 @@ class BuildNewNetwork extends Task {
 	}
 
 	function Run() {
+		// just before building a new network is a good place to stop if our company value is too high
+		CheckCompanyValueLimit();
+
 		local count = 0;
 
 		if (!subtasks) {
@@ -508,6 +554,13 @@ class ExtendCrossing extends Builder {
 		local exit = crossing.GetExit(direction);
 		if (!subtasks && AIRail.IsRailTile(exit[1])) {
 			return;
+		}
+
+		// Extending a crossing is a good "pause point" if we're company value limited, but we don't
+		// want half-built infrastructure, so don't pause unless we have at least one train in the network,
+		// which also means we have at least two stations.
+		if (network.trains.len() > 0) {
+			CheckCompanyValueLimit();
 		}
 		
 		if (!subtasks) {

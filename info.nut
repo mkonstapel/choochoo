@@ -22,6 +22,8 @@ class ChooChoo extends AIInfo {
 	    AddSetting({name = "CarryOn", description = "Keep running on unexpected errors (rather than aborting with a stack trace)", easy_value = 1, medium_value = 1, hard_value = 1, custom_value = 1, flags = CONFIG_BOOLEAN|CONFIG_INGAME});
 	    AddSetting({name = "RunTests", description = "Detect test map and run tests", easy_value = 0, medium_value = 0, hard_value = 0, custom_value = 0, flags = CONFIG_BOOLEAN|CONFIG_INGAME|CONFIG_DEVELOPER});
 	    AddSetting({name = "RandomSeed", description = "Random seed (0=unset)", min_value = 0, max_value = 10, easy_value = 0, medium_value = 0, hard_value = 0, custom_value = 0, flags = CONFIG_INGAME|CONFIG_DEVELOPER});
+	    AddSetting({name = "CompanyValueLimit", description = "Limit company value: stop expanding if exceeding", min_value = 0, max_value = 4, easy_value = 0, medium_value = 0, hard_value = 0, custom_value = 0, flags = CONFIG_INGAME});
+	    AddLabels("CompanyValueLimit", {_0 = "No limit", _1 = "50% of Company 1", _2 = "100% of Company 1", _3 = "150% of Company 1", _4 = "200% of Company 1"});
 	}
 }
 
