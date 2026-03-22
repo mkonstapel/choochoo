@@ -241,9 +241,9 @@ class ChooChoo extends AIController {
 	function CheckGameSettings() {
 		local ok = true;
 		ok = CheckSetting("construction.road_stop_on_town_road", 1,
-			"Advanced Settings, Stations, Allow drive-through road stations on town owned roads") && ok;
+			"Advanced Settings, Limitations, Allow drive-through road stops on roads owned by towns") && ok;
 		ok = CheckSetting("station.distant_join_stations", 1,
-			"Advanced Settings, Stations, Allow to join stations not directly adjacent") && ok;
+			"Advanced Settings, Limitations, Allow joining stations not directly adjacent") && ok;
 		
 		if (ok) {
 			Debug("Game settings OK");
