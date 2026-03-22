@@ -9,11 +9,11 @@ class BuildHQ extends Builder {
 	}
 	
 	function Run() {
-		// build our HQ at a four point crossing, if we don't have one yet
+		// build our HQ at a three or four point crossing, if we don't have one yet
 		if (HaveHQ()) return;
 		
 		local crossing = Crossing(location);
-		if (crossing.CountConnections() == 4) {
+		if (crossing.CountConnections() >= 3) {
 			AICompany.BuildCompanyHQ(GetTile([-1, -1]));
 		}
 	}	
