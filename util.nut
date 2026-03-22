@@ -432,7 +432,13 @@ function MaxDistance(cargo, trainLength) {
 }
 
 function GetGameSetting(setting, defaultValue) {
-	return AIGameSettings.IsValid(setting) ? AIGameSettings.GetValue(setting) : defaultValue;
+	if (!AIGameSettings.IsValid(setting)) {
+		Warning("Invalid game setting:", setting);
+		Warning("Using default value", defaultValue);
+		return defaultValue;
+	}
+
+	return AIGameSettings.GetValue(setting);
 }
 
 class Counter {

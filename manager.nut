@@ -62,6 +62,20 @@ function ManageVehicles() {
 	}
 	
 	// replace aging trains and buses
+	local vehiclesNeverExpire = GetGameSetting("vehicle.never_expire_vehicles", false);
+	local breakdowns = GetGameSetting("difficulty.vehicle_breakdowns", 2);
+	if (vehiclesNeverExpire && breakdowns == 0) {
+		// don't bother replacing vehicles if they don't expire (so can be autorenewed indefinitely)
+		// and there are no breakdowns so age doesn't matter for reliability
+	} else {
+		ReplaceOldVehicles();
+	}
+
+	Debug("Done culling");
+}
+
+
+function ReplaceOldVehicles() {
 	local vehicles = AIVehicleList();
 	vehicles.Valuate(AIVehicle.GetAgeLeft);
 	vehicles.KeepBelowValue(365);
@@ -84,8 +98,6 @@ function ManageVehicles() {
 			tasks.insert(1, task);
 		}
 	}
-
-	Debug("Done culling");
 }
 
 function Cull(vehicle) {
