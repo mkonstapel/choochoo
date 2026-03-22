@@ -90,6 +90,7 @@ class BuildNewNetwork extends Task {
 			while (true) {
 				networkTile = RandomTile();
 				SetConstructionSign(networkTile, this);
+				ClearSecondarySign();
 				if (AIMap.IsValidTile(networkTile) &&
 					AITile.IsBuildableRectangle(
 						networkTile - AIMap.GetTileIndex(Crossing.WIDTH, Crossing.WIDTH),
@@ -509,7 +510,7 @@ class ExtendCrossing extends Builder {
 		if (!subtasks && AIRail.IsRailTile(exit[1])) {
 			return;
 		}
-		
+
 		if (!subtasks) {
 			SetConstructionSign(crossingTile, this);
 			local towns = FindTowns(crossingTile, direction, MIN_TOWN_POPULATION, network.minDistance, network.maxDistance, network.maxDistance/2, true);
@@ -638,6 +639,8 @@ class ExtendCrossing extends Builder {
 		
 		RunSubtasks();
 
+		crossing.VerifyConnectivity();
+
 		// If a crossing was built, put its extenders into the tasks queue
 		// here: first, continue onwards in the direction we're going
 		// (front of the queue) but put sideways extension on the back of the
@@ -757,6 +760,8 @@ class ExtendCrossing extends Builder {
 			// leave the exit in place
 			return;
 		}
+
+		// all below is currently dead code; we leave cleanup to BuildBranchLinef
 		
 		// either we didn't find a town, or one of our subtasks failed
 		local crossing = Crossing(crossingTile);
@@ -893,19 +898,15 @@ class ExtendCrossing extends Builder {
 						local neighbourTile1 = tile + AIMap.GetTileIndex(dirs[dir1][0], dirs[dir1][1]);
 						local tracks1 = AIRail.IsRailTile(neighbourTile1) ? AIRail.GetRailTracks(neighbourTile1) : 0;
 						local connected1 = tracks1 & bits1;
-						Debug("checking bit " + bitNames[bit] + " at " + TileToString(tile) + ": neighbour1 in direction " + DirectionName(dir1) + " tile " + neighbourTile1 + " has tracks " + tracks1 + " and needs " + bits1 + " connected? " + connected1);
 
 						local dir2 = connections[1][0];
 						local bits2 = connections[1][1];
 						local neighbourTile2 = tile + AIMap.GetTileIndex(dirs[dir2][0], dirs[dir2][1]);
 						local tracks2 = AIRail.IsRailTile(neighbourTile2) ? AIRail.GetRailTracks(neighbourTile2) : 0;
 						local connected2 = tracks2 & bits2;
-						Debug("checking bit " + bitNames[bit] + " at " + TileToString(tile) + ": neighbour2 in direction " + DirectionName(dir2) + " tile " + neighbourTile2 + " has tracks " + tracks2 + " and needs " + bits2 + " connected? " + connected2);
 
 						if (!(connected1 && connected2)) {
-							// this bit isn't connecting anything, so it's dead
-							Debug("Removing bit " + bitNames[bit] + " at " + TileToString(tile) + " from bits " + trackBits);
-
+							// this bit isn't connecting two others, so it's dead
 							RemoveRailTrackAbsolute(tile, bit, true);
 							// every time we remove a bit of rail, new dead rail might be exposed
 							keepGoing = true;

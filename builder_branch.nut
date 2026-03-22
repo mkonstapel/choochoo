@@ -44,7 +44,7 @@ class BuildBranchLine extends Builder {
         if (!subtasks && AIRail.IsRailTile(entrance[0])) {
             return;
         }
-        
+
         if (!subtasks) {
             SetConstructionSign(crossingTile, this);
 
@@ -152,28 +152,72 @@ class BuildBranchLine extends Builder {
         if (location == crossingTile) {
             SetLocalCoordinateSystem(GetTile(offset), rotation);
         }
+
+        // rebuild the center of the crossing, because RemoveDeadRails may have
+        // removed pieces we now need again
+
+        // four segments of track
+        BuildSegment([1,1], [2,1]);
+        BuildSegment([1,2], [2,2]);
+        BuildSegment([1,1], [1,2]);
+        BuildSegment([2,1], [2,2]);
         
+        // outer diagonals (clockwise)
+        BuildRail([1,0], [1,1], [0,1]);
+        BuildRail([0,2], [1,2], [1,3]);
+        BuildRail([3,2], [2,2], [2,3]);
+        BuildRail([2,0], [2,1], [3,1]);
+        
+        // inner diagonals (clockwise)
+        BuildRail([2,1], [1,1], [1,2]);
+        BuildRail([1,1], [1,2], [2,2]);
+        BuildRail([2,1], [2,2], [1,2]);
+        BuildRail([1,1], [2,1], [2,2]);
+
         if (network.rightSide) {
+            // the exit might have a waypoint
+            Demolish([0,2]);
+
             RemoveRail([-1,2], [0,2], [1,2]);
             RemoveRail([1,3], [1,2], [0,2]);
             RemoveRail([2,2], [1,2], [0,2]);
             
-            BuildRail([2,0], [2,1], [1,1]);
-            BuildRail([1,2], [1,1], [0,1]);
+            // allow left turn from the counter clockwise entrance to turn into the branch line if it still exists
+            if (HasRail([2,0])) {
+                BuildRail([2,0], [2,1], [1,1]);
+            }
 
+            // left turn out of the branch line, or right turn into it from the two clockwise entrances
+            BuildRail([1,2], [1,1], [0,1]);
+            
             RemoveSignal([0,1], [-1, 1]);
             BuildSignal([0,1], [-1, 1], AIRail.SIGNALTYPE_PBS);
         } else {
+            // the exit might have a waypoint
+            Demolish([0,1]);
+
             RemoveRail([-1,1], [0,1], [1,1]);
             RemoveRail([1,0], [1,1], [0,1]);
             RemoveRail([2,1], [1,1], [0,1]);
             
-            BuildRail([2,3], [2,2], [1,2]);
+            // allow right turn from the clockwise entrance to turn into the branch line if it still exists
+            if (HasRail([2,3])) {
+                BuildRail([2,3], [2,2], [1,2]);
+            }
+
+            // right turn out of the branch line, or left turn into it from the two counter clockwise entrances
             BuildRail([1,1], [1,2], [0,2]);
 
             RemoveSignal([0,2], [-1, 2]);
             BuildSignal([0,2], [-1, 2], AIRail.SIGNALTYPE_PBS);
         }
+
+        crossing.VerifyConnectivity();
+
+        // clean up the crossing now that we've removed some rails
+        ExtendCrossing.RemoveDeadRails(crossing);
+
+        crossing.VerifyConnectivity();
 
         // extend the branch, update train to new end of line station
         tasks.insert(1, ExtendBranchLine(null, stationTile, direction, network, MAX_BRANCH_DEPTH - 1));
@@ -213,6 +257,8 @@ class BuildBranchLine extends Builder {
         local entrance = crossing.GetEntrance(direction);
         local exit = crossing.GetExit(direction);
         
+        crossing.VerifyConnectivity();
+
         // use the NE direction as a template and derive the others
         // by rotation and offset
         local rotation;
@@ -255,52 +301,9 @@ class BuildBranchLine extends Builder {
         RemoveRail([-1,1], [0,1], [1,1]);
         RemoveRail([-1,2], [0,2], [1,2]);
         
-        /*
-        RemoveRail([0,1], [1,1], [1,0]);
-        RemoveRail([0,1], [1,1], [2,1]);
-        
-        RemoveRail([0,2], [1,2], [2,2]);
-        RemoveRail([0,2], [1,2], [1,3]);
-        
-        RemoveRail([2,2], [2,1], [1,1]);
-        // is this one incorrect? not in general
-        RemoveRail([2,1], [2,2], [1,2]);
-        // BuildSign([2,1], "A0");
-        // BuildSign([2,2], "X0");
-        // BuildSign([1,2], "B0");
-
-        // TODO generic, iterative dead end removal!
-        // remove the exits, then any rails that are now dead ends, then repeat until we have no more dead ends
-
-        if (network.rightSide) {
-            // this is definitely wrong
-            // RemoveRail([2,0], [2,1], [1,1]);
-            BuildSign([2,0], "A1");
-            BuildSign([2,1], "X1");
-            BuildSign([1,1], "B1");
-            RemoveRail([1,2], [1,1], [0,1]);
-        } else {
-            // so this is also probably wrong (less well tested)
-            // RemoveRail([2,3], [2,2], [1,2]);
-            BuildSign([1,2], "X2");
-            RemoveRail([1,1], [1,2], [0,2]);
-        }
-
-        // we can remove more bits if another direction is already gone
-        if (!HasRail([1,3]) && !HasRail([2,3]) && !HasRail([2,0])) {
-            RemoveRail([1,1], [2,1], [3,1]);
-            RemoveRail([2,0], [2,1], [2,2]);
-            RemoveRail([2,1], [2,2], [2,3]);
-        }
-        
-        if (!HasRail([1,0]) && !HasRail([2,0]) && !HasRail([1,3])) {
-            RemoveRail([1,2], [2,2], [3,2]);
-            RemoveRail([2,0], [2,1], [2,2]);
-            RemoveRail([2,1], [2,2], [2,3]);
-        }
-        */
-
+        crossing.VerifyConnectivity();
         ExtendCrossing.RemoveDeadRails(crossing);
+        crossing.VerifyConnectivity();
 
         // TODO: if we reduce the crossing to one direction,
         // we should delete the whole line

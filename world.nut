@@ -216,10 +216,10 @@ class Crossing extends WorldObject {
 
 		local suffixesForCount = [
 			null,
-			["Stop"],
-			["Waypoint"],
-			["Junction", "Switch", "Points"],
-			["Crossing", "Cross", "Union"]
+			["Stop", "End", "Halt", "Buffer"],
+			["Waypoint", "Gate", "Pass"],
+			["Junction", "Switch", "Points", "Fork", "Turnout"],
+			["Crossing", "Cross", "Union", "Interchange"]
 		];
 
 		local town = AITile.GetClosestTown(AIWaypoint.GetLocation(waypointID));
@@ -248,10 +248,99 @@ class Crossing extends WorldObject {
 		}
 	}
 
+	/**
+	 * BFS through rail tiles using AreTilesConnected, starting from
+	 * startTile entered from fromTile. Returns the list of visited
+	 * [tile, prevTile] states.
+	 */
+	function ReachableFrom(startTile, fromTile) {
+		local interior = AITileList();
+		interior.AddRectangle(GetTile([0, 0]), GetTile([WIDTH - 1, WIDTH - 1]));
+
+		local queue = [[startTile, fromTile]];
+		local visited = {};
+		visited["" + startTile + "," + fromTile] <- true;
+
+		local qi = 0;
+		while (qi < queue.len()) {
+			local state = queue[qi++];
+			local tile = state[0];
+			local prev = state[1];
+
+			foreach (offset in [AIMap.GetTileIndex(1,0), AIMap.GetTileIndex(-1,0),
+			                     AIMap.GetTileIndex(0,1), AIMap.GetTileIndex(0,-1)]) {
+				local next = tile + offset;
+				local key = "" + next + "," + tile;
+				if (!(key in visited) && interior.HasItem(next) && AIRail.AreTilesConnected(prev, tile, next)) {
+					visited[key] <- true;
+					queue.append([next, tile]);
+				}
+			}
+		}
+
+		return queue;
+	}
+
+	/**
+	 * Verify that all active entrances are connected to all active exits
+	 * (from different directions) through the crossing. A branch line
+	 * uses a single track as both entrance and exit, so it must connect
+	 * in both directions.
+	 */
+	function VerifyConnectivity() {
+		local directions = [Direction.NE, Direction.SW, Direction.NW, Direction.SE];
+		local entryPoints = [];  // [tile, fromTile, direction]
+		local exitPoints = [];   // [tile, toTile, direction]
+
+		foreach (d in directions) {
+			local entrance = GetEntrance(d);
+			local exit = GetExit(d);
+
+			local entranceActive = AIRail.IsRailTile(entrance[1]) && AITile.GetOwner(entrance[1]) == COMPANY;
+			local exitActive = AIRail.IsRailTile(exit[0]) && AITile.GetOwner(exit[0]) == COMPANY;
+
+			if (entranceActive) {
+				entryPoints.append([entrance[1], entrance[0], d]);
+			}
+			if (exitActive) {
+				exitPoints.append([exit[0], exit[1], d]);
+			}
+
+			// branch line: single track serves as both entrance and exit
+			if (entranceActive && !exitActive) {
+				exitPoints.append([entrance[1], entrance[0], d]);
+			}
+			if (exitActive && !entranceActive) {
+				entryPoints.append([exit[0], exit[1], d]);
+			}
+		}
+
+		foreach (entry in entryPoints) {
+			local reachable = ReachableFrom(entry[0], entry[1]);
+
+			foreach (exit in exitPoints) {
+				if (exit[2] == entry[2]) continue;
+
+				local found = false;
+				foreach (state in reachable) {
+					if (state[0] == exit[0] && AIRail.AreTilesConnected(state[1], exit[0], exit[1])) {
+						found = true;
+						break;
+					}
+				}
+
+				if (!found) {
+					Warning(this + ": not connected: ", entry[0], DirectionName(entry[2]) + " entrance -> " + exit[0], DirectionName(exit[2]) + " exit");
+					throw "connectivity failure";
+				}
+			}
+		}
+	}
+
 	function _tostring() {
 		return GetName();
 	}
-	
+
 }
 
 class TrainStation extends WorldObject {
