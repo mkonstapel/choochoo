@@ -94,6 +94,11 @@ function CheckCompanyValueLimit() {
 		return;
 	}
 
+	if (COMPANY == AICompany.COMPANY_FIRST) {
+		// we are the first company, so nothing to compare to
+		return;
+	}
+
 	local limitPercentage;
 	switch (limitSetting) {
 		case 1: limitPercentage = 0.5; break;	// 50% of company 1
