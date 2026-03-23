@@ -41,7 +41,13 @@ class ChooChoo extends AIController {
 		AICompany.SetAutoRenewMoney(0);
 		
 		AIRoad.SetCurrentRoadType(AIRoad.ROADTYPE_ROAD);
-		
+
+		// delete any signs after loading a saved game
+		local signList = AISignList();
+		for (local sign = signList.Begin(); signList.HasNext(); sign = signList.Next()) {
+			AISign.RemoveSign(sign);
+		}
+
 		::MAP_SIZE_X <- AIMap.GetMapSizeX();
 		::MAP_SIZE_Y <- AIMap.GetMapSizeY();
 		::COMPANY <- AICompany.ResolveCompanyID(AICompany.COMPANY_SELF);
@@ -72,7 +78,7 @@ class ChooChoo extends AIController {
 			for (local town = towns.Begin(); towns.HasNext(); town = towns.Next()) {
 				Debug(AITown.GetName(town));
 				if (AITown.GetName(town) == "CHOOCHOOTEST") {
-					Debug("Running tests");
+					Debug("Found CHOOCHOOTEST: running tests");
 					::TESTING <- true;
 					break;
 				}

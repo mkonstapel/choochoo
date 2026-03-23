@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Find towns in the expansion direction that don't already have a station.
  */
 function FindTowns(fromTile, direction, minPopulation, minDistance, maxDistance, maxWidth, ignoreBranchStations) {
